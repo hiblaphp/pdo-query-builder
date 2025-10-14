@@ -1,0 +1,20 @@
+{
+    "name": "hiblaphp/pdo-query-builder",
+    "description": "Framework Agnostic Asynchonous Query Builder",
+    "type": "library",
+    "license": "MIT",
+    "autoload": {
+        "psr-4": {
+            "Hibla\\PdoQueryBuilder\\": "src/"
+        }
+    },
+    "require": {
+        "php": "^8.2",
+        "hiblaphp/event-loop": "dev-main",
+        "hiblaphp/promise": "dev-main",
+        "hiblaphp/async": "dev-main",
+        "hiblaphp/async-pdo": "dev-main",
+        "rcalicdan/query-builder-primitives": "dev-main",
+        "ext-pdo": "*"
+    }
+}
