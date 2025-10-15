@@ -3,7 +3,9 @@
 namespace Hibla\PdoQueryBuilder\Utilities;
 
 use Dotenv\Dotenv;
-use Exception;
+use Hibla\PdoQueryBuilder\Exception\EnvFileLoadException;
+use Hibla\PdoQueryBuilder\Exception\EnvFileNotFoundException;
+use Hibla\PdoQueryBuilder\Exception\ProjectRootNotFoundException;
 
 /**
  * A singleton configuration loader that automatically finds the project root.
@@ -92,20 +94,20 @@ final class ConfigLoader
     private function loadDotEnv(): void
     {
         if ($this->rootPath === null) {
-            throw new Exception('Root path not found, cannot load .env file');
+            throw new ProjectRootNotFoundException();
         }
 
         $envFile = $this->rootPath . '/.env';
 
-        if (file_exists($envFile)) {
-            try {
-                $dotenv = Dotenv::createImmutable($this->rootPath);
-                $dotenv->load();
-            } catch (\Throwable $e) {
-                throw new Exception("Error loading .env file: {$e->getMessage()}");
-            }
-        } else {
-            throw new Exception("Env file not found at: $envFile");
+        if (!file_exists($envFile)) {
+            throw new EnvFileNotFoundException($envFile);
+        }
+
+        try {
+            $dotenv = Dotenv::createImmutable($this->rootPath);
+            $dotenv->load();
+        } catch (\Throwable $e) {
+            throw new EnvFileLoadException($e->getMessage());
         }
     }
 
@@ -115,7 +117,7 @@ final class ConfigLoader
     private function loadConfigFiles(): void
     {
         if ($this->rootPath === null) {
-            throw new Exception('Root path not found, cannot load config files');
+            throw new ProjectRootNotFoundException();
         }
 
         $configDir = $this->rootPath . '/config';

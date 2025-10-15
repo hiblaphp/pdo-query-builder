@@ -3,6 +3,10 @@
 namespace Hibla\PdoQueryBuilder;
 
 use Hibla\AsyncPDO\AsyncPDO;
+use Hibla\PdoQueryBuilder\Exception\DatabaseConfigNotFoundException;
+use Hibla\PdoQueryBuilder\Exception\InvalidConnectionConfigException;
+use Hibla\PdoQueryBuilder\Exception\InvalidDefaultConnectionException;
+use Hibla\PdoQueryBuilder\Exception\InvalidPoolSizeException;
 use Hibla\PdoQueryBuilder\Utilities\ConfigLoader;
 use Hibla\PdoQueryBuilder\Utilities\PDOQueryBuilder;
 use Hibla\Promise\Interfaces\PromiseInterface;
@@ -24,7 +28,7 @@ class DB
      * This method is called by every public method to ensure the system is ready.
      * Validates only once if successful, but re-validates if there were previous errors.
      */
-    private static function initializeIfNeeded(): void
+     private static function initializeIfNeeded(): void
     {
         if (self::$isInitialized && ! self::$hasValidationError) {
             return;
@@ -37,21 +41,21 @@ class DB
             $dbConfigAll = $configLoader->get('pdo-query-builder');
 
             if (! is_array($dbConfigAll)) {
-                throw new \RuntimeException("Database configuration not found. Ensure 'config/pdo-query-builder.php' exists in your project root.");
+                throw new DatabaseConfigNotFoundException();
             }
 
             $defaultConnection = $dbConfigAll['default'] ?? null;
             if (! is_string($defaultConnection)) {
-                throw new \RuntimeException('Default connection name must be a string in your database config.');
+                throw new InvalidConnectionConfigException('Default connection name must be a string in your database config.');
             }
 
             $connections = $dbConfigAll['connections'] ?? null;
             if (! is_array($connections)) {
-                throw new \RuntimeException('Database connections configuration must be an array.');
+                throw new InvalidConnectionConfigException('Database connections configuration must be an array.');
             }
 
             if (! isset($connections[$defaultConnection]) || ! is_array($connections[$defaultConnection])) {
-                throw new \RuntimeException("Default database connection '{$defaultConnection}' not defined in your database config.");
+                throw new InvalidDefaultConnectionException($defaultConnection);
             }
 
             $connectionConfig = $connections[$defaultConnection];
@@ -60,7 +64,7 @@ class DB
             $validatedConfig = [];
             foreach ($connectionConfig as $key => $value) {
                 if (! is_string($key)) {
-                    throw new \RuntimeException('Database connection configuration must have string keys only.');
+                    throw new InvalidConnectionConfigException('Database connection configuration must have string keys only.');
                 }
                 $validatedConfig[$key] = $value;
             }
@@ -68,7 +72,7 @@ class DB
             $poolSize = 10;
             if (isset($dbConfigAll['pool_size'])) {
                 if (! is_int($dbConfigAll['pool_size']) || $dbConfigAll['pool_size'] < 1) {
-                    throw new \RuntimeException('Database pool size must be a positive integer.');
+                    throw new InvalidPoolSizeException();
                 }
                 $poolSize = $dbConfigAll['pool_size'];
             }
