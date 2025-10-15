@@ -173,4 +173,51 @@ class DB
 
         return AsyncPDO::transaction($callback, $attempts);
     }
+
+    /**
+     * Begin a new database transaction.
+     *
+     * @return PromiseInterface<void>
+     */
+    public static function beginTransaction(): PromiseInterface
+    {
+        self::initializeIfNeeded();
+
+        return AsyncPDO::beginTransaction();
+    }
+
+    /**
+     * Commit the active database transaction.
+     *
+     * @return PromiseInterface<void>
+     */
+    public static function commit(): PromiseInterface
+    {
+        self::initializeIfNeeded();
+
+        return AsyncPDO::commit();
+    }
+
+    /**
+     * Rollback the active database transaction.
+     *
+     * @return PromiseInterface<void>
+     */
+    public static function rollback(): PromiseInterface
+    {
+        self::initializeIfNeeded();
+
+        return AsyncPDO::rollback();
+    }
+    /**
+     * Check if a database transaction is active.
+     *
+     * @return bool
+     */
+    public static function inTransaction()
+    {
+        self::initializeIfNeeded();
+
+        return AsyncPDO::inTransaction();
+    }
 }
