@@ -75,7 +75,7 @@ final class ConfigLoader
     {
         $dir = __DIR__;
         for ($i = 0; $i < 10; $i++) {
-            if (is_dir($dir.'/vendor')) {
+            if (is_dir($dir . '/vendor')) {
                 return $dir;
             }
 
@@ -95,11 +95,9 @@ final class ConfigLoader
             throw new Exception('Root path not found, cannot load .env file');
         }
 
-        $envFile = $this->rootPath.'/.env';
+        $envFile = $this->rootPath . '/.env';
 
         if (file_exists($envFile)) {
-            file_get_contents($envFile);
-
             try {
                 $dotenv = Dotenv::createImmutable($this->rootPath);
                 $dotenv->load();
@@ -120,15 +118,16 @@ final class ConfigLoader
             throw new Exception('Root path not found, cannot load config files');
         }
 
-        $configDir = $this->rootPath.'/config';
-        if (is_dir($configDir)) {
-            $files = glob($configDir.'/*.php');
-            if ($files !== false) {
-                foreach ($files as $file) {
-                    $key = basename($file, '.php');
-                    $this->config[$key] = require $file;
-                }
-            }
+        $configDir = $this->rootPath . '/config';
+        $files = is_dir($configDir) ? glob($configDir . '/*.php') : false;
+
+        if ($files === false || $files === []) {
+            return;
+        }
+
+        foreach ($files as $file) {
+            $key = basename($file, '.php');
+            $this->config[$key] = require $file;
         }
     }
 }
