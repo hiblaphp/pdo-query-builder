@@ -28,7 +28,7 @@ class DB
      * This method is called by every public method to ensure the system is ready.
      * Validates only once if successful, but re-validates if there were previous errors.
      */
-     private static function initializeIfNeeded(): void
+    private static function initializeIfNeeded(): void
     {
         if (self::$isInitialized && ! self::$hasValidationError) {
             return;
@@ -79,7 +79,6 @@ class DB
 
             AsyncPDO::init($validatedConfig, $poolSize);
             self::$isInitialized = true;
-
         } catch (\Exception $e) {
             self::$hasValidationError = true;
             self::$isInitialized = false;
@@ -162,14 +161,16 @@ class DB
     }
 
     /**
-     * Run a database transaction.
+     * Run a database transaction with automatic retry on failure.
      *
+     * @param  callable  $callback
+     * @param  int  $attempts  Number of times to attempt the transaction (default: 1)
      * @return PromiseInterface<mixed>
      */
-    public static function transaction(callable $callback): PromiseInterface
+    public static function transaction(callable $callback, int $attempts = 1): PromiseInterface
     {
         self::initializeIfNeeded();
 
-        return AsyncPDO::transaction($callback);
+        return AsyncPDO::transaction($callback, $attempts);
     }
 }
