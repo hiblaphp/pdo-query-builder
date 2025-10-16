@@ -17,8 +17,8 @@ class MakeMigrationCommand extends Command
             ->setName('make:migration')
             ->setDescription('Create a new migration file')
             ->addArgument('name', InputArgument::REQUIRED, 'Migration name')
-            ->addOption('create', null, InputOption::VALUE_OPTIONAL, 'Table to create')
-            ->addOption('table', null, InputOption::VALUE_OPTIONAL, 'Table to alter');
+            ->addOption('table', null, InputOption::VALUE_OPTIONAL, 'Table to create')
+            ->addOption('alter', null, InputOption::VALUE_OPTIONAL, 'Table to alter');
     }
 
     protected function execute(InputInterface $input, OutputInterface $output): int
@@ -27,8 +27,8 @@ class MakeMigrationCommand extends Command
         $io->title('Create Migration');
 
         $name = $input->getArgument('name');
-        $create = $input->getOption('create');
         $table = $input->getOption('table');
+        $alter = $input->getOption('alter');
 
         $projectRoot = $this->findProjectRoot();
         if (!$projectRoot) {
@@ -47,10 +47,10 @@ class MakeMigrationCommand extends Command
         $fileName = "{$timestamp}_{$name}.php";
         $filePath = $migrationsPath . '/' . $fileName;
 
-        if ($create) {
-            $stub = $this->getCreateStub($className, $create);
-        } elseif ($table) {
-            $stub = $this->getAlterStub($className, $table);
+        if ($table) {
+            $stub = $this->getCreateStub($className, $table);
+        } elseif ($alter) {
+            $stub = $this->getAlterStub($className, $alter);
         } else {
             $stub = $this->getBlankStub($className);
         }
@@ -137,13 +137,11 @@ return new class
     public function up(SchemaBuilder \$schema): PromiseInterface
     {
         // Write your migration here and return a promise
-        return Promise::resolved(true);
     }
 
     public function down(SchemaBuilder \$schema): PromiseInterface
     {
         // Reverse your migration here and return a promise
-        return Promise::resolved(true);
     }
 };
 ";
