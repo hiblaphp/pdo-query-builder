@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Hibla\PdoQueryBuilder\Console;
 
 use Symfony\Component\Console\Command\Command;
@@ -10,6 +12,10 @@ use Symfony\Component\Console\Style\SymfonyStyle;
 
 class InitCommand extends Command
 {
+    private SymfonyStyle $io;
+    private string $projectRoot;
+    private bool $force;
+
     protected function configure(): void
     {
         $this
@@ -21,22 +27,43 @@ class InitCommand extends Command
 
     protected function execute(InputInterface $input, OutputInterface $output): int
     {
-        $io = new SymfonyStyle($input, $output);
-        $io->title('PDO Query Builder - Initialize');
+        $this->io = new SymfonyStyle($input, $output);
+        $this->force = $input->getOption('force');
 
-        $projectRoot = $this->findProjectRoot();
-        if (!$projectRoot) {
-            $io->error('Could not find project root');
+        $this->io->title('PDO Query Builder - Initialize');
+
+        $this->projectRoot = $this->findProjectRoot();
+        if (!$this->projectRoot) {
+            $this->io->error('Could not find project root');
             return Command::FAILURE;
         }
 
-        $configDir = $projectRoot . '/config';
+        $configDir = $this->ensureConfigDirectoryExists();
+        if ($configDir === null) {
+            return Command::FAILURE;
+        }
+
+        if ($this->copyConfigFiles($configDir) === Command::FAILURE) {
+            return Command::FAILURE;
+        }
+
+        $this->promptEnvFileCreation();
+
+        return Command::SUCCESS;
+    }
+
+    private function ensureConfigDirectoryExists(): ?string
+    {
+        $configDir = $this->projectRoot . '/config';
         if (!is_dir($configDir) && !mkdir($configDir, 0755, true)) {
-            $io->error("Failed to create config directory");
-            return Command::FAILURE;
+            $this->io->error("Failed to create config directory");
+            return null;
         }
+        return $configDir;
+    }
 
-        $force = $input->getOption('force');
+    private function copyConfigFiles(string $configDir): int
+    {
         $files = [
             'pdo-query-builder.php' => $this->getSourceConfigPath('pdo-query-builder.php'),
             'pdo-schema.php' => $this->getSourceConfigPath('pdo-schema.php'),
@@ -45,37 +72,45 @@ class InitCommand extends Command
         $failedFiles = [];
 
         foreach ($files as $filename => $sourceConfig) {
-            $destConfig = $configDir . '/' . $filename;
-
-            if (file_exists($destConfig) && !$force) {
-                if (!$io->confirm("File '{$filename}' already exists. Overwrite?", false)) {
-                    $io->warning("Skipped: {$filename}");
-                    continue;
-                }
-            }
-
-            if (!file_exists($sourceConfig)) {
-                $io->error("Source config not found: {$sourceConfig}");
+            if ($this->copyFile($filename, $sourceConfig, $configDir)) {
+                $this->io->success("✓ Configuration created: config/{$filename}");
+            } else {
                 $failedFiles[] = $filename;
-                continue;
             }
-
-            if (!copy($sourceConfig, $destConfig)) {
-                $io->error("Failed to copy {$filename}");
-                $failedFiles[] = $filename;
-                continue;
-            }
-
-            $io->success("✓ Configuration created: config/{$filename}");
         }
 
-        if (!empty($failedFiles)) {
-            return Command::FAILURE;
+        return empty($failedFiles) ? Command::SUCCESS : Command::FAILURE;
+    }
+
+    private function copyFile(string $filename, string $sourceConfig, string $configDir): bool
+    {
+        $destConfig = $configDir . '/' . $filename;
+
+        if (file_exists($destConfig) && !$this->force) {
+            if (!$this->io->confirm("File '{$filename}' already exists. Overwrite?", false)) {
+                $this->io->warning("Skipped: {$filename}");
+                return true;
+            }
         }
 
-        if (!file_exists($projectRoot . '/.env')) {
-            $io->section('Create .env file with:');
-            $io->listing([
+        if (!file_exists($sourceConfig)) {
+            $this->io->error("Source config not found: {$sourceConfig}");
+            return false;
+        }
+
+        if (!copy($sourceConfig, $destConfig)) {
+            $this->io->error("Failed to copy {$filename}");
+            return false;
+        }
+
+        return true;
+    }
+
+    private function promptEnvFileCreation(): void
+    {
+        if (!file_exists($this->projectRoot . '/.env')) {
+            $this->io->section('Create .env file with:');
+            $this->io->listing([
                 'DB_CONNECTION=mysql',
                 'DB_HOST=127.0.0.1',
                 'DB_PORT=3306',
@@ -84,8 +119,6 @@ class InitCommand extends Command
                 'DB_PASSWORD=',
             ]);
         }
-
-        return Command::SUCCESS;
     }
 
     private function findProjectRoot(): ?string

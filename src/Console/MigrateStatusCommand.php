@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Hibla\PdoQueryBuilder\Console;
 
 use Hibla\PdoQueryBuilder\DB;
@@ -11,6 +13,10 @@ use Symfony\Component\Console\Style\SymfonyStyle;
 
 class MigrateStatusCommand extends Command
 {
+    private SymfonyStyle $io;
+    private string $projectRoot;
+    private string $migrationsPath;
+
     protected function configure(): void
     {
         $this
@@ -20,60 +26,96 @@ class MigrateStatusCommand extends Command
 
     protected function execute(InputInterface $input, OutputInterface $output): int
     {
-        $io = new SymfonyStyle($input, $output);
-        $io->title('Migration Status');
+        $this->io = new SymfonyStyle($input, $output);
+        $this->io->title('Migration Status');
 
-        $projectRoot = $this->findProjectRoot();
-        if (!$projectRoot) {
-            $io->error('Could not find project root');
+        if (!$this->initializeProjectRoot()) {
             return Command::FAILURE;
         }
 
-        $migrationsPath = $projectRoot . '/database/migrations';
-        if (!is_dir($migrationsPath)) {
-            $io->warning('Migrations directory not found');
+        if (!$this->validateMigrationsDirectory()) {
             return Command::SUCCESS;
         }
 
-        try { 
-            $this->initializeDatabase($io);
-
-            $repository = new MigrationRepository('migrations');
-       
-            await($repository->createRepository());
-            
-            $files = glob($migrationsPath . '/*.php');
-            if ($files === false || empty($files)) {
-                $io->warning('No migration files found');
-                return Command::SUCCESS;
-            }
-
-            sort($files);
-
-            $ranMigrations = await($repository->getRan());
-            $ranMigrationNames = array_column($ranMigrations, 'migration');
-
-            $rows = [];
-            foreach ($files as $file) {
-                $migrationName = basename($file);
-                $status = in_array($migrationName, $ranMigrationNames) ? '<info>✓ Ran</info>' : '<comment>Pending</comment>';
-                
-                $rows[] = [$migrationName, $status];
-            }
-
-            $io->table(['Migration', 'Status'], $rows);
-
+        try {
+            $this->initializeDatabase();
+            $this->displayMigrationStatus();
             return Command::SUCCESS;
         } catch (\Throwable $e) {
-            $io->error('Failed to get migration status: ' . $e->getMessage());
-            if ($output->isVerbose()) {
-                $io->writeln($e->getTraceAsString());
-            }
+            $this->handleError($e);
             return Command::FAILURE;
         }
     }
 
-    private function initializeDatabase(SymfonyStyle $io): void
+    private function initializeProjectRoot(): bool
+    {
+        $this->projectRoot = $this->findProjectRoot();
+        if (!$this->projectRoot) {
+            $this->io->error('Could not find project root');
+            return false;
+        }
+        return true;
+    }
+
+    private function validateMigrationsDirectory(): bool
+    {
+        $this->migrationsPath = $this->projectRoot . '/database/migrations';
+        if (!is_dir($this->migrationsPath)) {
+            $this->io->warning('Migrations directory not found');
+            return false;
+        }
+        return true;
+    }
+
+    private function displayMigrationStatus(): void
+    {
+        $repository = new MigrationRepository('migrations');
+        await($repository->createRepository());
+
+        $migrationFiles = $this->getMigrationFiles();
+        if (empty($migrationFiles)) {
+            $this->io->warning('No migration files found');
+            return;
+        }
+
+        $ranMigrations = await($repository->getRan());
+        $rows = $this->buildStatusRows($migrationFiles, $ranMigrations);
+
+        $this->io->table(['Migration', 'Status'], $rows);
+    }
+
+    private function getMigrationFiles(): array
+    {
+        $files = glob($this->migrationsPath . '/*.php');
+        if ($files === false) {
+            return [];
+        }
+        
+        sort($files);
+        return array_map('basename', $files);
+    }
+
+    private function buildStatusRows(array $migrationFiles, array $ranMigrations): array
+    {
+        $ranMigrationNames = array_column($ranMigrations, 'migration');
+        $rows = [];
+
+        foreach ($migrationFiles as $migrationName) {
+            $status = $this->getMigrationStatus($migrationName, $ranMigrationNames);
+            $rows[] = [$migrationName, $status];
+        }
+
+        return $rows;
+    }
+
+    private function getMigrationStatus(string $migrationName, array $ranMigrationNames): string
+    {
+        return in_array($migrationName, $ranMigrationNames) 
+            ? '<info>✓ Ran</info>' 
+            : '<comment>Pending</comment>';
+    }
+
+    private function initializeDatabase(): void
     {
         try {
             DB::table('_test_init');
@@ -81,6 +123,14 @@ class MigrateStatusCommand extends Command
             if (!str_contains($e->getMessage(), 'not found')) {
                 throw $e;
             }
+        }
+    }
+
+    private function handleError(\Throwable $e): void
+    {
+        $this->io->error('Failed to get migration status: ' . $e->getMessage());
+        if ($this->io->isVerbose()) {
+            $this->io->writeln($e->getTraceAsString());
         }
     }
 

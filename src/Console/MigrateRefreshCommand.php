@@ -10,6 +10,9 @@ use Symfony\Component\Console\Style\SymfonyStyle;
 
 class MigrateRefreshCommand extends Command
 {
+    private SymfonyStyle $io;
+    private OutputInterface $output;
+
     protected function configure(): void
     {
         $this
@@ -19,29 +22,40 @@ class MigrateRefreshCommand extends Command
 
     protected function execute(InputInterface $input, OutputInterface $output): int
     {
-        $io = new SymfonyStyle($input, $output);
-        $io->title('Refresh Migrations');
+        $this->io = new SymfonyStyle($input, $output);
+        $this->output = $output;
+        $this->io->title('Refresh Migrations');
 
-        $resetCommand = $this->getApplication()->find('migrate:reset');
-        $resetInput = new ArrayInput([]);
-        $resetCode = $resetCommand->run($resetInput, $output);
-
-        if ($resetCode !== Command::SUCCESS) {
-            $io->error('Reset failed');
+        if (!$this->resetMigrations()) {
+            $this->io->error('Reset failed');
             return Command::FAILURE;
         }
 
-        $migrateCommand = $this->getApplication()->find('migrate');
-        $migrateInput = new ArrayInput([]);
-        $migrateCode = $migrateCommand->run($migrateInput, $output);
-
-        if ($migrateCode !== Command::SUCCESS) {
-            $io->error('Migration failed');
+        if (!$this->runMigrations()) {
+            $this->io->error('Migration failed');
             return Command::FAILURE;
         }
 
-        $io->success('Database refreshed successfully!');
-
+        $this->io->success('Database refreshed successfully!');
         return Command::SUCCESS;
+    }
+
+    private function resetMigrations(): bool
+    {
+        return $this->executeCommand('migrate:reset');
+    }
+
+    private function runMigrations(): bool
+    {
+        return $this->executeCommand('migrate');
+    }
+
+    private function executeCommand(string $commandName): bool
+    {
+        $command = $this->getApplication()->find($commandName);
+        $input = new ArrayInput([]);
+        $code = $command->run($input, $this->output);
+
+        return $code === Command::SUCCESS;
     }
 }

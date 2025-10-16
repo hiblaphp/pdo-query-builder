@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Hibla\PdoQueryBuilder\Console;
 
 use Symfony\Component\Console\Command\Command;
@@ -11,6 +13,13 @@ use Symfony\Component\Console\Style\SymfonyStyle;
 
 class MakeMigrationCommand extends Command
 {
+    private SymfonyStyle $io;
+    private string $projectRoot;
+    private string $migrationsPath;
+    private string $migrationName;
+    private ?string $table;
+    private ?string $alter;
+
     protected function configure(): void
     {
         $this
@@ -23,54 +32,83 @@ class MakeMigrationCommand extends Command
 
     protected function execute(InputInterface $input, OutputInterface $output): int
     {
-        $io = new SymfonyStyle($input, $output);
-        $io->title('Create Migration');
+        $this->io = new SymfonyStyle($input, $output);
+        $this->io->title('Create Migration');
 
-        $name = $input->getArgument('name');
-        $table = $input->getOption('table');
-        $alter = $input->getOption('alter');
+        $this->migrationName = $input->getArgument('name');
+        $this->table = $input->getOption('table');
+        $this->alter = $input->getOption('alter');
 
-        $projectRoot = $this->findProjectRoot();
-        if (!$projectRoot) {
-            $io->error('Could not find project root');
+        if (!$this->initializeProjectRoot()) {
             return Command::FAILURE;
         }
 
-        $migrationsPath = $projectRoot . '/database/migrations';
-        if (!is_dir($migrationsPath) && !mkdir($migrationsPath, 0755, true)) {
-            $io->error("Failed to create migrations directory");
+        if (!$this->ensureMigrationsDirectory()) {
             return Command::FAILURE;
         }
 
-        $timestamp = date('Y_m_d_His');
-        $className = $this->generateClassName($name);
-        $fileName = "{$timestamp}_{$name}.php";
-        $filePath = $migrationsPath . '/' . $fileName;
-
-        if ($table) {
-            $stub = $this->getCreateStub($className, $table);
-        } elseif ($alter) {
-            $stub = $this->getAlterStub($className, $alter);
-        } else {
-            $stub = $this->getBlankStub($className);
-        }
-
-        if (file_put_contents($filePath, $stub) === false) {
-            $io->error("Failed to create migration file");
+        if (!$this->createMigrationFile()) {
             return Command::FAILURE;
         }
-
-        $io->success("Migration created: database/migrations/{$fileName}");
 
         return Command::SUCCESS;
     }
 
-    private function generateClassName(string $name): string
+    private function initializeProjectRoot(): bool
     {
-        return str_replace('_', '', ucwords($name, '_'));
+        $this->projectRoot = $this->findProjectRoot();
+        if (!$this->projectRoot) {
+            $this->io->error('Could not find project root');
+            return false;
+        }
+        return true;
     }
 
-    private function getCreateStub(string $className, string $table): string
+    private function ensureMigrationsDirectory(): bool
+    {
+        $this->migrationsPath = $this->projectRoot . '/database/migrations';
+        if (!is_dir($this->migrationsPath) && !mkdir($this->migrationsPath, 0755, true)) {
+            $this->io->error("Failed to create migrations directory");
+            return false;
+        }
+        return true;
+    }
+
+    private function createMigrationFile(): bool
+    {
+        $fileName = $this->generateFileName();
+        $filePath = $this->migrationsPath . '/' . $fileName;
+        $stub = $this->generateMigrationStub();
+
+        if (file_put_contents($filePath, $stub) === false) {
+            $this->io->error("Failed to create migration file");
+            return false;
+        }
+
+        $this->io->success("Migration created: database/migrations/{$fileName}");
+        return true;
+    }
+
+    private function generateFileName(): string
+    {
+        $timestamp = date('Y_m_d_His');
+        return "{$timestamp}_{$this->migrationName}.php";
+    }
+
+    private function generateMigrationStub(): string
+    {
+        if ($this->table) {
+            return $this->getCreateStub();
+        }
+
+        if ($this->alter) {
+            return $this->getAlterStub();
+        }
+
+        return $this->getBlankStub();
+    }
+
+    private function getCreateStub(): string
     {
         return "<?php
 
@@ -82,7 +120,7 @@ return new class
 {
     public function up(SchemaBuilder \$schema): PromiseInterface
     {
-        return \$schema->create('{$table}', function (Blueprint \$table) {
+        return \$schema->create('{$this->table}', function (Blueprint \$table) {
             \$table->id();
             \$table->timestamps();
         });
@@ -90,13 +128,13 @@ return new class
 
     public function down(SchemaBuilder \$schema): PromiseInterface
     {
-        return \$schema->dropIfExists('{$table}');
+        return \$schema->dropIfExists('{$this->table}');
     }
 };
 ";
     }
 
-    private function getAlterStub(string $className, string $table): string
+    private function getAlterStub(): string
     {
         return "<?php
 
@@ -108,14 +146,14 @@ return new class
 {
     public function up(SchemaBuilder \$schema): PromiseInterface
     {
-        return \$schema->table('{$table}', function (Blueprint \$table) {
+        return \$schema->table('{$this->alter}', function (Blueprint \$table) {
             // Add columns, indexes, etc.
         });
     }
 
     public function down(SchemaBuilder \$schema): PromiseInterface
     {
-        return \$schema->table('{$table}', function (Blueprint \$table) {
+        return \$schema->table('{$this->alter}', function (Blueprint \$table) {
             // Reverse the changes
         });
     }
@@ -123,7 +161,7 @@ return new class
 ";
     }
 
-    private function getBlankStub(string $className): string
+    private function getBlankStub(): string
     {
         return "<?php
 

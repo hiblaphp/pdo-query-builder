@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Hibla\PdoQueryBuilder\Console;
 
 use Symfony\Component\Console\Command\Command;
@@ -9,6 +11,13 @@ use Symfony\Component\Console\Style\SymfonyStyle;
 
 class StatusCommand extends Command
 {
+    private SymfonyStyle $io;
+    private string $projectRoot;
+    private array $configFiles = [
+        'pdo-query-builder.php' => 'Config File',
+        'pdo-schema.php' => 'Schema File',
+    ];
+
     protected function configure(): void
     {
         $this
@@ -18,33 +27,65 @@ class StatusCommand extends Command
 
     protected function execute(InputInterface $input, OutputInterface $output): int
     {
-        $io = new SymfonyStyle($input, $output);
-        $io->title('PDO Query Builder - Status');
+        $this->io = new SymfonyStyle($input, $output);
+        $this->io->title('PDO Query Builder - Status');
 
-        $projectRoot = $this->findProjectRoot();
-        if (!$projectRoot) {
-            $io->error('Could not find project root');
+        $this->projectRoot = $this->findProjectRoot();
+        if (!$this->projectRoot) {
+            $this->io->error('Could not find project root');
             return Command::FAILURE;
         }
 
-        $configFile = $projectRoot . '/config/pdo-query-builder.php';
-        $schemaFile = $projectRoot . '/config/pdo-schema.php';
-        $envFile = $projectRoot . '/.env';
+        $this->displayStatusTable();
 
-        $io->table(['Item', 'Status'], [
-            ['Project Root', $projectRoot],
-            ['Config File', file_exists($configFile) ? '✓ Found' : '✗ Missing'],
-            ['Schema File', file_exists($schemaFile) ? '✓ Found' : '✗ Missing'],
-            ['.env File', file_exists($envFile) ? '✓ Found' : '✗ Missing'],
-        ]);
-
-        if (!file_exists($configFile) || !file_exists($schemaFile)) {
-            $io->note('Run: ./vendor/bin/pdo-query-builder init');
+        if (!$this->allRequiredFilesExist()) {
+            $this->io->note('Run: ./vendor/bin/pdo-query-builder init');
             return Command::FAILURE;
         }
 
-        $io->success('All configured!');
+        $this->io->success('All configured!');
         return Command::SUCCESS;
+    }
+
+    private function displayStatusTable(): void
+    {
+        $rows = $this->buildStatusRows();
+        $this->io->table(['Item', 'Status'], $rows);
+    }
+
+    private function buildStatusRows(): array
+    {
+        $rows = [
+            ['Project Root', $this->projectRoot],
+        ];
+
+        foreach ($this->configFiles as $filename => $label) {
+            $filePath = $this->getConfigFilePath($filename);
+            $status = file_exists($filePath) ? '✓ Found' : '✗ Missing';
+            $rows[] = [$label, $status];
+        }
+
+        $envFile = $this->projectRoot . '/.env';
+        $envStatus = file_exists($envFile) ? '✓ Found' : '✗ Missing';
+        $rows[] = ['.env File', $envStatus];
+
+        return $rows;
+    }
+
+    private function allRequiredFilesExist(): bool
+    {
+        foreach ($this->configFiles as $filename => $label) {
+            $filePath = $this->getConfigFilePath($filename);
+            if (!file_exists($filePath)) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    private function getConfigFilePath(string $filename): string
+    {
+        return $this->projectRoot . '/config/' . $filename;
     }
 
     private function findProjectRoot(): ?string

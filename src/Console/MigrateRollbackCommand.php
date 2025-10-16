@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Hibla\PdoQueryBuilder\Console;
 
 use Hibla\PdoQueryBuilder\DB;
@@ -13,6 +15,13 @@ use Symfony\Component\Console\Style\SymfonyStyle;
 
 class MigrateRollbackCommand extends Command
 {
+    private SymfonyStyle $io;
+    private OutputInterface $output;
+    private string $projectRoot;
+    private string $migrationsPath;
+    private MigrationRepository $repository;
+    private SchemaBuilder $schema;
+
     protected function configure(): void
     {
         $this
@@ -23,90 +32,135 @@ class MigrateRollbackCommand extends Command
 
     protected function execute(InputInterface $input, OutputInterface $output): int
     {
-        $io = new SymfonyStyle($input, $output);
-        $io->title('Rollback Migrations');
+        $this->io = new SymfonyStyle($input, $output);
+        $this->output = $output;
+        $this->io->title('Rollback Migrations');
 
-        $projectRoot = $this->findProjectRoot();
-        if (!$projectRoot) {
-            $io->error('Could not find project root');
+        if (!$this->initializeProjectRoot()) {
             return Command::FAILURE;
         }
 
-        $migrationsPath = $projectRoot . '/database/migrations';
-        if (!is_dir($migrationsPath)) {
-            $io->error('Migrations directory not found');
+        if (!$this->validateMigrationsDirectory()) {
             return Command::FAILURE;
         }
 
         try {
-            $this->initializeDatabase($io);
-
-            $repository = new MigrationRepository('migrations');
-            $schema = new SchemaBuilder();
+            $this->initializeDatabase();
+            $this->repository = new MigrationRepository('migrations');
+            $this->schema = new SchemaBuilder();
 
             $step = (int) $input->getOption('step');
             
-            $lastBatchMigrations = await($repository->getLast());
-
-            if (empty($lastBatchMigrations)) {
-                $io->warning('Nothing to rollback');
-                return Command::SUCCESS;
+            if (!$this->performRollback($step)) {
+                return Command::FAILURE;
             }
 
-            if ($step > 0) {
-                $lastBatchMigrations = array_slice($lastBatchMigrations, 0, $step);
-            }
-
-            $io->section('Rolling back migrations');
-
-            $lastBatchMigrations = array_reverse($lastBatchMigrations);
-
-            foreach ($lastBatchMigrations as $migrationData) {
-                $migrationName = $migrationData['migration'];
-                $file = $migrationsPath . '/' . $migrationName;
-
-                if (!file_exists($file)) {
-                    $io->warning("Migration file not found: {$migrationName}");
-                    continue;
-                }
-
-                try {
-                    $migration = require $file;
-                    
-                    if (!method_exists($migration, 'down')) {
-                        $io->error("Migration {$migrationName} does not have a down() method");
-                        continue;
-                    }
-
-                    $io->write("Rolling back: {$migrationName}...");
-                    
-                    await($migration->down($schema));
-                    await($repository->delete($migrationName));
-                    
-                    $io->writeln(' <info>✓</info>');
-                } catch (\Throwable $e) {
-                    $io->newLine();
-                    $io->error("Failed to rollback migration {$migrationName}: " . $e->getMessage());
-                    if ($output->isVerbose()) {
-                        $io->writeln($e->getTraceAsString());
-                    }
-                    return Command::FAILURE;
-                }
-            }
-
-            $io->success('Rollback completed successfully!');
-
+            $this->io->success('Rollback completed successfully!');
             return Command::SUCCESS;
         } catch (\Throwable $e) {
-            $io->error('Rollback failed: ' . $e->getMessage());
-            if ($output->isVerbose()) {
-                $io->writeln($e->getTraceAsString());
-            }
+            $this->handleCriticalError($e);
             return Command::FAILURE;
         }
     }
 
-    private function initializeDatabase(SymfonyStyle $io): void
+    private function initializeProjectRoot(): bool
+    {
+        $this->projectRoot = $this->findProjectRoot();
+        if (!$this->projectRoot) {
+            $this->io->error('Could not find project root');
+            return false;
+        }
+        return true;
+    }
+
+    private function validateMigrationsDirectory(): bool
+    {
+        $this->migrationsPath = $this->projectRoot . '/database/migrations';
+        if (!is_dir($this->migrationsPath)) {
+            $this->io->error('Migrations directory not found');
+            return false;
+        }
+        return true;
+    }
+
+    private function performRollback(int $step): bool
+    {
+        $lastBatchMigrations = await($this->repository->getLast());
+
+        if (empty($lastBatchMigrations)) {
+            $this->io->warning('Nothing to rollback');
+            return true;
+        }
+
+        if ($step > 0) {
+            $lastBatchMigrations = array_slice($lastBatchMigrations, 0, $step);
+        }
+
+        $this->io->section('Rolling back migrations');
+
+        $lastBatchMigrations = array_reverse($lastBatchMigrations);
+
+        foreach ($lastBatchMigrations as $migrationData) {
+            if (!$this->rollbackMigration($migrationData)) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    private function rollbackMigration(array $migrationData): bool
+    {
+        $migrationName = $migrationData['migration'];
+        $file = $this->migrationsPath . '/' . $migrationName;
+
+        if (!$this->validateMigrationFile($file, $migrationName)) {
+            return false;
+        }
+
+        try {
+            $migration = require $file;
+            
+            if (!$this->validateMigrationClass($migration, $migrationName)) {
+                return false;
+            }
+
+            $this->io->write("Rolling back: {$migrationName}...");
+            
+            await($migration->down($this->schema));
+            await($this->repository->delete($migrationName));
+            
+            $this->io->writeln(' <info>✓</info>');
+            return true;
+        } catch (\Throwable $e) {
+            $this->io->newLine();
+            $this->io->error("Failed to rollback migration {$migrationName}: " . $e->getMessage());
+            if ($this->output->isVerbose()) {
+                $this->io->writeln($e->getTraceAsString());
+            }
+            return false;
+        }
+    }
+
+    private function validateMigrationFile(string $file, string $migrationName): bool
+    {
+        if (!file_exists($file)) {
+            $this->io->warning("Migration file not found: {$migrationName}");
+            return false;
+        }
+        return true;
+    }
+
+    private function validateMigrationClass(object $migration, string $migrationName): bool
+    {
+        if (!method_exists($migration, 'down')) {
+            $this->io->error("Migration {$migrationName} does not have a down() method");
+            return false;
+        }
+        return true;
+    }
+
+    private function initializeDatabase(): void
     {
         try {
             DB::table('_test_init');
@@ -114,6 +168,14 @@ class MigrateRollbackCommand extends Command
             if (!str_contains($e->getMessage(), 'not found')) {
                 throw $e;
             }
+        }
+    }
+
+    private function handleCriticalError(\Throwable $e): void
+    {
+        $this->io->error('Rollback failed: ' . $e->getMessage());
+        if ($this->output->isVerbose()) {
+            $this->io->writeln($e->getTraceAsString());
         }
     }
 

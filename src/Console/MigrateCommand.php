@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Hibla\PdoQueryBuilder\Console;
 
 use Hibla\PdoQueryBuilder\DB;
@@ -13,6 +15,13 @@ use Symfony\Component\Console\Style\SymfonyStyle;
 
 class MigrateCommand extends Command
 {
+    private SymfonyStyle $io;
+    private OutputInterface $output;
+    private string $projectRoot;
+    private string $migrationsPath;
+    private MigrationRepository $repository;
+    private SchemaBuilder $schema;
+
     protected function configure(): void
     {
         $this
@@ -24,105 +33,155 @@ class MigrateCommand extends Command
 
     protected function execute(InputInterface $input, OutputInterface $output): int
     {
-        $io = new SymfonyStyle($input, $output);
-        $io->title('Database Migrations');
+        $this->io = new SymfonyStyle($input, $output);
+        $this->output = $output;
+        $this->io->title('Database Migrations');
 
-        $projectRoot = $this->findProjectRoot();
-        if (!$projectRoot) {
-            $io->error('Could not find project root');
+        if (!$this->initializeProjectRoot()) {
             return Command::FAILURE;
         }
 
-        $migrationsPath = $projectRoot . '/database/migrations';
-        if (!is_dir($migrationsPath)) {
-            $io->error('Migrations directory not found. Run make:migration first.');
+        if (!$this->validateMigrationsDirectory()) {
             return Command::FAILURE;
         }
 
         try {
-            $this->initializeDatabase($io);
+            $this->initializeDatabase();
+            $this->repository = new MigrationRepository('migrations');
+            $this->schema = new SchemaBuilder();
 
-            $repository = new MigrationRepository('migrations');
-            $schema = new SchemaBuilder();
-
-            // Create migrations table if it doesn't exist
-            $io->writeln('Preparing migration repository...');
-            await($repository->createRepository());
-
-            // Get already ran migrations
-            $ranMigrations = await($repository->getRan());
-            $ranMigrationNames = array_column($ranMigrations, 'migration');
-
-            // Get all migration files
-            $files = glob($migrationsPath . '/*.php');
-            if ($files === false || empty($files)) {
-                $io->warning('No migration files found');
-                return Command::SUCCESS;
-            }
-
-            sort($files);
-
-            // Filter pending migrations
-            $pendingMigrations = array_filter($files, function ($file) use ($ranMigrationNames) {
-                return !in_array(basename($file), $ranMigrationNames);
-            });
-
-            if (empty($pendingMigrations)) {
-                $io->success('Nothing to migrate');
-                return Command::SUCCESS;
-            }
-
-            // Get next batch number
-            $batchNumber = await($repository->getNextBatchNumber());
-            $batchNumber = ($batchNumber ?? 0) + 1;
+            $this->io->writeln('Preparing migration repository...');
+            await($this->repository->createRepository());
 
             $step = (int) $input->getOption('step');
-            if ($step > 0) {
-                $pendingMigrations = array_slice($pendingMigrations, 0, $step);
+            
+            if (!$this->performMigration($step)) {
+                return Command::FAILURE;
             }
 
-            $io->section('Running migrations');
-
-            foreach ($pendingMigrations as $file) {
-                $migrationName = basename($file);
-                
-                try {
-                    $migration = require $file;
-                    
-                    if (!method_exists($migration, 'up')) {
-                        $io->error("Migration {$migrationName} does not have an up() method");
-                        continue;
-                    }
-
-                    $io->write("Migrating: {$migrationName}...");
-                    
-                    await($migration->up($schema));
-                    await($repository->log($migrationName, $batchNumber));
-                    
-                    $io->writeln(' <info>✓</info>');
-                } catch (\Throwable $e) {
-                    $io->newLine();
-                    $io->error("Failed to run migration {$migrationName}: " . $e->getMessage());
-                    if ($output->isVerbose()) {
-                        $io->writeln($e->getTraceAsString());
-                    }
-                    return Command::FAILURE;
-                }
-            }
-
-            $io->success('Migrations completed successfully!');
-
+            $this->io->success('Migrations completed successfully!');
             return Command::SUCCESS;
         } catch (\Throwable $e) {
-            $io->error('Migration failed: ' . $e->getMessage());
-            if ($output->isVerbose()) {
-                $io->writeln($e->getTraceAsString());
-            }
+            $this->handleCriticalError($e);
             return Command::FAILURE;
         }
     }
 
-    private function initializeDatabase(SymfonyStyle $io): void
+    private function initializeProjectRoot(): bool
+    {
+        $this->projectRoot = $this->findProjectRoot();
+        if (!$this->projectRoot) {
+            $this->io->error('Could not find project root');
+            return false;
+        }
+        return true;
+    }
+
+    private function validateMigrationsDirectory(): bool
+    {
+        $this->migrationsPath = $this->projectRoot . '/database/migrations';
+        if (!is_dir($this->migrationsPath)) {
+            $this->io->error('Migrations directory not found. Run make:migration first.');
+            return false;
+        }
+        return true;
+    }
+
+    private function performMigration(int $step): bool
+    {
+        $ranMigrations = await($this->repository->getRan());
+        $pendingMigrations = $this->getPendingMigrations($ranMigrations);
+
+        if (empty($pendingMigrations)) {
+            $this->io->success('Nothing to migrate');
+            return true;
+        }
+
+        if ($step > 0) {
+            $pendingMigrations = array_slice($pendingMigrations, 0, $step);
+        }
+
+        $batchNumber = $this->getNextBatchNumber();
+
+        $this->io->section('Running migrations');
+
+        foreach ($pendingMigrations as $file) {
+            if (!$this->runMigration($file, $batchNumber)) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    private function getPendingMigrations(array $ranMigrations): array
+    {
+        $files = glob($this->migrationsPath . '/*.php');
+        if ($files === false) {
+            return [];
+        }
+
+        sort($files);
+
+        $ranMigrationNames = array_column($ranMigrations, 'migration');
+
+        return array_filter($files, function ($file) use ($ranMigrationNames) {
+            return !in_array(basename($file), $ranMigrationNames);
+        });
+    }
+
+    private function getNextBatchNumber(): int
+    {
+        $batchNumber = await($this->repository->getNextBatchNumber());
+        return ($batchNumber ?? 0) + 1;
+    }
+
+    private function runMigration(string $file, int $batchNumber): bool
+    {
+        $migrationName = basename($file);
+
+        try {
+            $migration = require $file;
+
+            if (!$this->validateMigrationClass($migration, $migrationName)) {
+                return false;
+            }
+
+            $this->io->write("Migrating: {$migrationName}...");
+
+            await($migration->up($this->schema));
+            await($this->repository->log($migrationName, $batchNumber));
+
+            $this->io->writeln(' <info>✓</info>');
+            return true;
+        } catch (\Throwable $e) {
+            $this->io->newLine();
+            $this->io->error("Failed to run migration {$migrationName}: " . $e->getMessage());
+            if ($this->output->isVerbose()) {
+                $this->io->writeln($e->getTraceAsString());
+            }
+            return false;
+        }
+    }
+
+    private function validateMigrationClass(object $migration, string $migrationName): bool
+    {
+        if (!method_exists($migration, 'up')) {
+            $this->io->error("Migration {$migrationName} does not have an up() method");
+            return false;
+        }
+        return true;
+    }
+
+    private function handleCriticalError(\Throwable $e): void
+    {
+        $this->io->error('Migration failed: ' . $e->getMessage());
+        if ($this->output->isVerbose()) {
+            $this->io->writeln($e->getTraceAsString());
+        }
+    }
+
+    private function initializeDatabase(): void
     {
         try {
             DB::table('_test_init');

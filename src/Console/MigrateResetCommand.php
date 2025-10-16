@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Hibla\PdoQueryBuilder\Console;
 
 use Hibla\PdoQueryBuilder\DB;
@@ -12,6 +14,13 @@ use Symfony\Component\Console\Style\SymfonyStyle;
 
 class MigrateResetCommand extends Command
 {
+    private SymfonyStyle $io;
+    private OutputInterface $output;
+    private string $projectRoot;
+    private string $migrationsPath;
+    private MigrationRepository $repository;
+    private SchemaBuilder $schema;
+
     protected function configure(): void
     {
         $this
@@ -21,83 +30,129 @@ class MigrateResetCommand extends Command
 
     protected function execute(InputInterface $input, OutputInterface $output): int
     {
-        $io = new SymfonyStyle($input, $output);
-        $io->title('Reset All Migrations');
+        $this->io = new SymfonyStyle($input, $output);
+        $this->output = $output;
+        $this->io->title('Reset All Migrations');
 
-        if (!$io->confirm('This will rollback ALL migrations. Are you sure?', false)) {
-            $io->warning('Reset cancelled');
+        if (!$this->confirmReset()) {
+            $this->io->warning('Reset cancelled');
             return Command::SUCCESS;
         }
 
-        $projectRoot = $this->findProjectRoot();
-        if (!$projectRoot) {
-            $io->error('Could not find project root');
+        if (!$this->initializeProjectRoot()) {
             return Command::FAILURE;
         }
 
-        $migrationsPath = $projectRoot . '/database/migrations';
+        $this->migrationsPath = $this->projectRoot . '/database/migrations';
 
         try {
-            // Initialize DB system
-            $this->initializeDatabase($io);
+            $this->initializeDatabase();
+            $this->repository = new MigrationRepository('migrations');
+            $this->schema = new SchemaBuilder();
 
-            $repository = new MigrationRepository('migrations');
-            $schema = new SchemaBuilder();
-
-            $allMigrations = await($repository->getRan());
-
-            if (empty($allMigrations)) {
-                $io->warning('Nothing to reset');
-                return Command::SUCCESS;
+            if (!$this->performReset()) {
+                return Command::FAILURE;
             }
 
-            $io->section('Resetting all migrations');
-
-            // Rollback in reverse order
-            $allMigrations = array_reverse($allMigrations);
-
-            foreach ($allMigrations as $migrationData) {
-                $migrationName = $migrationData['migration'];
-                $file = $migrationsPath . '/' . $migrationName;
-
-                if (!file_exists($file)) {
-                    $io->warning("Migration file not found: {$migrationName}");
-                    await($repository->delete($migrationName));
-                    continue;
-                }
-
-                try {
-                    $migration = require $file;
-                    
-                    if (method_exists($migration, 'down')) {
-                        $io->write("Rolling back: {$migrationName}...");
-                        await($migration->down($schema));
-                        $io->writeln(' <info>✓</info>');
-                    }
-                    
-                    await($repository->delete($migrationName));
-                } catch (\Throwable $e) {
-                    $io->newLine();
-                    $io->error("Failed to rollback {$migrationName}: " . $e->getMessage());
-                    if ($output->isVerbose()) {
-                        $io->writeln($e->getTraceAsString());
-                    }
-                }
-            }
-
-            $io->success('All migrations have been reset!');
-
+            $this->io->success('All migrations have been reset!');
             return Command::SUCCESS;
         } catch (\Throwable $e) {
-            $io->error('Reset failed: ' . $e->getMessage());
-            if ($output->isVerbose()) {
-                $io->writeln($e->getTraceAsString());
-            }
+            $this->handleCriticalError($e);
             return Command::FAILURE;
         }
     }
 
-    private function initializeDatabase(SymfonyStyle $io): void
+    private function confirmReset(): bool
+    {
+        return $this->io->confirm('This will rollback ALL migrations. Are you sure?', false);
+    }
+
+    private function initializeProjectRoot(): bool
+    {
+        $this->projectRoot = $this->findProjectRoot();
+        if (!$this->projectRoot) {
+            $this->io->error('Could not find project root');
+            return false;
+        }
+        return true;
+    }
+
+    private function performReset(): bool
+    {
+        $allMigrations = await($this->repository->getRan());
+
+        if (empty($allMigrations)) {
+            $this->io->warning('Nothing to reset');
+            return true;
+        }
+
+        $this->io->section('Resetting all migrations');
+
+        $allMigrations = array_reverse($allMigrations);
+
+        foreach ($allMigrations as $migrationData) {
+            $this->resetMigration($migrationData);
+        }
+
+        return true;
+    }
+
+    private function resetMigration(array $migrationData): void
+    {
+        $migrationName = $migrationData['migration'];
+        $file = $this->migrationsPath . '/' . $migrationName;
+
+        if (!$this->validateMigrationFile($file, $migrationName)) {
+            await($this->repository->delete($migrationName));
+            return;
+        }
+
+        try {
+            $migration = require $file;
+            
+            $this->executeMigrationDown($migration, $migrationName);
+            await($this->repository->delete($migrationName));
+        } catch (\Throwable $e) {
+            $this->handleMigrationError($migrationName, $e);
+        }
+    }
+
+    private function executeMigrationDown(object $migration, string $migrationName): void
+    {
+        if (method_exists($migration, 'down')) {
+            $this->io->write("Rolling back: {$migrationName}...");
+            await($migration->down($this->schema));
+            $this->io->writeln(' <info>✓</info>');
+        }
+    }
+
+    private function validateMigrationFile(string $file, string $migrationName): bool
+    {
+        if (!file_exists($file)) {
+            $this->io->warning("Migration file not found: {$migrationName}");
+            return false;
+        }
+        return true;
+    }
+
+    private function handleMigrationError(string $migrationName, \Throwable $e): void
+    {
+        $this->io->newLine();
+        $this->io->error("Failed to rollback {$migrationName}: " . $e->getMessage());
+        if ($this->output->isVerbose()) {
+            $this->io->writeln($e->getTraceAsString());
+        }
+    }
+
+    private function handleCriticalError(\Throwable $e): void
+    {
+        $this->io->error('Reset failed: ' . $e->getMessage());
+        if ($this->output->isVerbose()) {
+            $this->io->writeln($e->getTraceAsString());
+        }
+    }
+
+    private function initializeDatabase(): void
     {
         try {
             DB::table('_test_init');
