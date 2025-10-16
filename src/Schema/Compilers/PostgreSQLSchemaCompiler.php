@@ -56,6 +56,10 @@ class PostgreSQLSchemaCompiler implements SchemaCompiler
             $sql .= ' NOT NULL';
         }
 
+        if ($column->isPrimary()) {
+            $sql .= ' PRIMARY KEY';
+        }
+
         if ($column->hasDefault()) {
             $default = $column->getDefault();
             if ($default === null) {
@@ -106,17 +110,17 @@ class PostgreSQLSchemaCompiler implements SchemaCompiler
     {
         $cols = implode('", "', $foreignKey->getColumns());
         $refCols = implode('", "', $foreignKey->getReferenceColumns());
-        
+
         return "CONSTRAINT \"{$foreignKey->getName()}\" FOREIGN KEY (\"{$cols}\") " .
-               "REFERENCES \"{$foreignKey->getReferenceTable()}\" (\"{$refCols}\") " .
-               "ON DELETE {$foreignKey->getOnDelete()} ON UPDATE {$foreignKey->getOnUpdate()}";
+            "REFERENCES \"{$foreignKey->getReferenceTable()}\" (\"{$refCols}\") " .
+            "ON DELETE {$foreignKey->getOnDelete()} ON UPDATE {$foreignKey->getOnUpdate()}";
     }
 
     public function compileAlter(Blueprint $blueprint): string
     {
         $table = $blueprint->getTable();
         $sql = "ALTER TABLE \"{$table}\"\n";
-        
+
         $alterations = [];
         foreach ($blueprint->getColumns() as $column) {
             $alterations[] = "  ADD COLUMN " . $this->compileColumn($column);
@@ -138,6 +142,6 @@ class PostgreSQLSchemaCompiler implements SchemaCompiler
     public function compileTableExists(string $table): string
     {
         return "SELECT COUNT(*) FROM information_schema.tables " .
-               "WHERE table_schema = 'public' AND table_name = '{$table}'";
+            "WHERE table_schema = 'public' AND table_name = '{$table}'";
     }
 }

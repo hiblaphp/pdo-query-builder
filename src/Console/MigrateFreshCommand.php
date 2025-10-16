@@ -111,7 +111,7 @@ class MigrateFreshCommand extends Command
 
             foreach ($tables as $table) {
                 $this->io->write("Dropping table: {$table}...");
-                await($this->schema->drop($table));
+                $this->dropTable($table);
                 $this->io->writeln(' <info>✓</info>');
             }
 
@@ -125,6 +125,22 @@ class MigrateFreshCommand extends Command
                 $this->io->writeln($e->getTraceAsString());
             }
             return false;
+        }
+    }
+
+    private function dropTable(string $table): void
+    {
+        $sql = match ($this->driver) {
+            'pgsql' => "DROP TABLE IF EXISTS \"{$table}\" CASCADE",
+            'mysql' => "DROP TABLE IF EXISTS `{$table}`",
+            'sqlite' => "DROP TABLE IF EXISTS `{$table}`",
+            'sqlsrv' => "IF OBJECT_ID('{$table}', 'U') IS NOT NULL DROP TABLE [{$table}]",
+            default => "DROP TABLE IF EXISTS `{$table}`",
+        };
+
+        $promise = DB::raw($sql);
+        if ($promise !== null) {
+            await($promise);
         }
     }
 
@@ -165,7 +181,10 @@ class MigrateFreshCommand extends Command
 
         if ($sql) {
             try {
-                await(DB::raw($sql));
+                $promise = DB::raw($sql);
+                if ($promise !== null) {
+                    await($promise);
+                }
             } catch (\Throwable $e) {
                 // Some drivers might not support this, continue anyway
             }
@@ -184,7 +203,10 @@ class MigrateFreshCommand extends Command
 
         if ($sql) {
             try {
-                await(DB::raw($sql));
+                $promise = DB::raw($sql);
+                if ($promise !== null) {
+                    await($promise);
+                }
             } catch (\Throwable $e) {
                 // Some drivers might not support this, continue anyway
             }

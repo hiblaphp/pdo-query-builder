@@ -47,6 +47,10 @@ class SQLServerSchemaCompiler implements SchemaCompiler
             $sql .= ' IDENTITY(1,1)';
         }
 
+        if ($column->isPrimary()) {
+            $sql .= ' PRIMARY KEY';
+        }
+
         if (!$column->isNullable()) {
             $sql .= ' NOT NULL';
         }
