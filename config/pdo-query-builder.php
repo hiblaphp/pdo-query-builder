@@ -8,7 +8,7 @@ return [
             'driver' => 'sqlite',
             'database' => match ($path = $_ENV['DB_SQLITE_PATH'] ?? null) {
                 ':memory:' => 'file::memory:?cache=shared',
-                null => __DIR__.'/../database/database.sqlite',
+                null => __DIR__ . '/../database/database.sqlite',
                 default => $path,
             },
             'options' => [
@@ -29,6 +29,7 @@ return [
                 PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
                 PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
                 PDO::ATTR_EMULATE_PREPARES => false,
+                PDO::ATTR_PERSISTENT => true,
             ],
         ],
 
@@ -43,7 +44,8 @@ return [
             'options' => [
                 PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
                 PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
-                PDO::ATTR_PERSISTENT => false,
+                PDO::ATTR_EMULATE_PREPARES => false,
+                PDO::ATTR_PERSISTENT => true,
             ],
         ],
 
@@ -57,33 +59,8 @@ return [
             'options' => [
                 PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
                 PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
-            ],
-        ],
-
-        'oracle' => [
-            'driver' => 'oci',
-            'host' => $_ENV['DB_HOST_ORACLE'] ?? $_ENV['DB_HOST'] ?? '127.0.0.1',
-            'port' => (int) ($_ENV['DB_PORT_ORACLE'] ?? $_ENV['DB_PORT'] ?? 1521),
-            'database' => $_ENV['DB_DATABASE_ORACLE'] ?? $_ENV['DB_DATABASE'] ?? 'xe',
-            'username' => $_ENV['DB_USERNAME_ORACLE'] ?? $_ENV['DB_USERNAME'] ?? '',
-            'password' => $_ENV['DB_PASSWORD_ORACLE'] ?? $_ENV['DB_PASSWORD'] ?? '',
-            'charset' => 'AL32UTF8',
-            'options' => [
-                PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
-                PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
-            ],
-        ],
-
-        'ibm' => [
-            'driver' => 'ibm',
-            'host' => $_ENV['DB_HOST_IBM'] ?? $_ENV['DB_HOST'] ?? '127.0.0.1',
-            'port' => (int) ($_ENV['DB_PORT_IBM'] ?? $_ENV['DB_PORT'] ?? 50000),
-            'database' => $_ENV['DB_DATABASE_IBM'] ?? $_ENV['DB_DATABASE'] ?? 'test',
-            'username' => $_ENV['DB_USERNAME_IBM'] ?? $_ENV['DB_USERNAME'] ?? '',
-            'password' => $_ENV['DB_PASSWORD_IBM'] ?? $_ENV['DB_PASSWORD'] ?? '',
-            'options' => [
-                PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
-                PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
+                PDO::ATTR_EMULATE_PREPARES => false,
+                PDO::ATTR_PERSISTENT => true,
             ],
         ],
     ],
