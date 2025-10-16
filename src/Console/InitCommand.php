@@ -15,7 +15,7 @@ class InitCommand extends Command
         $this
             ->setName('init')
             ->setDescription('Initialize PDO Query Builder configuration')
-            ->setHelp('Copies the default configuration file to your project\'s config directory.')
+            ->setHelp('Copies the default configuration files to your project\'s config directory.')
             ->addOption('force', 'f', InputOption::VALUE_NONE, 'Overwrite existing configuration');
     }
 
@@ -36,27 +36,42 @@ class InitCommand extends Command
             return Command::FAILURE;
         }
 
-        $sourceConfig = $this->getSourceConfigPath();
-        $destConfig = $configDir . '/pdo-query-builder.php';
+        $force = $input->getOption('force');
+        $files = [
+            'pdo-query-builder.php' => $this->getSourceConfigPath('pdo-query-builder.php'),
+            'pdo-schema.php' => $this->getSourceConfigPath('pdo-schema.php'),
+        ];
 
-        if (file_exists($destConfig) && !$input->getOption('force')) {
-            if (!$io->confirm('Configuration already exists. Overwrite?', false)) {
-                $io->warning('Cancelled');
-                return Command::SUCCESS;
+        $failedFiles = [];
+
+        foreach ($files as $filename => $sourceConfig) {
+            $destConfig = $configDir . '/' . $filename;
+
+            if (file_exists($destConfig) && !$force) {
+                if (!$io->confirm("File '{$filename}' already exists. Overwrite?", false)) {
+                    $io->warning("Skipped: {$filename}");
+                    continue;
+                }
             }
+
+            if (!file_exists($sourceConfig)) {
+                $io->error("Source config not found: {$sourceConfig}");
+                $failedFiles[] = $filename;
+                continue;
+            }
+
+            if (!copy($sourceConfig, $destConfig)) {
+                $io->error("Failed to copy {$filename}");
+                $failedFiles[] = $filename;
+                continue;
+            }
+
+            $io->success("✓ Configuration created: config/{$filename}");
         }
 
-        if (!file_exists($sourceConfig)) {
-            $io->error("Source config not found: {$sourceConfig}");
+        if (!empty($failedFiles)) {
             return Command::FAILURE;
         }
-
-        if (!copy($sourceConfig, $destConfig)) {
-            $io->error("Failed to copy configuration");
-            return Command::FAILURE;
-        }
-
-        $io->success('✓ Configuration created: config/pdo-query-builder.php');
 
         if (!file_exists($projectRoot . '/.env')) {
             $io->section('Create .env file with:');
@@ -85,17 +100,17 @@ class InitCommand extends Command
         return null;
     }
 
-    private function getSourceConfigPath(): string
+    private function getSourceConfigPath(string $filename): string
     {
         $paths = [
-            __DIR__ . '/../../config/pdo-query-builder.php',
-            __DIR__ . '/../../../config/pdo-query-builder.php',
+            __DIR__ . "/../../config/{$filename}",
+            __DIR__ . "/../../../config/{$filename}",
         ];
         
         foreach ($paths as $path) {
             if (file_exists($path)) return $path;
         }
         
-        return __DIR__ . '/../../config/pdo-query-builder.php';
+        return __DIR__ . "/../../config/{$filename}";
     }
 }

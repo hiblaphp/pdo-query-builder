@@ -28,15 +28,17 @@ class StatusCommand extends Command
         }
 
         $configFile = $projectRoot . '/config/pdo-query-builder.php';
+        $schemaFile = $projectRoot . '/config/pdo-schema.php';
         $envFile = $projectRoot . '/.env';
 
         $io->table(['Item', 'Status'], [
             ['Project Root', $projectRoot],
             ['Config File', file_exists($configFile) ? '✓ Found' : '✗ Missing'],
+            ['Schema File', file_exists($schemaFile) ? '✓ Found' : '✗ Missing'],
             ['.env File', file_exists($envFile) ? '✓ Found' : '✗ Missing'],
         ]);
 
-        if (!file_exists($configFile)) {
+        if (!file_exists($configFile) || !file_exists($schemaFile)) {
             $io->note('Run: ./vendor/bin/pdo-query-builder init');
             return Command::FAILURE;
         }
