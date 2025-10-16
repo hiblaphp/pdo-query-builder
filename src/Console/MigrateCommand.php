@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Hibla\PdoQueryBuilder\Console;
 
+use Hibla\PdoQueryBuilder\Console\Traits\LoadsSchemaConfiguration;
 use Hibla\PdoQueryBuilder\DB;
 use Hibla\PdoQueryBuilder\Schema\MigrationRepository;
 use Hibla\PdoQueryBuilder\Schema\SchemaBuilder;
@@ -15,6 +16,8 @@ use Symfony\Component\Console\Style\SymfonyStyle;
 
 class MigrateCommand extends Command
 {
+    use LoadsSchemaConfiguration;
+
     private SymfonyStyle $io;
     private OutputInterface $output;
     private string $projectRoot;
@@ -47,7 +50,7 @@ class MigrateCommand extends Command
 
         try {
             $this->initializeDatabase();
-            $this->repository = new MigrationRepository('migrations');
+            $this->repository = new MigrationRepository($this->getMigrationsTable());
             $this->schema = new SchemaBuilder();
 
             $this->io->writeln('Preparing migration repository...');
@@ -79,7 +82,7 @@ class MigrateCommand extends Command
 
     private function validateMigrationsDirectory(): bool
     {
-        $this->migrationsPath = $this->projectRoot . '/database/migrations';
+        $this->migrationsPath = $this->getMigrationsPath();
         if (!is_dir($this->migrationsPath)) {
             $this->io->error('Migrations directory not found. Run make:migration first.');
             return false;

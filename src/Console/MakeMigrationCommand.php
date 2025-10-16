@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Hibla\PdoQueryBuilder\Console;
 
+use Hibla\PdoQueryBuilder\Console\Traits\LoadsSchemaConfiguration;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Input\InputArgument;
 use Symfony\Component\Console\Input\InputInterface;
@@ -13,6 +14,8 @@ use Symfony\Component\Console\Style\SymfonyStyle;
 
 class MakeMigrationCommand extends Command
 {
+    use LoadsSchemaConfiguration;
+
     private SymfonyStyle $io;
     private string $projectRoot;
     private string $migrationsPath;
@@ -66,11 +69,13 @@ class MakeMigrationCommand extends Command
 
     private function ensureMigrationsDirectory(): bool
     {
-        $this->migrationsPath = $this->projectRoot . '/database/migrations';
+        $this->migrationsPath = $this->getMigrationsPath();
+        
         if (!is_dir($this->migrationsPath) && !mkdir($this->migrationsPath, 0755, true)) {
-            $this->io->error("Failed to create migrations directory");
+            $this->io->error("Failed to create migrations directory: {$this->migrationsPath}");
             return false;
         }
+        
         return true;
     }
 
@@ -85,14 +90,34 @@ class MakeMigrationCommand extends Command
             return false;
         }
 
-        $this->io->success("Migration created: database/migrations/{$fileName}");
+        $relativePath = str_replace($this->projectRoot . '/', '', $this->migrationsPath);
+        $this->io->success("Migration created: {$relativePath}/{$fileName}");
         return true;
     }
 
     private function generateFileName(): string
     {
+        $convention = $this->getNamingConvention();
+        
+        return match ($convention) {
+            'sequential' => $this->generateSequentialFileName(),
+            'timestamp' => $this->generateTimestampFileName(),
+            default => $this->generateTimestampFileName(),
+        };
+    }
+    
+    private function generateTimestampFileName(): string
+    {
         $timestamp = date('Y_m_d_His');
         return "{$timestamp}_{$this->migrationName}.php";
+    }
+    
+    private function generateSequentialFileName(): string
+    {
+        $files = glob($this->migrationsPath . '/*.php');
+        $nextNumber = count($files) + 1;
+        $paddedNumber = str_pad((string)$nextNumber, 4, '0', STR_PAD_LEFT);
+        return "{$paddedNumber}_{$this->migrationName}.php";
     }
 
     private function generateMigrationStub(): string

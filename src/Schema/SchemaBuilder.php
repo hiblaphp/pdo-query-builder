@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Hibla\PdoQueryBuilder\Schema;
 
 use Hibla\AsyncPDO\AsyncPDO;
+use Hibla\PdoQueryBuilder\Utilities\ConfigLoader;
 use Hibla\Promise\Interfaces\PromiseInterface;
 
 class SchemaBuilder
@@ -18,7 +19,7 @@ class SchemaBuilder
 
     private function detectDriver(): string
     {
-        $configLoader = \Hibla\PdoQueryBuilder\Utilities\ConfigLoader::getInstance();
+        $configLoader = ConfigLoader::getInstance();
         $dbConfig = $configLoader->get('pdo-query-builder');
 
         if (!is_array($dbConfig)) {
@@ -64,8 +65,6 @@ class SchemaBuilder
         $compiler = $this->getCompiler();
         $sql = $compiler->compileTableExists($table);
 
-        // Some drivers use placeholders, others use inline values
-        // For now, all our compilers use inline values
         return AsyncPDO::fetchValue($sql, []);
     }
 

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Hibla\PdoQueryBuilder\Console;
 
+use Hibla\PdoQueryBuilder\Console\Traits\LoadsSchemaConfiguration;
 use Hibla\PdoQueryBuilder\DB;
 use Hibla\PdoQueryBuilder\Schema\MigrationRepository;
 use Symfony\Component\Console\Command\Command;
@@ -13,6 +14,8 @@ use Symfony\Component\Console\Style\SymfonyStyle;
 
 class MigrateStatusCommand extends Command
 {
+    use LoadsSchemaConfiguration;
+
     private SymfonyStyle $io;
     private string $projectRoot;
     private string $migrationsPath;
@@ -59,7 +62,7 @@ class MigrateStatusCommand extends Command
 
     private function validateMigrationsDirectory(): bool
     {
-        $this->migrationsPath = $this->projectRoot . '/database/migrations';
+        $this->migrationsPath = $this->getMigrationsPath();
         if (!is_dir($this->migrationsPath)) {
             $this->io->warning('Migrations directory not found');
             return false;
@@ -69,7 +72,7 @@ class MigrateStatusCommand extends Command
 
     private function displayMigrationStatus(): void
     {
-        $repository = new MigrationRepository('migrations');
+        $repository = new MigrationRepository($this->getMigrationsTable());
         await($repository->createRepository());
 
         $migrationFiles = $this->getMigrationFiles();
@@ -90,7 +93,7 @@ class MigrateStatusCommand extends Command
         if ($files === false) {
             return [];
         }
-        
+
         sort($files);
         return array_map('basename', $files);
     }
@@ -110,8 +113,8 @@ class MigrateStatusCommand extends Command
 
     private function getMigrationStatus(string $migrationName, array $ranMigrationNames): string
     {
-        return in_array($migrationName, $ranMigrationNames) 
-            ? '<info>✓ Ran</info>' 
+        return in_array($migrationName, $ranMigrationNames)
+            ? '<info>✓ Ran</info>'
             : '<comment>Pending</comment>';
     }
 

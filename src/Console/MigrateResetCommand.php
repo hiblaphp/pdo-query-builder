@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Hibla\PdoQueryBuilder\Console;
 
+use Hibla\PdoQueryBuilder\Console\Traits\LoadsSchemaConfiguration;
 use Hibla\PdoQueryBuilder\DB;
 use Hibla\PdoQueryBuilder\Schema\MigrationRepository;
 use Hibla\PdoQueryBuilder\Schema\SchemaBuilder;
@@ -14,6 +15,8 @@ use Symfony\Component\Console\Style\SymfonyStyle;
 
 class MigrateResetCommand extends Command
 {
+    use LoadsSchemaConfiguration;
+
     private SymfonyStyle $io;
     private OutputInterface $output;
     private string $projectRoot;
@@ -43,11 +46,11 @@ class MigrateResetCommand extends Command
             return Command::FAILURE;
         }
 
-        $this->migrationsPath = $this->projectRoot . '/database/migrations';
+        $this->migrationsPath = $this->getMigrationsPath();
 
         try {
             $this->initializeDatabase();
-            $this->repository = new MigrationRepository('migrations');
+            $this->repository = new MigrationRepository($this->getMigrationsTable());
             $this->schema = new SchemaBuilder();
 
             if (!$this->performReset()) {
@@ -109,7 +112,7 @@ class MigrateResetCommand extends Command
 
         try {
             $migration = require $file;
-            
+
             $this->executeMigrationDown($migration, $migrationName);
             await($this->repository->delete($migrationName));
         } catch (\Throwable $e) {
