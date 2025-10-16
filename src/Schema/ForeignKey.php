@@ -12,11 +12,13 @@ class ForeignKey
     private array $referenceColumns = [];
     private string $onDelete = 'RESTRICT';
     private string $onUpdate = 'RESTRICT';
+    private string $blueprintTable;
 
-    public function __construct(string $name, array $columns)
+    public function __construct(string $name, array $columns, string $blueprintTable = '')
     {
         $this->name = $name;
         $this->columns = $columns;
+        $this->blueprintTable = $blueprintTable;
     }
 
     public function getName(): string
@@ -47,6 +49,11 @@ class ForeignKey
     public function getOnUpdate(): string
     {
         return $this->onUpdate;
+    }
+
+    public function getBlueprintTable(): string
+    {
+        return $this->blueprintTable;
     }
 
     public function references(string|array $columns): self
@@ -86,5 +93,25 @@ class ForeignKey
     public function nullOnDelete(): self
     {
         return $this->onDelete('SET NULL');
+    }
+
+    public function restrictOnDelete(): self
+    {
+        return $this->onDelete('RESTRICT');
+    }
+
+    public function restrictOnUpdate(): self
+    {
+        return $this->onUpdate('RESTRICT');
+    }
+
+    public function noActionOnDelete(): self
+    {
+        return $this->onDelete('NO ACTION');
+    }
+
+    public function noActionOnUpdate(): self
+    {
+        return $this->onUpdate('NO ACTION');
     }
 }

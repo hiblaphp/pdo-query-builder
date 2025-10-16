@@ -10,8 +10,7 @@ return new class
     {
         return $schema->create('humans', function (Blueprint $table) {
             $table->id();
-            $table->bigInteger('horse_id')->unsigned()->nullable();
-            $table->foreign('horse_id')->references('id')->on('horses');
+            $table->foreignId('horse_id')->constrained('horses');
             $table->timestamps();
         });
     }

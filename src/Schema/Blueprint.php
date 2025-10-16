@@ -54,7 +54,6 @@ class Blueprint
         return $this->collation;
     }
 
-    // Column types
     public function id(string $name = 'id'): Column
     {
         return $this->bigIncrements($name);
@@ -64,6 +63,7 @@ class Blueprint
     {
         $column = new Column($name, 'BIGINT');
         $column->unsigned()->autoIncrement()->primary();
+        $column->setBlueprint($this);
         $this->columns[] = $column;
         return $column;
     }
@@ -72,6 +72,7 @@ class Blueprint
     {
         $column = new Column($name, 'INT');
         $column->unsigned()->autoIncrement()->primary();
+        $column->setBlueprint($this);
         $this->columns[] = $column;
         return $column;
     }
@@ -79,6 +80,7 @@ class Blueprint
     public function string(string $name, int $length = 255): Column
     {
         $column = new Column($name, 'VARCHAR', $length);
+        $column->setBlueprint($this);
         $this->columns[] = $column;
         return $column;
     }
@@ -86,6 +88,7 @@ class Blueprint
     public function text(string $name): Column
     {
         $column = new Column($name, 'TEXT');
+        $column->setBlueprint($this);
         $this->columns[] = $column;
         return $column;
     }
@@ -93,6 +96,7 @@ class Blueprint
     public function mediumText(string $name): Column
     {
         $column = new Column($name, 'MEDIUMTEXT');
+        $column->setBlueprint($this);
         $this->columns[] = $column;
         return $column;
     }
@@ -100,6 +104,7 @@ class Blueprint
     public function longText(string $name): Column
     {
         $column = new Column($name, 'LONGTEXT');
+        $column->setBlueprint($this);
         $this->columns[] = $column;
         return $column;
     }
@@ -107,6 +112,7 @@ class Blueprint
     public function integer(string $name): Column
     {
         $column = new Column($name, 'INT');
+        $column->setBlueprint($this);
         $this->columns[] = $column;
         return $column;
     }
@@ -114,6 +120,7 @@ class Blueprint
     public function bigInteger(string $name): Column
     {
         $column = new Column($name, 'BIGINT');
+        $column->setBlueprint($this);
         $this->columns[] = $column;
         return $column;
     }
@@ -121,6 +128,7 @@ class Blueprint
     public function tinyInteger(string $name): Column
     {
         $column = new Column($name, 'TINYINT');
+        $column->setBlueprint($this);
         $this->columns[] = $column;
         return $column;
     }
@@ -128,6 +136,7 @@ class Blueprint
     public function smallInteger(string $name): Column
     {
         $column = new Column($name, 'SMALLINT');
+        $column->setBlueprint($this);
         $this->columns[] = $column;
         return $column;
     }
@@ -135,6 +144,7 @@ class Blueprint
     public function decimal(string $name, int $precision = 8, int $scale = 2): Column
     {
         $column = new Column($name, 'DECIMAL', null, $precision, $scale);
+        $column->setBlueprint($this);
         $this->columns[] = $column;
         return $column;
     }
@@ -142,6 +152,7 @@ class Blueprint
     public function float(string $name, int $precision = 8, int $scale = 2): Column
     {
         $column = new Column($name, 'FLOAT', null, $precision, $scale);
+        $column->setBlueprint($this);
         $this->columns[] = $column;
         return $column;
     }
@@ -149,6 +160,7 @@ class Blueprint
     public function double(string $name, int $precision = 8, int $scale = 2): Column
     {
         $column = new Column($name, 'DOUBLE', null, $precision, $scale);
+        $column->setBlueprint($this);
         $this->columns[] = $column;
         return $column;
     }
@@ -157,6 +169,7 @@ class Blueprint
     {
         $column = new Column($name, 'TINYINT', 1);
         $column->default(0);
+        $column->setBlueprint($this);
         $this->columns[] = $column;
         return $column;
     }
@@ -164,6 +177,7 @@ class Blueprint
     public function date(string $name): Column
     {
         $column = new Column($name, 'DATE');
+        $column->setBlueprint($this);
         $this->columns[] = $column;
         return $column;
     }
@@ -171,6 +185,7 @@ class Blueprint
     public function dateTime(string $name): Column
     {
         $column = new Column($name, 'DATETIME');
+        $column->setBlueprint($this);
         $this->columns[] = $column;
         return $column;
     }
@@ -178,6 +193,7 @@ class Blueprint
     public function timestamp(string $name): Column
     {
         $column = new Column($name, 'TIMESTAMP');
+        $column->setBlueprint($this);
         $this->columns[] = $column;
         return $column;
     }
@@ -196,6 +212,7 @@ class Blueprint
     public function json(string $name): Column
     {
         $column = new Column($name, 'JSON');
+        $column->setBlueprint($this);
         $this->columns[] = $column;
         return $column;
     }
@@ -204,8 +221,14 @@ class Blueprint
     {
         $column = new Column($name, 'ENUM');
         $column->setEnumValues($values);
+        $column->setBlueprint($this);
         $this->columns[] = $column;
         return $column;
+    }
+
+    public function foreignId(string $name): Column
+    {
+        return $this->bigInteger($name)->unsigned();
     }
 
     public function index(string|array $columns, ?string $name = null): self
@@ -235,7 +258,7 @@ class Blueprint
     {
         $columns = is_array($columns) ? $columns : [$columns];
         $name = $name ?? $this->table . '_' . implode('_', $columns) . '_foreign';
-        $foreignKey = new ForeignKey($name, $columns);
+        $foreignKey = new ForeignKey($name, $columns, $this->table);
         $this->foreignKeys[] = $foreignKey;
         return $foreignKey;
     }

@@ -23,6 +23,8 @@ class Column
     private bool $useCurrent = false;
     private ?string $onUpdate = null;
     private array $enumValues = [];
+    private ?ForeignKey $foreignKey = null;
+    private ?Blueprint $blueprint = null;
 
     public function __construct(
         string $name,
@@ -123,6 +125,11 @@ class Column
         return $this->enumValues;
     }
 
+    public function getForeignKey(): ?ForeignKey
+    {
+        return $this->foreignKey;
+    }
+
     public function nullable(bool $value = true): self
     {
         $this->nullable = $value;
@@ -187,6 +194,82 @@ class Column
     public function setEnumValues(array $values): self
     {
         $this->enumValues = $values;
+        return $this;
+    }
+
+    public function setBlueprint(Blueprint $blueprint): self
+    {
+        $this->blueprint = $blueprint;
+        return $this;
+    }
+
+    public function constrained(string $table, string $column = 'id'): self
+    {
+        if (!$this->blueprint) {
+            throw new \RuntimeException('Blueprint reference not set on column');
+        }
+
+        $foreignKey = $this->blueprint->foreign($this->name);
+        $foreignKey->references($column)->on($table);
+
+        $this->foreignKey = $foreignKey;
+
+        return $this;
+    }
+
+    public function cascadeOnDelete(): self
+    {
+        if ($this->foreignKey) {
+            $this->foreignKey->cascadeOnDelete();
+        }
+        return $this;
+    }
+
+    public function cascadeOnUpdate(): self
+    {
+        if ($this->foreignKey) {
+            $this->foreignKey->cascadeOnUpdate();
+        }
+        return $this;
+    }
+
+    public function nullOnDelete(): self
+    {
+        if ($this->foreignKey) {
+            $this->foreignKey->nullOnDelete();
+        }
+        return $this;
+    }
+
+    public function restrictOnDelete(): self
+    {
+        if ($this->foreignKey) {
+            $this->foreignKey->onDelete('RESTRICT');
+        }
+        return $this;
+    }
+
+    public function restrictOnUpdate(): self
+    {
+        if ($this->foreignKey) {
+            $this->foreignKey->onUpdate('RESTRICT');
+        }
+        return $this;
+    }
+
+    public function noActionOnDelete(): self
+    {
+        if ($this->foreignKey) {
+            $this->foreignKey->onDelete('NO ACTION');
+        }
+        return $this;
+    }
+
+    public function noActionOnUpdate(): self
+    {
+        if ($this->foreignKey) {
+            $this->foreignKey->onUpdate('NO ACTION');
+        }
         return $this;
     }
 }
