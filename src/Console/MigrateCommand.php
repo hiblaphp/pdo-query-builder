@@ -9,6 +9,7 @@ use Hibla\PdoQueryBuilder\DB;
 use Hibla\PdoQueryBuilder\Schema\DatabaseManager;
 use Hibla\PdoQueryBuilder\Schema\MigrationRepository;
 use Hibla\PdoQueryBuilder\Schema\SchemaBuilder;
+use Hibla\PdoQueryBuilder\Utilities\ConfigLoader;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Input\InputOption;
@@ -32,7 +33,7 @@ class MigrateCommand extends Command
             ->setName('migrate')
             ->setDescription('Run pending database migrations')
             ->addOption('step', null, InputOption::VALUE_OPTIONAL, 'Number of migrations to run', 0)
-            ->addOption('force', 'f', InputOption::VALUE_NONE, 'Force the operation to run');
+            ->addOption('force', 'f', InputOption::VALUE_NONE, 'Force the operation to run without prompts');
     }
 
     protected function execute(InputInterface $input, OutputInterface $output): int
@@ -50,9 +51,17 @@ class MigrateCommand extends Command
         }
 
         try {
-            // Automatically ensure database exists
-            if (!$this->ensureDatabaseExists()) {
+            $force = $input->getOption('force');
+            
+            $dbCheckResult = $this->ensureDatabaseExists($force);
+            
+            if ($dbCheckResult === false) {
                 return Command::FAILURE;
+            }
+            
+            if ($dbCheckResult === null) {
+                $this->io->warning('Migration cancelled by user');
+                return Command::SUCCESS;
             }
 
             $this->initializeDatabase();
@@ -76,25 +85,63 @@ class MigrateCommand extends Command
         }
     }
 
-    private function ensureDatabaseExists(): bool
+    /**
+     * Ensure database exists with user confirmation
+     * 
+     * @return bool|null true = success, false = error, null = user declined
+     */
+    private function ensureDatabaseExists(bool $force): ?bool
     {
         try {
             $dbManager = new DatabaseManager();
             
             if (!$dbManager->databaseExists()) {
-                $this->io->writeln('<comment>Database does not exist. Creating...</comment>');
+                $dbName = $this->getDatabaseName();
+                
+                $this->io->warning("Database '{$dbName}' does not exist!");
+            
+                if (!$force) {
+                    $confirmed = $this->io->confirm(
+                        "Do you want to create the database '{$dbName}'?",
+                        false
+                    );
+                    
+                    if (!$confirmed) {
+                        return null; 
+                    }
+                }
+                
+                $this->io->writeln('<comment>Creating database...</comment>');
                 $dbManager->createDatabaseIfNotExists();
                 $this->io->writeln('<info>✓ Database created successfully!</info>');
+                $this->io->newLine();
             }
             
             return true;
         } catch (\Throwable $e) {
             if ($this->isDatabaseNotExistError($e)) {
                 try {
-                    $this->io->writeln('<comment>Attempting to create database...</comment>');
+                    $dbName = $this->getDatabaseName();
+                    
+                    $this->io->warning("Database '{$dbName}' does not exist!");
+                    
+                    if (!$force) {
+                        $confirmed = $this->io->confirm(
+                            "Do you want to create the database '{$dbName}'?",
+                            false
+                        );
+                        
+                        if (!$confirmed) {
+                            return null; 
+                        }
+                    }
+                    
+                    $this->io->writeln('<comment>Creating database...</comment>');
                     $dbManager = new DatabaseManager();
                     $dbManager->createDatabaseIfNotExists();
                     $this->io->writeln('<info>✓ Database created successfully!</info>');
+                    $this->io->newLine();
+                    
                     return true;
                 } catch (\Throwable $createError) {
                     $this->io->error('Failed to create database: ' . $createError->getMessage());
@@ -110,6 +157,26 @@ class MigrateCommand extends Command
                 $this->io->writeln($e->getTraceAsString());
             }
             return false;
+        }
+    }
+
+    private function getDatabaseName(): string
+    {
+        try {
+            $configLoader = ConfigLoader::getInstance();
+            $dbConfig = $configLoader->get('pdo-query-builder');
+            
+            if (!is_array($dbConfig)) {
+                return 'unknown';
+            }
+            
+            $defaultConnection = $dbConfig['default'] ?? 'mysql';
+            $connections = $dbConfig['connections'] ?? [];
+            $config = $connections[$defaultConnection] ?? [];
+            
+            return $config['database'] ?? 'unknown';
+        } catch (\Throwable $e) {
+            return 'unknown';
         }
     }
 
