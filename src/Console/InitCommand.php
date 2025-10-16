@@ -153,6 +153,7 @@ use Hibla\PdoQueryBuilder\Console\MigrateCommand;
 use Hibla\PdoQueryBuilder\Console\MigrateRollbackCommand;
 use Hibla\PdoQueryBuilder\Console\MigrateResetCommand;
 use Hibla\PdoQueryBuilder\Console\MigrateRefreshCommand;
+use Hibla\PdoQueryBuilder\Console\MigrateFreshCommand;
 use Hibla\PdoQueryBuilder\Console\MigrateStatusCommand;
 use Hibla\PdoQueryBuilder\Console\StatusCommand;
 
@@ -165,6 +166,7 @@ $application->add(new MigrateCommand());
 $application->add(new MigrateRollbackCommand());
 $application->add(new MigrateResetCommand());
 $application->add(new MigrateRefreshCommand());
+$application->add(new MigrateFreshCommand());
 $application->add(new MigrateStatusCommand());
 $application->add(new StatusCommand());
 
@@ -206,11 +208,11 @@ PHP;
             __DIR__ . "/../../config/{$filename}",
             __DIR__ . "/../../../config/{$filename}",
         ];
-        
+
         foreach ($paths as $path) {
             if (file_exists($path)) return $path;
         }
-        
+
         return __DIR__ . "/../../config/{$filename}";
     }
 }

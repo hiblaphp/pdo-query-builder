@@ -1,0 +1,30 @@
+#!/usr/bin/env php
+<?php
+
+require_once __DIR__ . '/vendor/autoload.php';
+
+use Symfony\Component\Console\Application;
+use Hibla\PdoQueryBuilder\Console\InitCommand;
+use Hibla\PdoQueryBuilder\Console\MakeMigrationCommand;
+use Hibla\PdoQueryBuilder\Console\MigrateCommand;
+use Hibla\PdoQueryBuilder\Console\MigrateRollbackCommand;
+use Hibla\PdoQueryBuilder\Console\MigrateResetCommand;
+use Hibla\PdoQueryBuilder\Console\MigrateRefreshCommand;
+use Hibla\PdoQueryBuilder\Console\MigrateFreshCommand;
+use Hibla\PdoQueryBuilder\Console\MigrateStatusCommand;
+use Hibla\PdoQueryBuilder\Console\StatusCommand;
+
+$application = new Application('Async PDO Query Builder', '1.0.0');
+
+// Register all commands
+$application->add(new InitCommand());
+$application->add(new MakeMigrationCommand());
+$application->add(new MigrateCommand());
+$application->add(new MigrateRollbackCommand());
+$application->add(new MigrateResetCommand());
+$application->add(new MigrateRefreshCommand());
+$application->add(new MigrateFreshCommand());
+$application->add(new MigrateStatusCommand());
+$application->add(new StatusCommand());
+
+$application->run();
