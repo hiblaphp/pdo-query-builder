@@ -173,4 +173,18 @@ class DB
 
         return AsyncPDO::transaction($callback, $attempts);
     }
+
+    public static function onCommit(callable $callback): void
+    {
+        self::initializeIfNeeded();
+
+        AsyncPDO::onCommit($callback);
+    }
+
+    public static function onRollback(callable $callback): void
+    {
+        self::initializeIfNeeded();
+
+        AsyncPDO::onRollback($callback);
+    }
 }
