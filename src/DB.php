@@ -94,6 +94,7 @@ class DB
     {
         AsyncPDO::reset();
         ConfigLoader::reset();
+        PDOQueryBuilder::resetDriverCache(); 
         self::$isInitialized = false;
         self::$hasValidationError = false;
     }
@@ -106,6 +107,18 @@ class DB
         self::initializeIfNeeded();
 
         return new PDOQueryBuilder($table);
+    }
+
+    /**
+     * Start a new query builder instance with a specific driver.
+     * Useful for testing or multi-database scenarios.
+     */
+    public static function tableWithDriver(string $table, string $driver): PDOQueryBuilder
+    {
+        self::initializeIfNeeded();
+
+        $builder = new PDOQueryBuilder($table);
+        return $builder->setDriver($driver);
     }
 
     /**

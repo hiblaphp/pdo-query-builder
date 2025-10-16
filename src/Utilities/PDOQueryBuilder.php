@@ -17,6 +17,16 @@ use Rcalicdan\QueryBuilderPrimitives\QueryBuilderBase;
 class PDOQueryBuilder extends QueryBuilderBase
 {
     /**
+     * @var string|null Cached driver to avoid repeated detection
+     */
+    private static ?string $cachedDriver = null;
+
+    /**
+     * @var bool Whether driver detection has been attempted
+     */
+    private static bool $driverDetected = false;
+
+    /**
      * Create a new AsyncQueryBuilder instance.
      *
      * @param  string  $table  The table name to query.
@@ -26,6 +36,76 @@ class PDOQueryBuilder extends QueryBuilderBase
         if ($table !== '') {
             $this->table = $table;
         }
+
+        if (!self::$driverDetected) {
+            $this->autoDetectDriver();
+            self::$driverDetected = true;
+        } else {
+            $this->driver = self::$cachedDriver;
+        }
+    }
+
+    /**
+     * Auto-detect the database driver from the current AsyncPDO connection.
+     * This runs only once and caches the result.
+     */
+    private function autoDetectDriver(): void
+    {
+        try {
+            $driver = $this->getDriverFromConfig();
+            if ($driver !== null) {
+                $detectedDriver = strtolower($driver);
+                $this->driver = $detectedDriver;
+                self::$cachedDriver = $detectedDriver;
+            } else {
+                $this->driver = 'mysql';
+                self::$cachedDriver = 'mysql';
+            }
+        } catch (\Throwable $e) {
+            $this->driver = 'mysql';
+            self::$cachedDriver = 'mysql';
+        }
+    }
+
+    /**
+     * Get the driver from the loaded configuration.
+     *
+     * @return string|null
+     */
+    private function getDriverFromConfig(): ?string
+    {
+        $configLoader = ConfigLoader::getInstance();
+        $dbConfig = $configLoader->get('pdo-query-builder');
+
+        if (!is_array($dbConfig)) {
+            return null;
+        }
+
+        $defaultConnection = $dbConfig['default'] ?? null;
+        if (!is_string($defaultConnection)) {
+            return null;
+        }
+
+        $connections = $dbConfig['connections'] ?? [];
+        if (!is_array($connections)) {
+            return null;
+        }
+
+        $connectionConfig = $connections[$defaultConnection] ?? null;
+        if (!is_array($connectionConfig)) {
+            return null;
+        }
+
+        return $connectionConfig['driver'] ?? null;
+    }
+
+    /**
+     * Reset the driver cache. Useful for testing or when switching connections.
+     */
+    public static function resetDriverCache(): void
+    {
+        self::$cachedDriver = null;
+        self::$driverDetected = false;
     }
 
     /**
