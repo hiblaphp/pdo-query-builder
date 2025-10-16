@@ -15,6 +15,18 @@
         "hiblaphp/async": "dev-main",
         "hiblaphp/async-pdo": "dev-main",
         "rcalicdan/query-builder-primitives": "dev-main",
-        "ext-pdo": "*"
+        "ext-pdo": "*",
+        "symfony/console": "^7.3"
+    },
+    "bin": [
+        "bin/pdo-query-builder"
+    ],
+    "scripts": {
+        "post-install-cmd": [
+            "@php -r \"if (!is_dir('config')) { echo '\\nRun: ./vendor/bin/pdo-query-builder init\\n\\n'; }\""
+        ],
+        "post-update-cmd": [
+            "@php -r \"if (!is_dir('config')) { echo '\\nRun: ./vendor/bin/pdo-query-builder init\\n\\n'; }\""
+        ]
     }
 }
