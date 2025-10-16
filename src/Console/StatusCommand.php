@@ -9,11 +9,11 @@ use Symfony\Component\Console\Style\SymfonyStyle;
 
 class StatusCommand extends Command
 {
-    protected static $defaultName = 'status';
-
     protected function configure(): void
     {
-        $this->setDescription('Check PDO Query Builder configuration status');
+        $this
+            ->setName('status')
+            ->setDescription('Check PDO Query Builder configuration status');
     }
 
     protected function execute(InputInterface $input, OutputInterface $output): int

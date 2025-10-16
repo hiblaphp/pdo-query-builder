@@ -10,11 +10,10 @@ use Symfony\Component\Console\Style\SymfonyStyle;
 
 class InitCommand extends Command
 {
-    protected static $defaultName = 'init';
-
     protected function configure(): void
     {
         $this
+            ->setName('init')
             ->setDescription('Initialize PDO Query Builder configuration')
             ->setHelp('Copies the default configuration file to your project\'s config directory.')
             ->addOption('force', 'f', InputOption::VALUE_NONE, 'Overwrite existing configuration');
