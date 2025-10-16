@@ -47,6 +47,8 @@ class InitCommand extends Command
             return Command::FAILURE;
         }
 
+        $this->createAsyncPdoExecutable();
+
         $this->promptEnvFileCreation();
 
         return Command::SUCCESS;
@@ -104,6 +106,71 @@ class InitCommand extends Command
         }
 
         return true;
+    }
+
+    private function createAsyncPdoExecutable(): void
+    {
+        $asyncPdoPath = $this->projectRoot . '/async-pdo';
+
+        if (file_exists($asyncPdoPath) && !$this->force) {
+            $this->io->warning('async-pdo file already exists. Use --force to overwrite.');
+            return;
+        }
+
+        $stub = $this->getAsyncPdoStub();
+
+        if (file_put_contents($asyncPdoPath, $stub) === false) {
+            $this->io->error('Failed to create async-pdo file');
+            return;
+        }
+
+        if (DIRECTORY_SEPARATOR === '/') {
+            chmod($asyncPdoPath, 0755);
+        }
+
+        $this->io->success('✓ Created async-pdo executable');
+        $this->io->section('Usage:');
+        $this->io->listing([
+            'php async-pdo migrate',
+            'php async-pdo make:migration create_users_table',
+            'php async-pdo migrate:rollback',
+            'php async-pdo migrate:status',
+        ]);
+    }
+
+    private function getAsyncPdoStub(): string
+    {
+        return <<<'PHP'
+#!/usr/bin/env php
+<?php
+
+require_once __DIR__ . '/vendor/autoload.php';
+
+use Symfony\Component\Console\Application;
+use Hibla\PdoQueryBuilder\Console\InitCommand;
+use Hibla\PdoQueryBuilder\Console\MakeMigrationCommand;
+use Hibla\PdoQueryBuilder\Console\MigrateCommand;
+use Hibla\PdoQueryBuilder\Console\MigrateRollbackCommand;
+use Hibla\PdoQueryBuilder\Console\MigrateResetCommand;
+use Hibla\PdoQueryBuilder\Console\MigrateRefreshCommand;
+use Hibla\PdoQueryBuilder\Console\MigrateStatusCommand;
+use Hibla\PdoQueryBuilder\Console\StatusCommand;
+
+$application = new Application('Async PDO Query Builder', '1.0.0');
+
+// Register all commands
+$application->add(new InitCommand());
+$application->add(new MakeMigrationCommand());
+$application->add(new MigrateCommand());
+$application->add(new MigrateRollbackCommand());
+$application->add(new MigrateResetCommand());
+$application->add(new MigrateRefreshCommand());
+$application->add(new MigrateStatusCommand());
+$application->add(new StatusCommand());
+
+$application->run();
+
+PHP;
     }
 
     private function promptEnvFileCreation(): void
