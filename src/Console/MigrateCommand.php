@@ -6,6 +6,7 @@ namespace Hibla\PdoQueryBuilder\Console;
 
 use Hibla\PdoQueryBuilder\Console\Traits\LoadsSchemaConfiguration;
 use Hibla\PdoQueryBuilder\DB;
+use Hibla\PdoQueryBuilder\Schema\DatabaseManager;
 use Hibla\PdoQueryBuilder\Schema\MigrationRepository;
 use Hibla\PdoQueryBuilder\Schema\SchemaBuilder;
 use Symfony\Component\Console\Command\Command;
@@ -49,6 +50,11 @@ class MigrateCommand extends Command
         }
 
         try {
+            // Automatically ensure database exists
+            if (!$this->ensureDatabaseExists()) {
+                return Command::FAILURE;
+            }
+
             $this->initializeDatabase();
             $this->repository = new MigrationRepository($this->getMigrationsTable());
             $this->schema = new SchemaBuilder();
@@ -68,6 +74,53 @@ class MigrateCommand extends Command
             $this->handleCriticalError($e);
             return Command::FAILURE;
         }
+    }
+
+    private function ensureDatabaseExists(): bool
+    {
+        try {
+            $dbManager = new DatabaseManager();
+            
+            if (!$dbManager->databaseExists()) {
+                $this->io->writeln('<comment>Database does not exist. Creating...</comment>');
+                $dbManager->createDatabaseIfNotExists();
+                $this->io->writeln('<info>✓ Database created successfully!</info>');
+            }
+            
+            return true;
+        } catch (\Throwable $e) {
+            if ($this->isDatabaseNotExistError($e)) {
+                try {
+                    $this->io->writeln('<comment>Attempting to create database...</comment>');
+                    $dbManager = new DatabaseManager();
+                    $dbManager->createDatabaseIfNotExists();
+                    $this->io->writeln('<info>✓ Database created successfully!</info>');
+                    return true;
+                } catch (\Throwable $createError) {
+                    $this->io->error('Failed to create database: ' . $createError->getMessage());
+                    if ($this->output->isVerbose()) {
+                        $this->io->writeln($createError->getTraceAsString());
+                    }
+                    return false;
+                }
+            }
+            
+            $this->io->error('Database connection failed: ' . $e->getMessage());
+            if ($this->output->isVerbose()) {
+                $this->io->writeln($e->getTraceAsString());
+            }
+            return false;
+        }
+    }
+
+    private function isDatabaseNotExistError(\Throwable $e): bool
+    {
+        $message = strtolower($e->getMessage());
+        
+        return str_contains($message, 'does not exist') ||
+               str_contains($message, 'unknown database') ||
+               str_contains($message, 'database') && str_contains($message, 'not found') ||
+               str_contains($message, 'cannot connect to database');
     }
 
     private function initializeProjectRoot(): bool
