@@ -1,0 +1,164 @@
+<?php
+
+declare(strict_types=1);
+
+namespace Hibla\PdoQueryBuilder\Schema;
+
+use Hibla\AsyncPDO\AsyncPDO;
+use Hibla\PdoQueryBuilder\Utilities\ConfigLoader;
+use Hibla\Promise\Interfaces\PromiseInterface;
+
+class MigrationRepository
+{
+    private string $table;
+    private string $driver;
+
+    public function __construct(string $table = 'migrations')
+    {
+        $this->table = $table;
+        $this->driver = $this->detectDriver();
+    }
+
+    private function detectDriver(): string
+    {
+        try {
+            $configLoader = ConfigLoader::getInstance();
+            $dbConfig = $configLoader->get('pdo-query-builder');
+
+            if (!is_array($dbConfig)) {
+                return 'mysql';
+            }
+
+            $defaultConnection = $dbConfig['default'] ?? 'mysql';
+            $connections = $dbConfig['connections'] ?? [];
+            $connectionConfig = $connections[$defaultConnection] ?? [];
+
+            return strtolower($connectionConfig['driver'] ?? 'mysql');
+        } catch (\Throwable $e) {
+            return 'mysql';
+        }
+    }
+
+    private function quoteIdentifier(string $identifier): string
+    {
+        return match ($this->driver) {
+            'pgsql' => "\"{$identifier}\"",
+            'sqlsrv' => "[{$identifier}]",
+            'sqlite', 'mysql' => "`{$identifier}`",
+            default => "`{$identifier}`",
+        };
+    }
+
+    public function createRepository(): PromiseInterface
+    {
+        $table = $this->quoteIdentifier($this->table);
+
+        $sql = match ($this->driver) {
+            'pgsql' => "CREATE TABLE IF NOT EXISTS {$table} (
+                id SERIAL PRIMARY KEY,
+                migration VARCHAR(255) NOT NULL,
+                batch INTEGER NOT NULL,
+                executed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )",
+            'sqlsrv' => "IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = '{$this->table}')
+            CREATE TABLE {$table} (
+                id INT IDENTITY(1,1) PRIMARY KEY,
+                migration VARCHAR(255) NOT NULL,
+                batch INT NOT NULL,
+                executed_at DATETIME2 DEFAULT CURRENT_TIMESTAMP
+            )",
+            'sqlite' => "CREATE TABLE IF NOT EXISTS {$table} (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                migration TEXT NOT NULL,
+                batch INTEGER NOT NULL,
+                executed_at TEXT DEFAULT CURRENT_TIMESTAMP
+            )",
+            default => "CREATE TABLE IF NOT EXISTS {$table} (
+                id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+                migration VARCHAR(255) NOT NULL,
+                batch INT NOT NULL,
+                executed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )",
+        };
+
+        return AsyncPDO::execute($sql, []);
+    }
+
+    public function getRan(): PromiseInterface
+    {
+        $table = $this->quoteIdentifier($this->table);
+
+        return AsyncPDO::query(
+            "SELECT migration FROM {$table} ORDER BY batch, migration",
+            []
+        );
+    }
+
+    public function getMigrations(int $steps): PromiseInterface
+    {
+        $table = $this->quoteIdentifier($this->table);
+
+        $sql = match ($this->driver) {
+            'sqlsrv' => "SELECT TOP (?) migration FROM {$table} ORDER BY batch DESC, migration DESC",
+            default => "SELECT migration FROM {$table} ORDER BY batch DESC, migration DESC LIMIT ?",
+        };
+
+        return AsyncPDO::query($sql, [$steps]);
+    }
+
+    public function getLast(): PromiseInterface
+    {
+        $table = $this->quoteIdentifier($this->table);
+
+        return AsyncPDO::query(
+            "SELECT migration FROM {$table} WHERE batch = (SELECT MAX(batch) FROM {$table})",
+            []
+        );
+    }
+
+    public function log(string $file, int $batch): PromiseInterface
+    {
+        $table = $this->quoteIdentifier($this->table);
+
+        return AsyncPDO::execute(
+            "INSERT INTO {$table} (migration, batch) VALUES (?, ?)",
+            [$file, $batch]
+        );
+    }
+
+    public function delete(string $migration): PromiseInterface
+    {
+        $table = $this->quoteIdentifier($this->table);
+
+        return AsyncPDO::execute(
+            "DELETE FROM {$table} WHERE migration = ?",
+            [$migration]
+        );
+    }
+
+    public function getNextBatchNumber(): PromiseInterface
+    {
+        $table = $this->quoteIdentifier($this->table);
+
+        return AsyncPDO::fetchValue(
+            "SELECT MAX(batch) FROM {$table}",
+            []
+        );
+    }
+
+    public function repositoryExists(): PromiseInterface
+    {
+        $sql = match ($this->driver) {
+            'pgsql' => "SELECT COUNT(*) FROM information_schema.tables 
+                       WHERE table_schema = 'public' AND table_name = ?",
+            'sqlsrv' => "SELECT COUNT(*) FROM INFORMATION_SCHEMA.TABLES 
+                        WHERE TABLE_NAME = ?",
+            'sqlite' => "SELECT COUNT(*) FROM sqlite_master 
+                        WHERE type='table' AND name=?",
+            default => "SELECT COUNT(*) FROM information_schema.tables 
+                       WHERE table_schema = DATABASE() AND table_name = ?",
+        };
+
+        return AsyncPDO::fetchValue($sql, [$this->table]);
+    }
+}

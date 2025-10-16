@@ -23,12 +23,26 @@ if (!class_exists('Symfony\Component\Console\Application')) {
 
 use Hibla\PdoQueryBuilder\Console\InitCommand;
 use Hibla\PdoQueryBuilder\Console\StatusCommand;
+use Hibla\PdoQueryBuilder\Console\MakeMigrationCommand;
+use Hibla\PdoQueryBuilder\Console\MigrateCommand;
+use Hibla\PdoQueryBuilder\Console\MigrateRollbackCommand;
+use Hibla\PdoQueryBuilder\Console\MigrateResetCommand;
+use Hibla\PdoQueryBuilder\Console\MigrateRefreshCommand;
+use Hibla\PdoQueryBuilder\Console\MigrateStatusCommand;
 use Symfony\Component\Console\Application;
 
-$app = new Application('PDO Query Builder', 'development');
+$app = new Application('PDO Query Builder', '1.0.0');
 
-// Auto-register all commands
+// Configuration commands
 $app->add(new InitCommand());
 $app->add(new StatusCommand());
+
+// Migration commands
+$app->add(new MakeMigrationCommand());
+$app->add(new MigrateCommand());
+$app->add(new MigrateRollbackCommand());
+$app->add(new MigrateResetCommand());
+$app->add(new MigrateRefreshCommand());
+$app->add(new MigrateStatusCommand());
 
 $app->run();
