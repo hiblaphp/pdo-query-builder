@@ -7,14 +7,23 @@ namespace Hibla\PdoQueryBuilder\Schema\Compilers;
 use Hibla\PdoQueryBuilder\Schema\Blueprint;
 use Hibla\PdoQueryBuilder\Schema\Column;
 use Hibla\PdoQueryBuilder\Schema\SchemaCompiler;
+use PDO;
 
 class SQLiteSchemaCompiler implements SchemaCompiler
 {
+    private ?PDO $connection = null;
+
+    public function setConnection(?PDO $connection): void
+    {
+        $this->connection = $connection;
+    }
+
     public function compileCreate(Blueprint $blueprint): string
     {
         $table = $blueprint->getTable();
         $columns = $blueprint->getColumns();
         $indexes = $blueprint->getIndexes();
+        $foreignKeys = $blueprint->getForeignKeys();
 
         $sql = "CREATE TABLE `{$table}` (\n";
 
@@ -28,6 +37,23 @@ class SQLiteSchemaCompiler implements SchemaCompiler
                 $cols = implode('`, `', $index['columns']);
                 $columnDefinitions[] = "  PRIMARY KEY (`{$cols}`)";
             }
+        }
+
+        foreach ($foreignKeys as $foreignKey) {
+            $cols = implode('`, `', $foreignKey->getColumns());
+            $refCols = implode('`, `', $foreignKey->getReferenceColumns());
+            $refTable = $foreignKey->getReferenceTable();
+
+            $fkDef = "  FOREIGN KEY (`{$cols}`) REFERENCES `{$refTable}` (`{$refCols}`)";
+
+            if ($foreignKey->getOnDelete() !== 'RESTRICT') {
+                $fkDef .= " ON DELETE {$foreignKey->getOnDelete()}";
+            }
+            if ($foreignKey->getOnUpdate() !== 'RESTRICT') {
+                $fkDef .= " ON UPDATE {$foreignKey->getOnUpdate()}";
+            }
+
+            $columnDefinitions[] = $fkDef;
         }
 
         $sql .= implode(",\n", $columnDefinitions);
@@ -48,12 +74,12 @@ class SQLiteSchemaCompiler implements SchemaCompiler
             return $sql;
         }
 
-        if (!$column->isNullable()) {
-            $sql .= ' NOT NULL';
-        }
-
         if ($column->isPrimary()) {
             $sql .= ' PRIMARY KEY';
+        }
+
+        if (!$column->isNullable()) {
+            $sql .= ' NOT NULL';
         }
 
         if ($column->hasDefault()) {
@@ -65,8 +91,15 @@ class SQLiteSchemaCompiler implements SchemaCompiler
             } elseif (is_numeric($default)) {
                 $sql .= " DEFAULT {$default}";
             } else {
-                $sql .= " DEFAULT '{$default}'";
+                $escaped = str_replace("'", "''", $default);
+                $sql .= " DEFAULT '{$escaped}'";
             }
+        } elseif ($column->shouldUseCurrent() && in_array($column->getType(), ['DATETIME', 'TIMESTAMP'])) {
+            $sql .= " DEFAULT CURRENT_TIMESTAMP";
+        }
+
+        if ($column->isUnique()) {
+            $sql .= ' UNIQUE';
         }
 
         return $sql;
@@ -79,23 +112,232 @@ class SQLiteSchemaCompiler implements SchemaCompiler
             'VARCHAR' => 'TEXT',
             'TEXT', 'MEDIUMTEXT', 'LONGTEXT' => 'TEXT',
             'DECIMAL', 'FLOAT', 'DOUBLE' => 'REAL',
-            'DATETIME', 'TIMESTAMP' => 'TEXT',
+            'DATETIME', 'TIMESTAMP', 'DATE' => 'TEXT',
             'JSON' => 'TEXT',
+            'BOOLEAN' => 'INTEGER',
             default => $type,
         };
     }
 
-    public function compileAlter(Blueprint $blueprint): string
+    public function compileAlter(Blueprint $blueprint): string|array
     {
         $table = $blueprint->getTable();
-        $sql = "ALTER TABLE `{$table}`\n";
+        $statements = [];
 
-        $alterations = [];
-        foreach ($blueprint->getColumns() as $column) {
-            $alterations[] = "  ADD COLUMN " . $this->compileColumn($column);
+        $needsRecreation = !empty($blueprint->getDropColumns()) ||
+            !empty($blueprint->getModifyColumns()) ||
+            !empty($blueprint->getDropForeignKeys());
+
+        if ($needsRecreation) {
+            return $this->compileTableRecreation($blueprint);
         }
 
-        return $sql . implode(",\n", $alterations);
+        foreach ($blueprint->getColumns() as $column) {
+            $statements[] = "ALTER TABLE `{$table}` ADD COLUMN " . $this->compileColumn($column);
+        }
+
+        foreach ($blueprint->getRenameColumns() as $rename) {
+            $statements[] = "ALTER TABLE `{$table}` RENAME COLUMN `{$rename['from']}` TO `{$rename['to']}`";
+        }
+
+        foreach ($blueprint->getCommands() as $command) {
+            if ($command['type'] === 'rename') {
+                $statements[] = $this->compileRename($table, $command['to']);
+            }
+        }
+
+        foreach ($blueprint->getDropIndexes() as $index) {
+            if ($index[0] !== 'PRIMARY') {
+                $statements[] = "DROP INDEX IF EXISTS `{$index[0]}`";
+            }
+        }
+
+        foreach ($blueprint->getIndexes() as $index) {
+            if ($index['type'] === 'UNIQUE') {
+                $cols = implode('`, `', $index['columns']);
+                $statements[] = "CREATE UNIQUE INDEX `{$index['name']}` ON `{$table}` (`{$cols}`)";
+            } elseif ($index['type'] !== 'PRIMARY') {
+                $cols = implode('`, `', $index['columns']);
+                $statements[] = "CREATE INDEX `{$index['name']}` ON `{$table}` (`{$cols}`)";
+            }
+        }
+
+        return empty($statements) ? '' : (count($statements) === 1 ? $statements[0] : $statements);
+    }
+
+    /**
+     * Compile complex table recreation for operations SQLite doesn't support
+     */
+    private function compileTableRecreation(Blueprint $blueprint): array
+    {
+        $table = $blueprint->getTable();
+        $tempTable = "_temp_{$table}_" . bin2hex(random_bytes(4));
+
+        $statements = [];
+
+        $statements[] = "PRAGMA foreign_keys=OFF";
+        $statements[] = "BEGIN TRANSACTION";
+        $newBlueprint = $this->buildNewBlueprint($blueprint, $tempTable);
+        $statements[] = $this->compileCreate($newBlueprint);
+
+        $transferData = $this->getColumnTransferMapping($blueprint);
+        if (!empty($transferData['old']) && !empty($transferData['new'])) {
+            $oldCols = implode('`, `', $transferData['old']);
+            $newCols = implode('`, `', $transferData['new']);
+            $statements[] = "INSERT INTO `{$tempTable}` (`{$newCols}`) SELECT `{$oldCols}` FROM `{$table}`";
+        }
+
+        $statements[] = "DROP TABLE `{$table}`";
+        $statements[] = "ALTER TABLE `{$tempTable}` RENAME TO `{$table}`";
+
+        foreach ($blueprint->getIndexes() as $index) {
+            if ($index['type'] === 'UNIQUE') {
+                $cols = implode('`, `', $index['columns']);
+                $statements[] = "CREATE UNIQUE INDEX IF NOT EXISTS `{$index['name']}` ON `{$table}` (`{$cols}`)";
+            } elseif ($index['type'] !== 'PRIMARY') {
+                $cols = implode('`, `', $index['columns']);
+                $statements[] = "CREATE INDEX IF NOT EXISTS `{$index['name']}` ON `{$table}` (`{$cols}`)";
+            }
+        }
+
+        $statements[] = "PRAGMA foreign_key_check";
+        $statements[] = "COMMIT";
+        $statements[] = "PRAGMA foreign_keys=ON";
+
+        return $statements;
+    }
+
+    /**
+     * Build a new blueprint based on the original with modifications applied
+     */
+    private function buildNewBlueprint(Blueprint $originalBlueprint, string $newTableName): Blueprint
+    {
+        $newBlueprint = new Blueprint($newTableName);
+
+        $dropColumns = $originalBlueprint->getDropColumns();
+        $renameMap = $this->getRenameMap($originalBlueprint->getRenameColumns());
+        $modifyMap = $this->getModifyMap($originalBlueprint->getModifyColumns());
+
+        foreach ($originalBlueprint->getColumns() as $column) {
+            $columnName = $column->getName();
+
+            if (in_array($columnName, $dropColumns)) {
+                continue;
+            }
+
+            if (isset($renameMap[$columnName])) {
+                $newColumn = $column->copyWithName($renameMap[$columnName]);
+                $newColumn->setBlueprint($newBlueprint);
+                $this->addColumnToBlueprint($newBlueprint, $newColumn);
+                continue;
+            }
+
+            if (isset($modifyMap[$columnName])) {
+                $modifiedColumn = $modifyMap[$columnName];
+                $modifiedColumn->setBlueprint($newBlueprint);
+                $this->addColumnToBlueprint($newBlueprint, $modifiedColumn);
+                continue;
+            }
+
+            $clonedColumn = clone $column;
+            $clonedColumn->setBlueprint($newBlueprint);
+            $this->addColumnToBlueprint($newBlueprint, $clonedColumn);
+        }
+
+        $dropIndexNames = array_map(fn($idx) => $idx[0], $originalBlueprint->getDropIndexes());
+        foreach ($originalBlueprint->getIndexes() as $index) {
+            $indexName = $index['name'] ?? 'PRIMARY';
+            if (!in_array($indexName, $dropIndexNames)) {
+                $this->addIndexToBlueprint($newBlueprint, $index);
+            }
+        }
+
+        $dropForeignKeys = $originalBlueprint->getDropForeignKeys();
+        foreach ($originalBlueprint->getForeignKeys() as $foreignKey) {
+            if (!in_array($foreignKey->getName(), $dropForeignKeys)) {
+                $this->addForeignKeyToBlueprint($newBlueprint, $foreignKey);
+            }
+        }
+
+        return $newBlueprint;
+    }
+
+    /**
+     * Get column mapping for data transfer between old and new tables
+     */
+    private function getColumnTransferMapping(Blueprint $blueprint): array
+    {
+        $oldColumns = [];
+        $newColumns = [];
+
+        $dropColumns = $blueprint->getDropColumns();
+        $renameMap = $this->getRenameMap($blueprint->getRenameColumns());
+
+        foreach ($blueprint->getColumns() as $column) {
+            $columnName = $column->getName();
+
+            if (in_array($columnName, $dropColumns)) {
+                continue;
+            }
+
+            if (isset($renameMap[$columnName])) {
+                $oldColumns[] = $columnName;
+                $newColumns[] = $renameMap[$columnName];
+            } else {
+                $oldColumns[] = $columnName;
+                $newColumns[] = $columnName;
+            }
+        }
+
+        return ['old' => $oldColumns, 'new' => $newColumns];
+    }
+
+    private function addColumnToBlueprint(Blueprint $blueprint, Column $column): void
+    {
+        $reflection = new \ReflectionClass($blueprint);
+        $property = $reflection->getProperty('columns');
+        $property->setAccessible(true);
+        $columns = $property->getValue($blueprint);
+        $columns[] = $column;
+        $property->setValue($blueprint, $columns);
+    }
+
+    private function addIndexToBlueprint(Blueprint $blueprint, array $index): void
+    {
+        $reflection = new \ReflectionClass($blueprint);
+        $property = $reflection->getProperty('indexes');
+        $property->setAccessible(true);
+        $indexes = $property->getValue($blueprint);
+        $indexes[] = $index;
+        $property->setValue($blueprint, $indexes);
+    }
+
+    private function addForeignKeyToBlueprint(Blueprint $blueprint, $foreignKey): void
+    {
+        $reflection = new \ReflectionClass($blueprint);
+        $property = $reflection->getProperty('foreignKeys');
+        $property->setAccessible(true);
+        $foreignKeys = $property->getValue($blueprint);
+        $foreignKeys[] = $foreignKey;
+        $property->setValue($blueprint, $foreignKeys);
+    }
+
+    private function getRenameMap(array $renameColumns): array
+    {
+        $map = [];
+        foreach ($renameColumns as $rename) {
+            $map[$rename['from']] = $rename['to'];
+        }
+        return $map;
+    }
+
+    private function getModifyMap(array $modifyColumns): array
+    {
+        $map = [];
+        foreach ($modifyColumns as $column) {
+            $map[$column->getName()] = $column;
+        }
+        return $map;
     }
 
     public function compileDrop(string $table): string
@@ -111,5 +353,24 @@ class SQLiteSchemaCompiler implements SchemaCompiler
     public function compileTableExists(string $table): string
     {
         return "SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name='{$table}'";
+    }
+
+    public function compileRename(string $from, string $to): string
+    {
+        return "ALTER TABLE `{$from}` RENAME TO `{$to}`";
+    }
+
+    public function compileDropColumn(Blueprint $blueprint, array $columns): string
+    {
+        $table = $blueprint->getTable();
+        $drops = array_map(fn($col) => "DROP COLUMN `{$col}`", $columns);
+
+        return "ALTER TABLE `{$table}` " . implode(', ', $drops);
+    }
+
+    public function compileRenameColumn(Blueprint $blueprint, string $from, string $to): string
+    {
+        $table = $blueprint->getTable();
+        return "ALTER TABLE `{$table}` RENAME COLUMN `{$from}` TO `{$to}`";
     }
 }

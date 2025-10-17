@@ -7,6 +7,9 @@ namespace Hibla\PdoQueryBuilder\Schema;
 use Hibla\AsyncPDO\AsyncPDO;
 use Hibla\PdoQueryBuilder\Utilities\ConfigLoader;
 use Hibla\Promise\Interfaces\PromiseInterface;
+use Hibla\Promise\Promise;
+
+use function Hibla\await;
 
 class SchemaBuilder
 {
@@ -76,7 +79,91 @@ class SchemaBuilder
         $compiler = $this->getCompiler();
         $sql = $compiler->compileAlter($blueprint);
 
+        if (is_array($sql)) {
+            return $this->executeMultiple($sql);
+        }
+
         return AsyncPDO::execute($sql, []);
+    }
+
+    public function rename(string $from, string $to): PromiseInterface
+    {
+        $compiler = $this->getCompiler();
+        $sql = $compiler->compileRename($from, $to);
+
+        return AsyncPDO::execute($sql, []);
+    }
+
+    public function dropColumn(string $table, string|array $columns): PromiseInterface
+    {
+        $blueprint = new Blueprint($table);
+        $blueprint->dropColumn($columns);
+
+        $compiler = $this->getCompiler();
+        $sql = $compiler->compileAlter($blueprint);
+
+        if (is_array($sql)) {
+            return $this->executeMultiple($sql);
+        }
+
+        return AsyncPDO::execute($sql, []);
+    }
+
+    public function renameColumn(string $table, string $from, string $to): PromiseInterface
+    {
+        $blueprint = new Blueprint($table);
+        $blueprint->renameColumn($from, $to);
+
+        $compiler = $this->getCompiler();
+        $sql = $compiler->compileAlter($blueprint);
+
+        if (is_array($sql)) {
+            return $this->executeMultiple($sql);
+        }
+
+        return AsyncPDO::execute($sql, []);
+    }
+
+    public function dropIndex(string $table, string|array $index): PromiseInterface
+    {
+        $blueprint = new Blueprint($table);
+        $blueprint->dropIndex($index);
+
+        $compiler = $this->getCompiler();
+        $sql = $compiler->compileAlter($blueprint);
+
+        if (is_array($sql)) {
+            return $this->executeMultiple($sql);
+        }
+
+        return AsyncPDO::execute($sql, []);
+    }
+
+    public function dropForeign(string $table, string|array $foreignKey): PromiseInterface
+    {
+        $blueprint = new Blueprint($table);
+        $blueprint->dropForeign($foreignKey);
+
+        $compiler = $this->getCompiler();
+        $sql = $compiler->compileAlter($blueprint);
+
+        if (is_array($sql)) {
+            return $this->executeMultiple($sql);
+        }
+
+        return AsyncPDO::execute($sql, []);
+    }
+
+    private function executeMultiple(array $statements): PromiseInterface
+    {
+        return Promise::resolved(null)
+            ->then(function () use ($statements) {
+                $results = [];
+                foreach ($statements as $sql) {
+                    $results[] = await(AsyncPDO::execute($sql, []));
+                }
+                return $results;
+            });
     }
 
     private function getCompiler(): SchemaCompiler

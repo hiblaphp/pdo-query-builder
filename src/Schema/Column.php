@@ -4,6 +4,9 @@ declare(strict_types=1);
 
 namespace Hibla\PdoQueryBuilder\Schema;
 
+use Doctrine\Inflector\InflectorFactory;
+use Doctrine\Inflector\Inflector as DoctrineInflector;
+
 class Column
 {
     private string $name;
@@ -25,6 +28,8 @@ class Column
     private array $enumValues = [];
     private ?ForeignKey $foreignKey = null;
     private ?Blueprint $blueprint = null;
+    private static ?DoctrineInflector $inflector = null;
+
 
     public function __construct(
         string $name,
@@ -40,9 +45,36 @@ class Column
         $this->scale = $scale;
     }
 
+    private static function getInflector(): DoctrineInflector
+    {
+        if (self::$inflector === null) {
+            self::$inflector = InflectorFactory::create()->build();
+        }
+
+        return self::$inflector;
+    }
+
+    /**
+     * Clone method to support column duplication during table recreation
+     */
+    public function __clone()
+    {
+        if ($this->foreignKey !== null) {
+            $this->foreignKey = clone $this->foreignKey;
+        }
+
+        $this->blueprint = null;
+    }
+
     public function getName(): string
     {
         return $this->name;
+    }
+
+    public function setName(string $name): self
+    {
+        $this->name = $name;
+        return $this;
     }
 
     public function getType(): string
@@ -50,9 +82,21 @@ class Column
         return $this->type;
     }
 
+    public function setType(string $type): self
+    {
+        $this->type = $type;
+        return $this;
+    }
+
     public function getLength(): ?int
     {
         return $this->length;
+    }
+
+    public function setLength(?int $length): self
+    {
+        $this->length = $length;
+        return $this;
     }
 
     public function getPrecision(): ?int
@@ -60,9 +104,21 @@ class Column
         return $this->precision;
     }
 
+    public function setPrecision(?int $precision): self
+    {
+        $this->precision = $precision;
+        return $this;
+    }
+
     public function getScale(): ?int
     {
         return $this->scale;
+    }
+
+    public function setScale(?int $scale): self
+    {
+        $this->scale = $scale;
+        return $this;
     }
 
     public function isNullable(): bool
@@ -128,6 +184,11 @@ class Column
     public function getForeignKey(): ?ForeignKey
     {
         return $this->foreignKey;
+    }
+
+    public function getBlueprint(): ?Blueprint
+    {
+        return $this->blueprint;
     }
 
     public function nullable(bool $value = true): self
@@ -203,10 +264,14 @@ class Column
         return $this;
     }
 
-    public function constrained(string $table, string $column = 'id'): self
+    public function constrained(?string $table = null, string $column = 'id'): self
     {
         if (!$this->blueprint) {
             throw new \RuntimeException('Blueprint reference not set on column');
+        }
+
+        if ($table === null) {
+            $table = $this->guessTableName();
         }
 
         $foreignKey = $this->blueprint->foreign($this->name);
@@ -215,6 +280,18 @@ class Column
         $this->foreignKey = $foreignKey;
 
         return $this;
+    }
+
+    private function guessTableName(): string
+    {
+        $name = $this->name;
+
+        if (str_ends_with($name, '_id')) {
+            $name = substr($name, 0, -3);
+        }
+
+
+        return self::getInflector()->pluralize($name);
     }
 
     public function cascadeOnDelete(): self
@@ -271,5 +348,130 @@ class Column
             $this->foreignKey->onUpdate('NO ACTION');
         }
         return $this;
+    }
+
+    /**
+     * Create a new column instance from this column with a different name
+     * Useful for column renaming operations
+     */
+    public function copyWithName(string $newName): self
+    {
+        $column = clone $this;
+        $column->setName($newName);
+        return $column;
+    }
+
+    /**
+     * Create a new column instance with modified attributes
+     * Useful for column modification operations
+     */
+    public function copyWithModifications(array $modifications): self
+    {
+        $column = clone $this;
+
+        foreach ($modifications as $attribute => $value) {
+            match ($attribute) {
+                'type' => $column->setType($value),
+                'length' => $column->setLength($value),
+                'precision' => $column->setPrecision($value),
+                'scale' => $column->setScale($value),
+                'nullable' => $column->nullable($value),
+                'default' => $column->default($value),
+                'unsigned' => $column->unsigned($value),
+                'unique' => $column->unique($value),
+                'comment' => $column->comment($value),
+                default => null,
+            };
+        }
+
+        return $column;
+    }
+
+    /**
+     * Convert column to array representation
+     * Useful for debugging and serialization
+     */
+    public function toArray(): array
+    {
+        return [
+            'name' => $this->name,
+            'type' => $this->type,
+            'length' => $this->length,
+            'precision' => $this->precision,
+            'scale' => $this->scale,
+            'nullable' => $this->nullable,
+            'default' => $this->default,
+            'hasDefault' => $this->hasDefault,
+            'unsigned' => $this->unsigned,
+            'autoIncrement' => $this->autoIncrement,
+            'primary' => $this->primary,
+            'unique' => $this->unique,
+            'comment' => $this->comment,
+            'after' => $this->after,
+            'useCurrent' => $this->useCurrent,
+            'onUpdate' => $this->onUpdate,
+            'enumValues' => $this->enumValues,
+            'hasForeignKey' => $this->foreignKey !== null,
+        ];
+    }
+
+    /**
+     * Create a column from array representation
+     */
+    public static function fromArray(array $data): self
+    {
+        $column = new self(
+            $data['name'],
+            $data['type'],
+            $data['length'] ?? null,
+            $data['precision'] ?? null,
+            $data['scale'] ?? null
+        );
+
+        if ($data['nullable'] ?? false) {
+            $column->nullable();
+        }
+
+        if ($data['hasDefault'] ?? false) {
+            $column->default($data['default'] ?? null);
+        }
+
+        if ($data['unsigned'] ?? false) {
+            $column->unsigned();
+        }
+
+        if ($data['autoIncrement'] ?? false) {
+            $column->autoIncrement();
+        }
+
+        if ($data['primary'] ?? false) {
+            $column->primary();
+        }
+
+        if ($data['unique'] ?? false) {
+            $column->unique();
+        }
+
+        if (isset($data['comment'])) {
+            $column->comment($data['comment']);
+        }
+
+        if (isset($data['after'])) {
+            $column->after($data['after']);
+        }
+
+        if ($data['useCurrent'] ?? false) {
+            $column->useCurrent();
+        }
+
+        if (isset($data['onUpdate'])) {
+            $column->onUpdate($data['onUpdate']);
+        }
+
+        if (!empty($data['enumValues'])) {
+            $column->setEnumValues($data['enumValues']);
+        }
+
+        return $column;
     }
 }

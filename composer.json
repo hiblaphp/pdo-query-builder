@@ -16,7 +16,8 @@
         "hiblaphp/async-pdo": "dev-main",
         "rcalicdan/query-builder-primitives": "dev-main",
         "ext-pdo": "*",
-        "symfony/console": "^7.3"
+        "symfony/console": "^7.3",
+        "doctrine/inflector": "^2.1"
     },
     "bin": [
         "bin/pdo-query-builder"

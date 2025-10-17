@@ -101,7 +101,6 @@ class PostgreSQLSchemaCompiler implements SchemaCompiler
 
     private function compileEnum(Column $column): string
     {
-        // PostgreSQL doesn't have ENUM in the same way, use CHECK constraint
         $values = array_map(fn($v) => "'{$v}'", $column->getEnumValues());
         return "VARCHAR(50) CHECK (\"{$column->getName()}\" IN (" . implode(', ', $values) . "))";
     }
@@ -116,17 +115,85 @@ class PostgreSQLSchemaCompiler implements SchemaCompiler
             "ON DELETE {$foreignKey->getOnDelete()} ON UPDATE {$foreignKey->getOnUpdate()}";
     }
 
-    public function compileAlter(Blueprint $blueprint): string
+    public function compileAlter(Blueprint $blueprint): string|array
     {
         $table = $blueprint->getTable();
-        $sql = "ALTER TABLE \"{$table}\"\n";
+        $statements = [];
 
-        $alterations = [];
-        foreach ($blueprint->getColumns() as $column) {
-            $alterations[] = "  ADD COLUMN " . $this->compileColumn($column);
+        // Drop foreign keys
+        foreach ($blueprint->getDropForeignKeys() as $foreignKey) {
+            $statements[] = "ALTER TABLE \"{$table}\" DROP CONSTRAINT \"{$foreignKey}\"";
         }
 
-        return $sql . implode(",\n", $alterations);
+        // Drop indexes
+        foreach ($blueprint->getDropIndexes() as $index) {
+            if ($index[0] === 'PRIMARY') {
+                $statements[] = "ALTER TABLE \"{$table}\" DROP CONSTRAINT \"{$table}_pkey\"";
+            } else {
+                $statements[] = "DROP INDEX \"{$index[0]}\"";
+            }
+        }
+
+        // Drop columns
+        foreach ($blueprint->getDropColumns() as $column) {
+            $statements[] = "ALTER TABLE \"{$table}\" DROP COLUMN \"{$column}\"";
+        }
+
+        // Rename columns
+        foreach ($blueprint->getRenameColumns() as $rename) {
+            $statements[] = $this->compileRenameColumn($blueprint, $rename['from'], $rename['to']);
+        }
+
+        // Modify columns
+        foreach ($blueprint->getModifyColumns() as $column) {
+            $type = $this->mapType($column->getType(), $column);
+            $statements[] = "ALTER TABLE \"{$table}\" ALTER COLUMN \"{$column->getName()}\" TYPE {$type}";
+
+            if (!$column->isNullable()) {
+                $statements[] = "ALTER TABLE \"{$table}\" ALTER COLUMN \"{$column->getName()}\" SET NOT NULL";
+            } else {
+                $statements[] = "ALTER TABLE \"{$table}\" ALTER COLUMN \"{$column->getName()}\" DROP NOT NULL";
+            }
+
+            if ($column->hasDefault()) {
+                $default = $column->getDefault();
+                if ($default === null) {
+                    $statements[] = "ALTER TABLE \"{$table}\" ALTER COLUMN \"{$column->getName()}\" SET DEFAULT NULL";
+                } elseif (is_bool($default)) {
+                    $statements[] = "ALTER TABLE \"{$table}\" ALTER COLUMN \"{$column->getName()}\" SET DEFAULT " . ($default ? 'true' : 'false');
+                } elseif (is_numeric($default)) {
+                    $statements[] = "ALTER TABLE \"{$table}\" ALTER COLUMN \"{$column->getName()}\" SET DEFAULT {$default}";
+                } else {
+                    $statements[] = "ALTER TABLE \"{$table}\" ALTER COLUMN \"{$column->getName()}\" SET DEFAULT '{$default}'";
+                }
+            }
+        }
+
+        // Add columns
+        foreach ($blueprint->getColumns() as $column) {
+            $statements[] = "ALTER TABLE \"{$table}\" ADD COLUMN " . $this->compileColumn($column);
+        }
+
+        // Add indexes
+        foreach ($blueprint->getIndexes() as $index) {
+            if ($index['type'] === 'PRIMARY') {
+                $cols = implode('", "', $index['columns']);
+                $statements[] = "ALTER TABLE \"{$table}\" ADD PRIMARY KEY (\"{$cols}\")";
+            } elseif ($index['type'] === 'UNIQUE') {
+                $cols = implode('", "', $index['columns']);
+                $statements[] = "CREATE UNIQUE INDEX \"{$index['name']}\" ON \"{$table}\" (\"{$cols}\")";
+            } else {
+                $cols = implode('", "', $index['columns']);
+                $statements[] = "CREATE INDEX \"{$index['name']}\" ON \"{$table}\" (\"{$cols}\")";
+            }
+        }
+
+        // Add foreign keys
+        foreach ($blueprint->getForeignKeys() as $foreignKey) {
+            $statements[] = "ALTER TABLE \"{$table}\" ADD " . $this->compileForeignKey($foreignKey);
+        }
+
+        return count($statements) === 1 ? $statements[0] : $statements;
     }
 
     public function compileDrop(string $table): string
@@ -143,5 +210,23 @@ class PostgreSQLSchemaCompiler implements SchemaCompiler
     {
         return "SELECT COUNT(*) FROM information_schema.tables " .
             "WHERE table_schema = 'public' AND table_name = '{$table}'";
+    }
+
+    public function compileRename(string $from, string $to): string
+    {
+        return "ALTER TABLE \"{$from}\" RENAME TO \"{$to}\"";
+    }
+
+    public function compileDropColumn(Blueprint $blueprint, array $columns): string
+    {
+        $table = $blueprint->getTable();
+        $drops = array_map(fn($col) => "DROP COLUMN \"{$col}\"", $columns);
+        return "ALTER TABLE \"{$table}\" " . implode(', ', $drops);
+    }
+
+    public function compileRenameColumn(Blueprint $blueprint, string $from, string $to): string
+    {
+        $table = $blueprint->getTable();
+        return "ALTER TABLE \"{$table}\" RENAME COLUMN \"{$from}\" TO \"{$to}\"";
     }
 }

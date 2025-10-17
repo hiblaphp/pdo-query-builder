@@ -13,6 +13,12 @@ class Blueprint
     private string $engine = 'InnoDB';
     private string $charset = 'utf8mb4';
     private string $collation = 'utf8mb4_unicode_ci';
+    private array $commands = [];
+    private array $dropColumns = [];
+    private array $renameColumns = [];
+    private array $modifyColumns = [];
+    private array $dropIndexes = [];
+    private array $dropForeignKeys = [];
 
     public function __construct(string $table)
     {
@@ -52,6 +58,36 @@ class Blueprint
     public function getCollation(): string
     {
         return $this->collation;
+    }
+
+    public function getCommands(): array
+    {
+        return $this->commands;
+    }
+
+    public function getDropColumns(): array
+    {
+        return $this->dropColumns;
+    }
+
+    public function getRenameColumns(): array
+    {
+        return $this->renameColumns;
+    }
+
+    public function getModifyColumns(): array
+    {
+        return $this->modifyColumns;
+    }
+
+    public function getDropIndexes(): array
+    {
+        return $this->dropIndexes;
+    }
+
+    public function getDropForeignKeys(): array
+    {
+        return $this->dropForeignKeys;
     }
 
     public function id(string $name = 'id'): Column
@@ -234,7 +270,7 @@ class Blueprint
     public function index(string|array $columns, ?string $name = null): self
     {
         $columns = is_array($columns) ? $columns : [$columns];
-        $name = $name ?? $this->table . '_' . implode('_', $columns) . '_index';
+         $name ??= $this->table . '_' . implode('_', $columns) . '_index';
         $this->indexes[] = ['type' => 'INDEX', 'name' => $name, 'columns' => $columns];
         return $this;
     }
@@ -242,7 +278,7 @@ class Blueprint
     public function unique(string|array $columns, ?string $name = null): self
     {
         $columns = is_array($columns) ? $columns : [$columns];
-        $name = $name ?? $this->table . '_' . implode('_', $columns) . '_unique';
+         $name ??= $this->table . '_' . implode('_', $columns) . '_unique';
         $this->indexes[] = ['type' => 'UNIQUE', 'name' => $name, 'columns' => $columns];
         return $this;
     }
@@ -257,10 +293,78 @@ class Blueprint
     public function foreign(string|array $columns, ?string $name = null): ForeignKey
     {
         $columns = is_array($columns) ? $columns : [$columns];
-        $name = $name ?? $this->table . '_' . implode('_', $columns) . '_foreign';
+         $name ??= $this->table . '_' . implode('_', $columns) . '_foreign';
         $foreignKey = new ForeignKey($name, $columns, $this->table);
         $this->foreignKeys[] = $foreignKey;
         return $foreignKey;
+    }
+
+    // NEW: Column modification methods
+    public function dropColumn(string|array $columns): self
+    {
+        $columns = is_array($columns) ? $columns : [$columns];
+        $this->dropColumns = array_merge($this->dropColumns, $columns);
+        return $this;
+    }
+
+    public function renameColumn(string $from, string $to): self
+    {
+        $this->renameColumns[] = ['from' => $from, 'to' => $to];
+        return $this;
+    }
+
+    public function modifyColumn(string $name): Column
+    {
+        $column = new Column($name, 'VARCHAR'); 
+        $column->setBlueprint($this);
+        $this->modifyColumns[] = $column;
+        return $column;
+    }
+
+    public function string_modify(string $name, int $length = 255): Column
+    {
+        $column = new Column($name, 'VARCHAR', $length);
+        $column->setBlueprint($this);
+        $this->modifyColumns[] = $column;
+        return $column;
+    }
+
+    public function integer_modify(string $name): Column
+    {
+        $column = new Column($name, 'INT');
+        $column->setBlueprint($this);
+        $this->modifyColumns[] = $column;
+        return $column;
+    }
+
+    public function dropIndex(string|array $index): self
+    {
+        $this->dropIndexes[] = is_array($index) ? $index : [$index];
+        return $this;
+    }
+
+    public function dropUnique(string|array $index): self
+    {
+        return $this->dropIndex($index);
+    }
+
+    public function dropPrimary(?string $index = null): self
+    {
+        $this->dropIndexes[] = $index ? [$index] : ['PRIMARY'];
+        return $this;
+    }
+
+    public function dropForeign(string|array $index): self
+    {
+        $keys = is_array($index) ? $index : [$index];
+        $this->dropForeignKeys = array_merge($this->dropForeignKeys, $keys);
+        return $this;
+    }
+
+    public function rename(string $to): self
+    {
+        $this->commands[] = ['type' => 'rename', 'to' => $to];
+        return $this;
     }
 
     public function engine(string $engine): self
