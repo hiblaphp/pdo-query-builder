@@ -52,6 +52,10 @@ class SQLiteSchemaCompiler implements SchemaCompiler
             $sql .= ' NOT NULL';
         }
 
+        if ($column->isPrimary()) {
+            $sql .= ' PRIMARY KEY';
+        }
+
         if ($column->hasDefault()) {
             $default = $column->getDefault();
             if ($default === null) {

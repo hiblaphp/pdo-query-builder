@@ -19,13 +19,11 @@ class MySQLSchemaCompiler implements SchemaCompiler
 
         $sql = "CREATE TABLE `{$table}` (\n";
 
-        // Columns
         $columnDefinitions = [];
         foreach ($columns as $column) {
             $columnDefinitions[] = '  ' . $this->compileColumn($column);
         }
 
-        // Indexes
         foreach ($indexes as $index) {
             if ($index['type'] === 'PRIMARY') {
                 $cols = implode('`, `', $index['columns']);
@@ -39,7 +37,6 @@ class MySQLSchemaCompiler implements SchemaCompiler
             }
         }
 
-        // Foreign keys
         foreach ($foreignKeys as $foreignKey) {
             $columnDefinitions[] = '  ' . $this->compileForeignKey($foreignKey);
         }
@@ -54,7 +51,6 @@ class MySQLSchemaCompiler implements SchemaCompiler
     {
         $sql = "`{$column->getName()}` ";
 
-        // Type
         $type = $column->getType();
         if ($type === 'ENUM') {
             $values = array_map(fn($v) => "'{$v}'", $column->getEnumValues());
@@ -67,19 +63,20 @@ class MySQLSchemaCompiler implements SchemaCompiler
             $sql .= $type;
         }
 
-        // Unsigned
         if ($column->isUnsigned()) {
             $sql .= ' UNSIGNED';
         }
 
-        // Nullable
         if ($column->isNullable()) {
             $sql .= ' NULL';
         } else {
             $sql .= ' NOT NULL';
         }
 
-        // Default
+        if ($column->isPrimary()) {
+            $sql .= ' PRIMARY KEY';
+        }
+
         if ($column->hasDefault()) {
             $default = $column->getDefault();
             if ($default === null) {
@@ -95,17 +92,14 @@ class MySQLSchemaCompiler implements SchemaCompiler
             $sql .= ' DEFAULT CURRENT_TIMESTAMP';
         }
 
-        // On Update
         if ($column->getOnUpdate()) {
             $sql .= " ON UPDATE {$column->getOnUpdate()}";
         }
 
-        // Auto increment
         if ($column->isAutoIncrement()) {
             $sql .= ' AUTO_INCREMENT';
         }
 
-        // Comment
         if ($column->getComment()) {
             $sql .= " COMMENT '{$column->getComment()}'";
         }
