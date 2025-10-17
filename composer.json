@@ -8,6 +8,11 @@
             "Hibla\\PdoQueryBuilder\\": "src/"
         }
     },
+    "autoload-dev": {
+        "psr-4": {
+            "Tests\\": "tests/"
+        }
+    },
     "require": {
         "php": "^8.2",
         "hiblaphp/event-loop": "dev-main",
@@ -19,6 +24,9 @@
         "symfony/console": "^7.3",
         "doctrine/inflector": "^2.1"
     },
+    "require-dev": {
+        "pestphp/pest": "^3.0"
+    },
     "bin": [
         "bin/pdo-query-builder"
     ],
@@ -29,5 +37,10 @@
         "post-update-cmd": [
             "@php -r \"if (!is_dir('config')) { echo '\\nRun: ./vendor/bin/pdo-query-builder init\\n\\n'; }\""
         ]
+    },
+    "config": {
+        "allow-plugins": {
+            "pestphp/pest-plugin": true
+        }
     }
 }
