@@ -10,6 +10,10 @@ use Hibla\PdoQueryBuilder\Schema\SchemaCompiler;
 
 class PostgreSQLSchemaCompiler implements SchemaCompiler
 {
+    private bool $useConcurrentIndexes = false;
+    private bool $useNotValidConstraints = false;
+    private ?int $lockTimeout = null;
+
     public function compileCreate(Blueprint $blueprint): string
     {
         $table = $blueprint->getTable();
@@ -17,7 +21,7 @@ class PostgreSQLSchemaCompiler implements SchemaCompiler
         $indexes = $blueprint->getIndexes();
         $foreignKeys = $blueprint->getForeignKeys();
 
-        $sql = "CREATE TABLE \"{$table}\" (\n";
+        $sql = "CREATE TABLE IF NOT EXISTS \"{$table}\" (\n";
 
         $columnDefinitions = [];
         foreach ($columns as $column) {
@@ -56,40 +60,48 @@ class PostgreSQLSchemaCompiler implements SchemaCompiler
             $sql .= ' NOT NULL';
         }
 
-        if ($column->isPrimary()) {
+        if ($column->isPrimary() && !$column->isAutoIncrement()) {
             $sql .= ' PRIMARY KEY';
         }
 
         if ($column->hasDefault()) {
-            $default = $column->getDefault();
-            if ($default === null) {
-                $sql .= ' DEFAULT NULL';
-            } elseif (is_bool($default)) {
-                $sql .= ' DEFAULT ' . ($default ? 'true' : 'false');
-            } elseif (is_numeric($default)) {
-                $sql .= " DEFAULT {$default}";
-            } else {
-                $sql .= " DEFAULT '{$default}'";
-            }
+            $sql .= ' DEFAULT ' . $this->formatDefault($column->getDefault());
         } elseif ($column->shouldUseCurrent()) {
             $sql .= ' DEFAULT CURRENT_TIMESTAMP';
+        }
+
+        if ($column->getComment() !== null) {
+            // Comments are added separately in PostgreSQL
         }
 
         return $sql;
     }
 
+    private function formatDefault(mixed $default): string
+    {
+        if ($default === null) {
+            return 'NULL';
+        } elseif (is_bool($default)) {
+            return $default ? 'true' : 'false';
+        } elseif (is_numeric($default)) {
+            return (string) $default;
+        } else {
+            return "'" . addslashes((string) $default) . "'";
+        }
+    }
+
     private function mapType(string $type, Column $column): string
     {
         return match ($type) {
-            'BIGINT' => $column->isAutoIncrement() ? 'BIGSERIAL' : 'BIGINT',
-            'INT' => $column->isAutoIncrement() ? 'SERIAL' : 'INTEGER',
-            'VARCHAR' => "VARCHAR({$column->getLength()})",
-            'TEXT', 'MEDIUMTEXT', 'LONGTEXT' => 'TEXT',
+            'BIGINT' => $column->isAutoIncrement() ? 'BIGSERIAL' : ($column->isUnsigned() ? 'BIGINT' : 'BIGINT'),
+            'INT' => $column->isAutoIncrement() ? 'SERIAL' : ($column->isUnsigned() ? 'INTEGER' : 'INTEGER'),
             'TINYINT' => $column->getLength() === 1 ? 'BOOLEAN' : 'SMALLINT',
-            'SMALLINT' => 'SMALLINT',
+            'SMALLINT' => $column->isAutoIncrement() ? 'SMALLSERIAL' : 'SMALLINT',
+            'VARCHAR' => $column->getLength() ? "VARCHAR({$column->getLength()})" : 'VARCHAR',
+            'TEXT', 'MEDIUMTEXT', 'LONGTEXT' => 'TEXT',
             'DECIMAL' => "DECIMAL({$column->getPrecision()}, {$column->getScale()})",
-            'FLOAT' => "REAL",
-            'DOUBLE' => "DOUBLE PRECISION",
+            'FLOAT' => 'REAL',
+            'DOUBLE' => 'DOUBLE PRECISION',
             'DATETIME' => 'TIMESTAMP',
             'TIMESTAMP' => 'TIMESTAMP',
             'DATE' => 'DATE',
@@ -101,18 +113,31 @@ class PostgreSQLSchemaCompiler implements SchemaCompiler
 
     private function compileEnum(Column $column): string
     {
-        $values = array_map(fn($v) => "'{$v}'", $column->getEnumValues());
-        return "VARCHAR(50) CHECK (\"{$column->getName()}\" IN (" . implode(', ', $values) . "))";
+        $values = array_map(fn($v) => "'" . addslashes($v) . "'", $column->getEnumValues());
+        return "VARCHAR(255) CHECK (\"{$column->getName()}\" IN (" . implode(', ', $values) . "))";
     }
 
-    private function compileForeignKey($foreignKey): string
+    private function compileForeignKey($foreignKey, bool $notValid = false): string
     {
         $cols = implode('", "', $foreignKey->getColumns());
         $refCols = implode('", "', $foreignKey->getReferenceColumns());
 
-        return "CONSTRAINT \"{$foreignKey->getName()}\" FOREIGN KEY (\"{$cols}\") " .
-            "REFERENCES \"{$foreignKey->getReferenceTable()}\" (\"{$refCols}\") " .
-            "ON DELETE {$foreignKey->getOnDelete()} ON UPDATE {$foreignKey->getOnUpdate()}";
+        $sql = "CONSTRAINT \"{$foreignKey->getName()}\" FOREIGN KEY (\"{$cols}\") " .
+            "REFERENCES \"{$foreignKey->getReferenceTable()}\" (\"{$refCols}\")";
+
+        if ($foreignKey->getOnDelete() !== 'RESTRICT') {
+            $sql .= " ON DELETE {$foreignKey->getOnDelete()}";
+        }
+
+        if ($foreignKey->getOnUpdate() !== 'RESTRICT') {
+            $sql .= " ON UPDATE {$foreignKey->getOnUpdate()}";
+        }
+
+        if ($notValid || $this->useNotValidConstraints) {
+            $sql .= " NOT VALID";
+        }
+
+        return $sql;
     }
 
     public function compileAlter(Blueprint $blueprint): string|array
@@ -120,80 +145,203 @@ class PostgreSQLSchemaCompiler implements SchemaCompiler
         $table = $blueprint->getTable();
         $statements = [];
 
-        // Drop foreign keys
-        foreach ($blueprint->getDropForeignKeys() as $foreignKey) {
-            $statements[] = "ALTER TABLE \"{$table}\" DROP CONSTRAINT \"{$foreignKey}\"";
+        if ($this->lockTimeout !== null) {
+            $statements[] = "SET LOCAL lock_timeout = '{$this->lockTimeout}ms'";
         }
 
-        // Drop indexes
+        foreach ($blueprint->getDropForeignKeys() as $foreignKey) {
+            $statements[] = $this->compileDropForeignKey($table, $foreignKey);
+        }
+
         foreach ($blueprint->getDropIndexes() as $index) {
             if ($index[0] === 'PRIMARY') {
-                $statements[] = "ALTER TABLE \"{$table}\" DROP CONSTRAINT \"{$table}_pkey\"";
+                $statements[] = "ALTER TABLE \"{$table}\" DROP CONSTRAINT IF EXISTS \"{$table}_pkey\"";
             } else {
-                $statements[] = "DROP INDEX \"{$index[0]}\"";
+                $statements[] = "DROP INDEX IF EXISTS \"{$index[0]}\"";
             }
         }
 
-        // Drop columns
         foreach ($blueprint->getDropColumns() as $column) {
-            $statements[] = "ALTER TABLE \"{$table}\" DROP COLUMN \"{$column}\"";
+            $statements[] = "ALTER TABLE \"{$table}\" DROP COLUMN IF EXISTS \"{$column}\"";
         }
 
-        // Rename columns
         foreach ($blueprint->getRenameColumns() as $rename) {
             $statements[] = $this->compileRenameColumn($blueprint, $rename['from'], $rename['to']);
         }
 
-        // Modify columns
         foreach ($blueprint->getModifyColumns() as $column) {
-            $type = $this->mapType($column->getType(), $column);
-            $statements[] = "ALTER TABLE \"{$table}\" ALTER COLUMN \"{$column->getName()}\" TYPE {$type}";
-
-            if (!$column->isNullable()) {
-                $statements[] = "ALTER TABLE \"{$table}\" ALTER COLUMN \"{$column->getName()}\" SET NOT NULL";
-            } else {
-                $statements[] = "ALTER TABLE \"{$table}\" ALTER COLUMN \"{$column->getName()}\" DROP NOT NULL";
-            }
-
-            if ($column->hasDefault()) {
-                $default = $column->getDefault();
-                if ($default === null) {
-                    $statements[] = "ALTER TABLE \"{$table}\" ALTER COLUMN \"{$column->getName()}\" SET DEFAULT NULL";
-                } elseif (is_bool($default)) {
-                    $statements[] = "ALTER TABLE \"{$table}\" ALTER COLUMN \"{$column->getName()}\" SET DEFAULT " . ($default ? 'true' : 'false');
-                } elseif (is_numeric($default)) {
-                    $statements[] = "ALTER TABLE \"{$table}\" ALTER COLUMN \"{$column->getName()}\" SET DEFAULT {$default}";
-                } else {
-                    $statements[] = "ALTER TABLE \"{$table}\" ALTER COLUMN \"{$column->getName()}\" SET DEFAULT '{$default}'";
-                }
-            }
+            $statements = array_merge($statements, $this->compileModifyColumn($table, $column));
         }
 
-        // Add columns
         foreach ($blueprint->getColumns() as $column) {
-            $statements[] = "ALTER TABLE \"{$table}\" ADD COLUMN " . $this->compileColumn($column);
+            $statements = array_merge($statements, $this->compileAddColumn($table, $column));
         }
 
-        // Add indexes
         foreach ($blueprint->getIndexes() as $index) {
             if ($index['type'] === 'PRIMARY') {
-                $cols = implode('", "', $index['columns']);
-                $statements[] = "ALTER TABLE \"{$table}\" ADD PRIMARY KEY (\"{$cols}\")";
+                $statements = array_merge($statements, $this->compileAddPrimaryKey($table, $index));
             } elseif ($index['type'] === 'UNIQUE') {
-                $cols = implode('", "', $index['columns']);
-                $statements[] = "CREATE UNIQUE INDEX \"{$index['name']}\" ON \"{$table}\" (\"{$cols}\")";
+                $statements[] = $this->compileCreateIndex($table, $index['name'], $index['columns'], 'UNIQUE');
             } else {
-                $cols = implode('", "', $index['columns']);
-                $statements[] = "CREATE INDEX \"{$index['name']}\" ON \"{$table}\" (\"{$cols}\")";
+                $statements[] = $this->compileCreateIndex($table, $index['name'], $index['columns'], 'INDEX');
             }
         }
 
-        // Add foreign keys
         foreach ($blueprint->getForeignKeys() as $foreignKey) {
-            $statements[] = "ALTER TABLE \"{$table}\" ADD " . $this->compileForeignKey($foreignKey);
+            $statements[] = "ALTER TABLE \"{$table}\" ADD " . $this->compileForeignKey($foreignKey, $this->useNotValidConstraints);
+            
+            if ($this->useNotValidConstraints) {
+                $statements[] = $this->compileValidateConstraint($table, $foreignKey->getName());
+            }
+        }
+
+        foreach ($blueprint->getCommands() as $command) {
+            if ($command['type'] === 'rename') {
+                $statements[] = $this->compileRename($table, $command['to']);
+            }
         }
 
         return count($statements) === 1 ? $statements[0] : $statements;
+    }
+
+    /**
+     * Compile optimized column addition to avoid table rewrites
+     */
+    private function compileAddColumn(string $table, Column $column): array
+    {
+        $statements = [];
+        
+        $colDef = $this->compileColumnWithoutDefault($column);
+        $statements[] = "ALTER TABLE \"{$table}\" ADD COLUMN IF NOT EXISTS {$colDef}";
+        
+        if ($column->hasDefault()) {
+            $default = $this->formatDefault($column->getDefault());
+            $statements[] = "ALTER TABLE \"{$table}\" ALTER COLUMN \"{$column->getName()}\" SET DEFAULT {$default}";
+        } elseif ($column->shouldUseCurrent()) {
+            $statements[] = "ALTER TABLE \"{$table}\" ALTER COLUMN \"{$column->getName()}\" SET DEFAULT CURRENT_TIMESTAMP";
+        }
+
+        if ($column->getComment() !== null) {
+            $comment = addslashes($column->getComment());
+            $statements[] = "COMMENT ON COLUMN \"{$table}\".\"{$column->getName()}\" IS '{$comment}'";
+        }
+
+        return $statements;
+    }
+
+    /**
+     * Compile column definition without default value
+     */
+    private function compileColumnWithoutDefault(Column $column): string
+    {
+        $sql = "\"{$column->getName()}\" ";
+        $type = $this->mapType($column->getType(), $column);
+        $sql .= $type;
+
+        if (!$column->isNullable()) {
+            $sql .= ' NOT NULL';
+        }
+
+        return $sql;
+    }
+
+    /**
+     * Compile column modification with USING clause support
+     */
+    private function compileModifyColumn(string $table, Column $column): array
+    {
+        $statements = [];
+        $columnName = $column->getName();
+        $type = $this->mapType($column->getType(), $column);
+
+        $using = $this->getTypeConversionUsing($column);
+        $statements[] = "ALTER TABLE \"{$table}\" ALTER COLUMN \"{$columnName}\" TYPE {$type} USING {$using}";
+
+        if (!$column->isNullable()) {
+            $statements[] = "ALTER TABLE \"{$table}\" ALTER COLUMN \"{$columnName}\" SET NOT NULL";
+        } else {
+            $statements[] = "ALTER TABLE \"{$table}\" ALTER COLUMN \"{$columnName}\" DROP NOT NULL";
+        }
+
+        if ($column->hasDefault()) {
+            $default = $this->formatDefault($column->getDefault());
+            $statements[] = "ALTER TABLE \"{$table}\" ALTER COLUMN \"{$columnName}\" SET DEFAULT {$default}";
+        } elseif ($column->shouldUseCurrent()) {
+            $statements[] = "ALTER TABLE \"{$table}\" ALTER COLUMN \"{$columnName}\" SET DEFAULT CURRENT_TIMESTAMP";
+        } else {
+            $statements[] = "ALTER TABLE \"{$table}\" ALTER COLUMN \"{$columnName}\" DROP DEFAULT";
+        }
+
+        return $statements;
+    }
+
+    /**
+     * Get USING clause for type conversion
+     */
+    private function getTypeConversionUsing(Column $column): string
+    {
+        $name = $column->getName();
+        $type = $this->mapType($column->getType(), $column);
+
+        return match ($column->getType()) {
+            'BIGINT', 'INT', 'SMALLINT', 'TINYINT' => "\"{$name}\"::INTEGER",
+            'DECIMAL', 'FLOAT', 'DOUBLE' => "\"{$name}\"::NUMERIC",
+            'TEXT', 'VARCHAR' => "\"{$name}\"::TEXT",
+            'BOOLEAN' => "(\"{$name}\" = '1' OR \"{$name}\" = 'true' OR \"{$name}\" = 't')::BOOLEAN",
+            'TIMESTAMP', 'DATETIME' => "\"{$name}\"::TIMESTAMP",
+            'DATE' => "\"{$name}\"::DATE",
+            'JSON' => "\"{$name}\"::JSONB",
+            default => "\"{$name}\"::{$type}",
+        };
+    }
+
+    /**
+     * Compile index creation with CONCURRENTLY support
+     */
+    private function compileCreateIndex(string $table, string $name, array $columns, string $type): string
+    {
+        $cols = implode('", "', $columns);
+        $concurrent = $this->useConcurrentIndexes ? 'CONCURRENTLY' : '';
+
+        if ($type === 'UNIQUE') {
+            return "CREATE UNIQUE INDEX {$concurrent} IF NOT EXISTS \"{$name}\" ON \"{$table}\" (\"{$cols}\")";
+        }
+
+        return "CREATE INDEX {$concurrent} IF NOT EXISTS \"{$name}\" ON \"{$table}\" (\"{$cols}\")";
+    }
+
+    /**
+     * Compile primary key addition using concurrent index
+     */
+    private function compileAddPrimaryKey(string $table, array $index): array
+    {
+        $cols = implode('", "', $index['columns']);
+        $indexName = "{$table}_pkey";
+
+        if ($this->useConcurrentIndexes) {
+            return [
+                "CREATE UNIQUE INDEX CONCURRENTLY \"{$indexName}\" ON \"{$table}\" (\"{$cols}\")",
+                "ALTER TABLE \"{$table}\" ADD CONSTRAINT \"{$indexName}\" PRIMARY KEY USING INDEX \"{$indexName}\""
+            ];
+        }
+
+        return ["ALTER TABLE \"{$table}\" ADD PRIMARY KEY (\"{$cols}\")"];
+    }
+
+    /**
+     * Compile constraint validation
+     */
+    public function compileValidateConstraint(string $table, string $constraint): string
+    {
+        return "ALTER TABLE \"{$table}\" VALIDATE CONSTRAINT \"{$constraint}\"";
+    }
+
+    /**
+     * Compile drop foreign key with IF EXISTS
+     */
+    private function compileDropForeignKey(string $table, string $foreignKey): string
+    {
+        return "ALTER TABLE \"{$table}\" DROP CONSTRAINT IF EXISTS \"{$foreignKey}\"";
     }
 
     public function compileDrop(string $table): string
@@ -208,8 +356,11 @@ class PostgreSQLSchemaCompiler implements SchemaCompiler
 
     public function compileTableExists(string $table): string
     {
-        return "SELECT COUNT(*) FROM information_schema.tables " .
-            "WHERE table_schema = 'public' AND table_name = '{$table}'";
+        return "SELECT EXISTS (
+            SELECT FROM pg_tables 
+            WHERE schemaname = 'public' 
+            AND tablename = '{$table}'
+        )";
     }
 
     public function compileRename(string $from, string $to): string
@@ -220,7 +371,7 @@ class PostgreSQLSchemaCompiler implements SchemaCompiler
     public function compileDropColumn(Blueprint $blueprint, array $columns): string
     {
         $table = $blueprint->getTable();
-        $drops = array_map(fn($col) => "DROP COLUMN \"{$col}\"", $columns);
+        $drops = array_map(fn($col) => "DROP COLUMN IF EXISTS \"{$col}\"", $columns);
         return "ALTER TABLE \"{$table}\" " . implode(', ', $drops);
     }
 

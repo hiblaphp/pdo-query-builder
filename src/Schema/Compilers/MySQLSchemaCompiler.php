@@ -17,11 +17,14 @@ use PDO;
  * - RENAME COLUMN syntax
  * - Improved JSON support
  * - Better performance optimizations
+ * - Transaction support for DDL operations
  */
 class MySQLSchemaCompiler implements SchemaCompiler
 {
     private const MINIMUM_VERSION = '8.0';
     private ?PDO $connection = null;
+    private bool $useTransactions = false;
+    private ?int $lockWaitTimeout = null;
 
     public function setConnection(?PDO $connection): void
     {
@@ -65,7 +68,7 @@ class MySQLSchemaCompiler implements SchemaCompiler
         $indexes = $blueprint->getIndexes();
         $foreignKeys = $blueprint->getForeignKeys();
 
-        $sql = "CREATE TABLE `{$table}` (\n";
+        $sql = "CREATE TABLE IF NOT EXISTS `{$table}` (\n";
 
         $columnDefinitions = [];
 
@@ -219,15 +222,28 @@ class MySQLSchemaCompiler implements SchemaCompiler
         $cols = implode('`, `', $foreignKey->getColumns());
         $refCols = implode('`, `', $foreignKey->getReferenceColumns());
 
-        return "CONSTRAINT `{$foreignKey->getName()}` FOREIGN KEY (`{$cols}`) " .
-            "REFERENCES `{$foreignKey->getReferenceTable()}` (`{$refCols}`) " .
-            "ON DELETE {$foreignKey->getOnDelete()} ON UPDATE {$foreignKey->getOnUpdate()}";
+        $sql = "CONSTRAINT `{$foreignKey->getName()}` FOREIGN KEY (`{$cols}`) " .
+            "REFERENCES `{$foreignKey->getReferenceTable()}` (`{$refCols}`)";
+
+        if ($foreignKey->getOnDelete() !== 'RESTRICT') {
+            $sql .= " ON DELETE {$foreignKey->getOnDelete()}";
+        }
+
+        if ($foreignKey->getOnUpdate() !== 'RESTRICT') {
+            $sql .= " ON UPDATE {$foreignKey->getOnUpdate()}";
+        }
+
+        return $sql;
     }
 
     public function compileAlter(Blueprint $blueprint): string|array
     {
         $table = $blueprint->getTable();
         $statements = [];
+
+        if ($this->lockWaitTimeout !== null) {
+            $statements[] = "SET SESSION lock_wait_timeout = {$this->lockWaitTimeout}";
+        }
 
         foreach ($blueprint->getDropForeignKeys() as $foreignKey) {
             $statements[] = "ALTER TABLE `{$table}` DROP FOREIGN KEY `{$foreignKey}`";
@@ -332,189 +348,5 @@ class MySQLSchemaCompiler implements SchemaCompiler
 
         $escaped = str_replace("'", "''", $value);
         return "'{$escaped}'";
-    }
-
-    /**
-     * Get detailed column information from information_schema
-     */
-    public function getTableColumns(string $table): array
-    {
-        if (!$this->connection) {
-            throw new \RuntimeException('Database connection required to get table columns');
-        }
-
-        $sql = "SELECT 
-                    COLUMN_NAME,
-                    COLUMN_TYPE,
-                    IS_NULLABLE,
-                    COLUMN_DEFAULT,
-                    EXTRA,
-                    COLUMN_KEY,
-                    COLUMN_COMMENT,
-                    CHARACTER_SET_NAME,
-                    COLLATION_NAME,
-                    GENERATION_EXPRESSION
-                FROM information_schema.COLUMNS
-                WHERE TABLE_SCHEMA = DATABASE()
-                AND TABLE_NAME = ?
-                ORDER BY ORDINAL_POSITION";
-
-        $stmt = $this->connection->prepare($sql);
-        $stmt->execute([$table]);
-
-        return $stmt->fetchAll(PDO::FETCH_ASSOC);
-    }
-
-    /**
-     * Get index information for a table
-     */
-    public function getTableIndexes(string $table): array
-    {
-        if (!$this->connection) {
-            throw new \RuntimeException('Database connection required to get table indexes');
-        }
-
-        $sql = "SELECT 
-                    INDEX_NAME,
-                    COLUMN_NAME,
-                    NON_UNIQUE,
-                    SEQ_IN_INDEX,
-                    INDEX_TYPE,
-                    INDEX_COMMENT
-                FROM information_schema.STATISTICS
-                WHERE TABLE_SCHEMA = DATABASE()
-                AND TABLE_NAME = ?
-                ORDER BY INDEX_NAME, SEQ_IN_INDEX";
-
-        $stmt = $this->connection->prepare($sql);
-        $stmt->execute([$table]);
-
-        return $stmt->fetchAll(PDO::FETCH_ASSOC);
-    }
-
-    /**
-     * Get foreign key information for a table
-     */
-    public function getTableForeignKeys(string $table): array
-    {
-        if (!$this->connection) {
-            throw new \RuntimeException('Database connection required to get table foreign keys');
-        }
-
-        $sql = "SELECT 
-                    kcu.CONSTRAINT_NAME,
-                    kcu.COLUMN_NAME,
-                    kcu.REFERENCED_TABLE_NAME,
-                    kcu.REFERENCED_COLUMN_NAME,
-                    rc.UPDATE_RULE,
-                    rc.DELETE_RULE
-                FROM information_schema.KEY_COLUMN_USAGE kcu
-                JOIN information_schema.REFERENTIAL_CONSTRAINTS rc
-                    ON kcu.CONSTRAINT_NAME = rc.CONSTRAINT_NAME
-                    AND kcu.CONSTRAINT_SCHEMA = rc.CONSTRAINT_SCHEMA
-                WHERE kcu.TABLE_SCHEMA = DATABASE()
-                AND kcu.TABLE_NAME = ?
-                AND kcu.REFERENCED_TABLE_NAME IS NOT NULL
-                ORDER BY kcu.CONSTRAINT_NAME, kcu.ORDINAL_POSITION";
-
-        $stmt = $this->connection->prepare($sql);
-        $stmt->execute([$table]);
-
-        return $stmt->fetchAll(PDO::FETCH_ASSOC);
-    }
-
-    /**
-     * Get table status and metadata
-     */
-    public function getTableStatus(string $table): ?array
-    {
-        if (!$this->connection) {
-            throw new \RuntimeException('Database connection required to get table status');
-        }
-
-        $sql = "SELECT 
-                    ENGINE,
-                    VERSION,
-                    ROW_FORMAT,
-                    TABLE_ROWS,
-                    AVG_ROW_LENGTH,
-                    DATA_LENGTH,
-                    MAX_DATA_LENGTH,
-                    INDEX_LENGTH,
-                    DATA_FREE,
-                    AUTO_INCREMENT,
-                    CREATE_TIME,
-                    UPDATE_TIME,
-                    CHECK_TIME,
-                    TABLE_COLLATION,
-                    CHECKSUM,
-                    CREATE_OPTIONS,
-                    TABLE_COMMENT
-                FROM information_schema.TABLES
-                WHERE TABLE_SCHEMA = DATABASE()
-                AND TABLE_NAME = ?";
-
-        $stmt = $this->connection->prepare($sql);
-        $stmt->execute([$table]);
-
-        return $stmt->fetch(PDO::FETCH_ASSOC) ?: null;
-    }
-
-    /**
-     * Get the CREATE TABLE statement for a table
-     */
-    public function getTableCreateStatement(string $table): string
-    {
-        if (!$this->connection) {
-            throw new \RuntimeException('Database connection required to get CREATE TABLE statement');
-        }
-
-        $sql = "SHOW CREATE TABLE `{$table}`";
-        $stmt = $this->connection->query($sql);
-        $result = $stmt->fetch(PDO::FETCH_ASSOC);
-
-        return $result['Create Table'] ?? '';
-    }
-
-    /**
-     * Check if a column exists in a table
-     */
-    public function columnExists(string $table, string $column): bool
-    {
-        if (!$this->connection) {
-            throw new \RuntimeException('Database connection required to check column existence');
-        }
-
-        $sql = "SELECT COUNT(*) 
-                FROM information_schema.COLUMNS
-                WHERE TABLE_SCHEMA = DATABASE()
-                AND TABLE_NAME = ?
-                AND COLUMN_NAME = ?";
-
-        $stmt = $this->connection->prepare($sql);
-        $stmt->execute([$table, $column]);
-
-        return (bool) $stmt->fetchColumn();
-    }
-
-    /**
-     * Check if an index exists in a table
-     */
-    public function indexExists(string $table, string $index): bool
-    {
-        if (!$this->connection) {
-            throw new \RuntimeException('Database connection required to check index existence');
-        }
-
-        $sql = "SELECT COUNT(*) 
-                FROM information_schema.STATISTICS
-                WHERE TABLE_SCHEMA = DATABASE()
-                AND TABLE_NAME = ?
-                AND INDEX_NAME = ?";
-
-        $stmt = $this->connection->prepare($sql);
-        $stmt->execute([$table, $index]);
-
-        return (bool) $stmt->fetchColumn();
     }
 }

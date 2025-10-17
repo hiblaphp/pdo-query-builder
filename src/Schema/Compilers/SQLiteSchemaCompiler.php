@@ -11,13 +11,6 @@ use PDO;
 
 class SQLiteSchemaCompiler implements SchemaCompiler
 {
-    private ?PDO $connection = null;
-
-    public function setConnection(?PDO $connection): void
-    {
-        $this->connection = $connection;
-    }
-
     public function compileCreate(Blueprint $blueprint): string
     {
         $table = $blueprint->getTable();
