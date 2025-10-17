@@ -6,6 +6,7 @@ namespace Hibla\PdoQueryBuilder\Schema\Compilers;
 
 use Hibla\PdoQueryBuilder\Schema\Blueprint;
 use Hibla\PdoQueryBuilder\Schema\Column;
+use Hibla\PdoQueryBuilder\Schema\IndexDefinition;
 use Hibla\PdoQueryBuilder\Schema\SchemaCompiler;
 
 class PostgreSQLSchemaCompiler implements SchemaCompiler
@@ -17,7 +18,7 @@ class PostgreSQLSchemaCompiler implements SchemaCompiler
     {
         $table = $blueprint->getTable();
         $columns = $blueprint->getColumns();
-        $indexes = $blueprint->getIndexes();
+        $indexDefinitions = $blueprint->getIndexDefinitions();
         $foreignKeys = $blueprint->getForeignKeys();
 
         $sql = "CREATE TABLE IF NOT EXISTS \"{$table}\" (\n";
@@ -27,14 +28,9 @@ class PostgreSQLSchemaCompiler implements SchemaCompiler
             $columnDefinitions[] = '  ' . $this->compileColumn($column);
         }
 
-        foreach ($indexes as $index) {
-            if ($index['type'] === 'PRIMARY') {
-                $cols = implode('", "', $index['columns']);
-                $columnDefinitions[] = "  PRIMARY KEY (\"{$cols}\")";
-            } elseif ($index['type'] === 'UNIQUE') {
-                $cols = implode('", "', $index['columns']);
-                $name = $index['name'];
-                $columnDefinitions[] = "  CONSTRAINT \"{$name}\" UNIQUE (\"{$cols}\")";
+        foreach ($indexDefinitions as $indexDef) {
+            if ($indexDef->getType() === 'PRIMARY' || $indexDef->getType() === 'UNIQUE') {
+                $columnDefinitions[] = '  ' . $this->compileIndexDefinition($indexDef);
             }
         }
 
@@ -46,6 +42,21 @@ class PostgreSQLSchemaCompiler implements SchemaCompiler
         $sql .= "\n)";
 
         return $sql;
+    }
+
+    /**
+     * Compile index definition for PostgreSQL
+     */
+    private function compileIndexDefinition(IndexDefinition $indexDef): string
+    {
+        $type = $indexDef->getType();
+        $cols = implode('", "', $indexDef->getColumns());
+
+        return match ($type) {
+            'PRIMARY' => "PRIMARY KEY (\"{$cols}\")",
+            'UNIQUE' => "CONSTRAINT \"{$indexDef->getName()}\" UNIQUE (\"{$cols}\")",
+            default => '',
+        };
     }
 
     private function compileColumn(Column $column): string
@@ -160,10 +171,6 @@ class PostgreSQLSchemaCompiler implements SchemaCompiler
             }
         }
 
-        foreach ($blueprint->getDropColumns() as $column) {
-            $statements[] = "ALTER TABLE \"{$table}\" DROP COLUMN IF EXISTS \"{$column}\"";
-        }
-
         foreach ($blueprint->getRenameColumns() as $rename) {
             $statements[] = $this->compileRenameColumn($blueprint, $rename['from'], $rename['to']);
         }
@@ -176,14 +183,8 @@ class PostgreSQLSchemaCompiler implements SchemaCompiler
             $statements = array_merge($statements, $this->compileAddColumn($table, $column));
         }
 
-        foreach ($blueprint->getIndexes() as $index) {
-            if ($index['type'] === 'PRIMARY') {
-                $statements = array_merge($statements, $this->compileAddPrimaryKey($table, $index));
-            } elseif ($index['type'] === 'UNIQUE') {
-                $statements[] = $this->compileCreateIndex($table, $index['name'], $index['columns'], 'UNIQUE');
-            } else {
-                $statements[] = $this->compileCreateIndex($table, $index['name'], $index['columns'], 'INDEX');
-            }
+        foreach ($blueprint->getIndexDefinitions() as $indexDef) {
+            $statements = array_merge($statements, $this->compileAddIndexDefinition($table, $indexDef));
         }
 
         foreach ($blueprint->getForeignKeys() as $foreignKey) {
@@ -201,6 +202,65 @@ class PostgreSQLSchemaCompiler implements SchemaCompiler
         }
 
         return count($statements) === 1 ? $statements[0] : $statements;
+    }
+
+    /**
+     * Compile add index definitions for ALTER TABLE
+     */
+    private function compileAddIndexDefinition(string $table, IndexDefinition $indexDef): array
+    {
+        $type = $indexDef->getType();
+        $statements = [];
+
+        if ($type === 'PRIMARY') {
+            $cols = implode('", "', $indexDef->getColumns());
+            $statements[] = "ALTER TABLE \"{$table}\" ADD PRIMARY KEY (\"{$cols}\")";
+        } elseif ($type === 'UNIQUE') {
+            $cols = implode('", "', $indexDef->getColumns());
+            $statements[] = "ALTER TABLE \"{$table}\" ADD CONSTRAINT \"{$indexDef->getName()}\" UNIQUE (\"{$cols}\")";
+        } elseif ($type === 'FULLTEXT') {
+            $statements = array_merge($statements, $this->compileFulltextIndex($table, $indexDef));
+        } elseif ($type === 'SPATIAL') {
+            $statements = array_merge($statements, $this->compileSpatialIndex($table, $indexDef));
+        } elseif ($type === 'INDEX') {
+            $cols = implode('", "', $indexDef->getColumns());
+            $sql = "CREATE INDEX CONCURRENTLY IF NOT EXISTS \"{$indexDef->getName()}\" ON \"{$table}\" (\"{$cols}\")";
+            if ($indexDef->getAlgorithm()) {
+                $sql .= " USING {$indexDef->getAlgorithm()}";
+            }
+            $statements[] = $sql;
+        }
+
+        return $statements;
+    }
+
+    /**
+     * Compile fulltext index for PostgreSQL (GIN with tsvector)
+     */
+    private function compileFulltextIndex(string $table, IndexDefinition $indexDef): array
+    {
+        $statements = [];
+        $cols = implode('", "', $indexDef->getColumns());
+        $name = $indexDef->getName();
+
+        $statements[] = "CREATE INDEX CONCURRENTLY IF NOT EXISTS \"{$name}\" ON \"{$table}\" USING gin(to_tsvector('english', \"{$cols}\"))";
+
+        return $statements;
+    }
+
+    /**
+     * Compile spatial index for PostgreSQL (GiST/GIN)
+     */
+    private function compileSpatialIndex(string $table, IndexDefinition $indexDef): array
+    {
+        $statements = [];
+        $cols = implode('", "', $indexDef->getColumns());
+        $name = $indexDef->getName();
+        $operatorClass = $indexDef->getOperatorClass() ?? 'gist';
+
+        $statements[] = "CREATE INDEX CONCURRENTLY IF NOT EXISTS \"{$name}\" ON \"{$table}\" USING {$operatorClass} (\"{$cols}\")";
+
+        return $statements;
     }
 
     /**
@@ -292,39 +352,6 @@ class PostgreSQLSchemaCompiler implements SchemaCompiler
             'JSON' => "\"{$name}\"::JSONB",
             default => "\"{$name}\"::{$type}",
         };
-    }
-
-    /**
-     * Compile index creation with CONCURRENTLY support
-     */
-    private function compileCreateIndex(string $table, string $name, array $columns, string $type): string
-    {
-        $cols = implode('", "', $columns);
-        $concurrent = $this->useConcurrentIndexes ? 'CONCURRENTLY' : '';
-
-        if ($type === 'UNIQUE') {
-            return "CREATE UNIQUE INDEX {$concurrent} IF NOT EXISTS \"{$name}\" ON \"{$table}\" (\"{$cols}\")";
-        }
-
-        return "CREATE INDEX {$concurrent} IF NOT EXISTS \"{$name}\" ON \"{$table}\" (\"{$cols}\")";
-    }
-
-    /**
-     * Compile primary key addition using concurrent index
-     */
-    private function compileAddPrimaryKey(string $table, array $index): array
-    {
-        $cols = implode('", "', $index['columns']);
-        $indexName = "{$table}_pkey";
-
-        if ($this->useConcurrentIndexes) {
-            return [
-                "CREATE UNIQUE INDEX CONCURRENTLY \"{$indexName}\" ON \"{$table}\" (\"{$cols}\")",
-                "ALTER TABLE \"{$table}\" ADD CONSTRAINT \"{$indexName}\" PRIMARY KEY USING INDEX \"{$indexName}\""
-            ];
-        }
-
-        return ["ALTER TABLE \"{$table}\" ADD PRIMARY KEY (\"{$cols}\")"];
     }
 
     /**

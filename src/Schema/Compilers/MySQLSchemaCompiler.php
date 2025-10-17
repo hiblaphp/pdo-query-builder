@@ -6,6 +6,7 @@ namespace Hibla\PdoQueryBuilder\Schema\Compilers;
 
 use Hibla\PdoQueryBuilder\Schema\Blueprint;
 use Hibla\PdoQueryBuilder\Schema\Column;
+use Hibla\PdoQueryBuilder\Schema\IndexDefinition;
 use Hibla\PdoQueryBuilder\Schema\SchemaCompiler;
 use PDO;
 
@@ -18,6 +19,7 @@ use PDO;
  * - Improved JSON support
  * - Better performance optimizations
  * - Transaction support for DDL operations
+ * - FULLTEXT and SPATIAL indexes
  */
 class MySQLSchemaCompiler implements SchemaCompiler
 {
@@ -63,7 +65,7 @@ class MySQLSchemaCompiler implements SchemaCompiler
     {
         $table = $blueprint->getTable();
         $columns = $blueprint->getColumns();
-        $indexes = $blueprint->getIndexes();
+        $indexDefinitions = $blueprint->getIndexDefinitions();
         $foreignKeys = $blueprint->getForeignKeys();
 
         $sql = "CREATE TABLE IF NOT EXISTS `{$table}` (\n";
@@ -74,17 +76,8 @@ class MySQLSchemaCompiler implements SchemaCompiler
             $columnDefinitions[] = '  ' . $this->compileColumn($column);
         }
 
-        foreach ($indexes as $index) {
-            if ($index['type'] === 'PRIMARY') {
-                $cols = implode('`, `', $index['columns']);
-                $columnDefinitions[] = "  PRIMARY KEY (`{$cols}`)";
-            } elseif ($index['type'] === 'UNIQUE') {
-                $cols = implode('`, `', $index['columns']);
-                $columnDefinitions[] = "  UNIQUE KEY `{$index['name']}` (`{$cols}`)";
-            } else {
-                $cols = implode('`, `', $index['columns']);
-                $columnDefinitions[] = "  KEY `{$index['name']}` (`{$cols}`)";
-            }
+        foreach ($indexDefinitions as $indexDef) {
+            $columnDefinitions[] = '  ' . $this->compileIndexDefinition($indexDef);
         }
 
         foreach ($foreignKeys as $foreignKey) {
@@ -95,6 +88,108 @@ class MySQLSchemaCompiler implements SchemaCompiler
         $sql .= "\n) ENGINE={$blueprint->getEngine()} DEFAULT CHARSET={$blueprint->getCharset()} COLLATE={$blueprint->getCollation()}";
 
         return $sql;
+    }
+
+    /**
+     * Compile index definition with support for different index types
+     */
+    private function compileIndexDefinition(IndexDefinition $indexDef): string
+    {
+        $type = $indexDef->getType();
+        $cols = implode('`, `', $indexDef->getColumns());
+
+        $sql = match ($type) {
+            'PRIMARY' => $this->compilePrimaryIndex($indexDef),
+            'UNIQUE' => $this->compileUniqueIndex($indexDef),
+            'FULLTEXT' => $this->compileFulltextIndex($indexDef),
+            'SPATIAL' => $this->compileSpatialIndex($indexDef),
+            'RAW' => $this->compileRawIndex($indexDef),
+            default => $this->compileRegularIndex($indexDef),
+        };
+
+        return $sql;
+    }
+
+    /**
+     * Compile primary index
+     */
+    private function compilePrimaryIndex(IndexDefinition $indexDef): string
+    {
+        $cols = implode('`, `', $indexDef->getColumns());
+        $sql = "PRIMARY KEY (`{$cols}`)";
+
+        if ($indexDef->getAlgorithm()) {
+            $sql .= " USING {$indexDef->getAlgorithm()}";
+        }
+
+        return $sql;
+    }
+
+    /**
+     * Compile unique index with algorithm support
+     */
+    private function compileUniqueIndex(IndexDefinition $indexDef): string
+    {
+        $cols = implode('`, `', $indexDef->getColumns());
+        $name = $indexDef->getName();
+        $sql = "UNIQUE KEY `{$name}` (`{$cols}`)";
+
+        if ($indexDef->getAlgorithm()) {
+            $sql .= " USING {$indexDef->getAlgorithm()}";
+        }
+
+        return $sql;
+    }
+
+    /**
+     * Compile regular index
+     */
+    private function compileRegularIndex(IndexDefinition $indexDef): string
+    {
+        $cols = implode('`, `', $indexDef->getColumns());
+        $name = $indexDef->getName();
+        $sql = "KEY `{$name}` (`{$cols}`)";
+
+        if ($indexDef->getAlgorithm()) {
+            $sql .= " USING {$indexDef->getAlgorithm()}";
+        }
+
+        return $sql;
+    }
+
+    /**
+     * Compile fulltext index
+     */
+    private function compileFulltextIndex(IndexDefinition $indexDef): string
+    {
+        $cols = implode('`, `', $indexDef->getColumns());
+        $name = $indexDef->getName();
+        $sql = "FULLTEXT KEY `{$name}` (`{$cols}`)";
+
+        if ($indexDef->getAlgorithm()) {
+            $sql .= " WITH PARSER {$indexDef->getAlgorithm()}";
+        }
+
+        return $sql;
+    }
+
+    /**
+     * Compile spatial index
+     */
+    private function compileSpatialIndex(IndexDefinition $indexDef): string
+    {
+        $cols = implode('`, `', $indexDef->getColumns());
+        $name = $indexDef->getName();
+
+        return "SPATIAL KEY `{$name}` (`{$cols}`)";
+    }
+
+    /**
+     * Compile raw index expression
+     */
+    private function compileRawIndex(IndexDefinition $indexDef): string
+    {
+        return $indexDef->getColumns()[0] ?? '';
     }
 
     private function compileColumn(Column $column): string
@@ -256,11 +351,6 @@ class MySQLSchemaCompiler implements SchemaCompiler
             }
         }
 
-        if (!empty($blueprint->getDropColumns())) {
-            $drops = array_map(fn($col) => "DROP COLUMN `{$col}`", $blueprint->getDropColumns());
-            $statements[] = "ALTER TABLE `{$table}` " . implode(', ', $drops);
-        }
-
         foreach ($blueprint->getRenameColumns() as $rename) {
             $statements[] = "ALTER TABLE `{$table}` RENAME COLUMN `{$rename['from']}` TO `{$rename['to']}`";
         }
@@ -281,17 +371,8 @@ class MySQLSchemaCompiler implements SchemaCompiler
             $statements[] = "ALTER TABLE `{$table}` " . implode(', ', $additions);
         }
 
-        foreach ($blueprint->getIndexes() as $index) {
-            if ($index['type'] === 'PRIMARY') {
-                $cols = implode('`, `', $index['columns']);
-                $statements[] = "ALTER TABLE `{$table}` ADD PRIMARY KEY (`{$cols}`)";
-            } elseif ($index['type'] === 'UNIQUE') {
-                $cols = implode('`, `', $index['columns']);
-                $statements[] = "ALTER TABLE `{$table}` ADD UNIQUE KEY `{$index['name']}` (`{$cols}`)";
-            } else {
-                $cols = implode('`, `', $index['columns']);
-                $statements[] = "ALTER TABLE `{$table}` ADD KEY `{$index['name']}` (`{$cols}`)";
-            }
+        foreach ($blueprint->getIndexDefinitions() as $indexDef) {
+            $statements = array_merge($statements, $this->compileAddIndexDefinition($table, $indexDef));
         }
 
         foreach ($blueprint->getForeignKeys() as $foreignKey) {
@@ -299,6 +380,48 @@ class MySQLSchemaCompiler implements SchemaCompiler
         }
 
         return empty($statements) ? '' : (count($statements) === 1 ? $statements[0] : $statements);
+    }
+
+    /**
+     * Compile add index definition for ALTER TABLE
+     */
+    private function compileAddIndexDefinition(string $table, IndexDefinition $indexDef): array
+    {
+        $type = $indexDef->getType();
+        $cols = implode('`, `', $indexDef->getColumns());
+        $statements = [];
+
+        if ($type === 'PRIMARY') {
+            $sql = "ALTER TABLE `{$table}` ADD PRIMARY KEY (`{$cols}`)";
+            if ($indexDef->getAlgorithm()) {
+                $sql .= " USING {$indexDef->getAlgorithm()}";
+            }
+            $statements[] = $sql;
+        } elseif ($type === 'UNIQUE') {
+            $sql = "ALTER TABLE `{$table}` ADD UNIQUE KEY `{$indexDef->getName()}` (`{$cols}`)";
+            if ($indexDef->getAlgorithm()) {
+                $sql .= " USING {$indexDef->getAlgorithm()}";
+            }
+            $statements[] = $sql;
+        } elseif ($type === 'FULLTEXT') {
+            $sql = "ALTER TABLE `{$table}` ADD FULLTEXT KEY `{$indexDef->getName()}` (`{$cols}`)";
+            if ($indexDef->getAlgorithm()) {
+                $sql .= " WITH PARSER {$indexDef->getAlgorithm()}";
+            }
+            $statements[] = $sql;
+        } elseif ($type === 'SPATIAL') {
+            $statements[] = "ALTER TABLE `{$table}` ADD SPATIAL KEY `{$indexDef->getName()}` (`{$cols}`)";
+        } elseif ($type === 'RAW') {
+            // Raw indexes are handled separately
+        } else {
+            $sql = "ALTER TABLE `{$table}` ADD KEY `{$indexDef->getName()}` (`{$cols}`)";
+            if ($indexDef->getAlgorithm()) {
+                $sql .= " USING {$indexDef->getAlgorithm()}";
+            }
+            $statements[] = $sql;
+        }
+
+        return $statements;
     }
 
     public function compileDrop(string $table): string

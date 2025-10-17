@@ -41,11 +41,15 @@ class SchemaBuilder
         $blueprint = new Blueprint($table);
         $callback($blueprint);
 
+        // Process column-level indexes
+        $this->processColumnIndexes($blueprint);
+
         $compiler = $this->getCompiler();
         $sql = $compiler->compileCreate($blueprint);
 
         return AsyncPDO::execute($sql, []);
     }
+
 
     public function dropIfExists(string $table): PromiseInterface
     {
@@ -75,6 +79,9 @@ class SchemaBuilder
     {
         $blueprint = new Blueprint($table);
         $callback($blueprint);
+
+        // Process column-level indexes
+        $this->processColumnIndexes($blueprint);
 
         $compiler = $this->getCompiler();
         $sql = $compiler->compileAlter($blueprint);
@@ -175,5 +182,34 @@ class SchemaBuilder
             'sqlsrv' => new Compilers\SQLServerSchemaCompiler(),
             default => new Compilers\MySQLSchemaCompiler(),
         };
+    }
+
+    /**
+     * Process column-level indexes and add them to blueprint
+     */
+    private function processColumnIndexes(Blueprint $blueprint): void
+    {
+        foreach ($blueprint->getColumns() as $column) {
+            foreach ($column->getColumnIndexes() as $indexInfo) {
+                $indexName = $indexInfo['name'] ?? $blueprint->getTable() . '_' . $column->getName() . '_' . strtolower($indexInfo['type']);
+
+                $indexDef = new IndexDefinition($indexInfo['type'], [$column->getName()], $indexName);
+
+                if ($indexInfo['algorithm'] ?? null) {
+                    $indexDef->algorithm($indexInfo['algorithm']);
+                }
+
+                if ($indexInfo['operatorClass'] ?? null) {
+                    $indexDef->operatorClass($indexInfo['operatorClass']);
+                }
+
+                $reflection = new \ReflectionClass($blueprint);
+                $property = $reflection->getProperty('indexDefinitions');
+                $property->setAccessible(true);
+                $indexDefinitions = $property->getValue($blueprint);
+                $indexDefinitions[] = $indexDef;
+                $property->setValue($blueprint, $indexDefinitions);
+            }
+        }
     }
 }

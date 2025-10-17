@@ -6,6 +6,7 @@ namespace Hibla\PdoQueryBuilder\Schema\Compilers;
 
 use Hibla\PdoQueryBuilder\Schema\Blueprint;
 use Hibla\PdoQueryBuilder\Schema\Column;
+use Hibla\PdoQueryBuilder\Schema\IndexDefinition;
 use Hibla\PdoQueryBuilder\Schema\SchemaCompiler;
 
 class SQLiteSchemaCompiler implements SchemaCompiler
@@ -14,7 +15,7 @@ class SQLiteSchemaCompiler implements SchemaCompiler
     {
         $table = $blueprint->getTable();
         $columns = $blueprint->getColumns();
-        $indexes = $blueprint->getIndexes();
+        $indexDefinitions = $blueprint->getIndexDefinitions();
         $foreignKeys = $blueprint->getForeignKeys();
 
         $sql = "CREATE TABLE `{$table}` (\n";
@@ -24,9 +25,9 @@ class SQLiteSchemaCompiler implements SchemaCompiler
             $columnDefinitions[] = '  ' . $this->compileColumn($column);
         }
 
-        foreach ($indexes as $index) {
-            if ($index['type'] === 'PRIMARY') {
-                $cols = implode('`, `', $index['columns']);
+        foreach ($indexDefinitions as $indexDef) {
+            if ($indexDef->getType() === 'PRIMARY') {
+                $cols = implode('`, `', $indexDef->getColumns());
                 $columnDefinitions[] = "  PRIMARY KEY (`{$cols}`)";
             }
         }
@@ -148,17 +149,37 @@ class SQLiteSchemaCompiler implements SchemaCompiler
             }
         }
 
-        foreach ($blueprint->getIndexes() as $index) {
-            if ($index['type'] === 'UNIQUE') {
-                $cols = implode('`, `', $index['columns']);
-                $statements[] = "CREATE UNIQUE INDEX `{$index['name']}` ON `{$table}` (`{$cols}`)";
-            } elseif ($index['type'] !== 'PRIMARY') {
-                $cols = implode('`, `', $index['columns']);
-                $statements[] = "CREATE INDEX `{$index['name']}` ON `{$table}` (`{$cols}`)";
+        foreach ($blueprint->getIndexDefinitions() as $indexDef) {
+            if ($indexDef->getType() !== 'PRIMARY') {
+                $statements = array_merge($statements, $this->compileAddIndexDefinition($table, $indexDef));
             }
         }
 
         return empty($statements) ? '' : (count($statements) === 1 ? $statements[0] : $statements);
+    }
+
+    /**
+     * Compile add index definitions for ALTER TABLE
+     */
+    private function compileAddIndexDefinition(string $table, IndexDefinition $indexDef): array
+    {
+        $type = $indexDef->getType();
+        $cols = implode('`, `', $indexDef->getColumns());
+        $statements = [];
+
+        if ($type === 'UNIQUE') {
+            $statements[] = "CREATE UNIQUE INDEX `{$indexDef->getName()}` ON `{$table}` (`{$cols}`)";
+        } elseif ($type === 'INDEX') {
+            $statements[] = "CREATE INDEX `{$indexDef->getName()}` ON `{$table}` (`{$cols}`)";
+        } elseif ($type === 'FULLTEXT') {
+            // SQLite doesn't support FULLTEXT natively, use FTS5 instead
+            $statements[] = "CREATE VIRTUAL TABLE IF NOT EXISTS `{$table}_fts` USING fts5(`{$cols}`)";
+        } elseif ($type === 'SPATIAL') {
+            // SQLite doesn't support spatial indexes natively
+            $statements[] = "CREATE INDEX `{$indexDef->getName()}` ON `{$table}` (`{$cols}`)";
+        }
+
+        return $statements;
     }
 
     /**
@@ -186,13 +207,13 @@ class SQLiteSchemaCompiler implements SchemaCompiler
         $statements[] = "DROP TABLE `{$table}`";
         $statements[] = "ALTER TABLE `{$tempTable}` RENAME TO `{$table}`";
 
-        foreach ($blueprint->getIndexes() as $index) {
-            if ($index['type'] === 'UNIQUE') {
-                $cols = implode('`, `', $index['columns']);
-                $statements[] = "CREATE UNIQUE INDEX IF NOT EXISTS `{$index['name']}` ON `{$table}` (`{$cols}`)";
-            } elseif ($index['type'] !== 'PRIMARY') {
-                $cols = implode('`, `', $index['columns']);
-                $statements[] = "CREATE INDEX IF NOT EXISTS `{$index['name']}` ON `{$table}` (`{$cols}`)";
+        foreach ($blueprint->getIndexDefinitions() as $indexDef) {
+            if ($indexDef->getType() === 'UNIQUE') {
+                $cols = implode('`, `', $indexDef->getColumns());
+                $statements[] = "CREATE UNIQUE INDEX IF NOT EXISTS `{$indexDef->getName()}` ON `{$table}` (`{$cols}`)";
+            } elseif ($indexDef->getType() === 'INDEX') {
+                $cols = implode('`, `', $indexDef->getColumns());
+                $statements[] = "CREATE INDEX IF NOT EXISTS `{$indexDef->getName()}` ON `{$table}` (`{$cols}`)";
             }
         }
 
@@ -241,10 +262,10 @@ class SQLiteSchemaCompiler implements SchemaCompiler
         }
 
         $dropIndexNames = array_map(fn($idx) => $idx[0], $originalBlueprint->getDropIndexes());
-        foreach ($originalBlueprint->getIndexes() as $index) {
-            $indexName = $index['name'] ?? 'PRIMARY';
+        foreach ($originalBlueprint->getIndexDefinitions() as $indexDef) {
+            $indexName = $indexDef->getName() ?? 'PRIMARY';
             if (!in_array($indexName, $dropIndexNames)) {
-                $this->addIndexToBlueprint($newBlueprint, $index);
+                $this->addIndexDefinitionToBlueprint($newBlueprint, $indexDef);
             }
         }
 
@@ -298,14 +319,14 @@ class SQLiteSchemaCompiler implements SchemaCompiler
         $property->setValue($blueprint, $columns);
     }
 
-    private function addIndexToBlueprint(Blueprint $blueprint, array $index): void
+    private function addIndexDefinitionToBlueprint(Blueprint $blueprint, IndexDefinition $indexDef): void
     {
         $reflection = new \ReflectionClass($blueprint);
-        $property = $reflection->getProperty('indexes');
+        $property = $reflection->getProperty('indexDefinitions');
         $property->setAccessible(true);
-        $indexes = $property->getValue($blueprint);
-        $indexes[] = $index;
-        $property->setValue($blueprint, $indexes);
+        $indexDefinitions = $property->getValue($blueprint);
+        $indexDefinitions[] = $indexDef;
+        $property->setValue($blueprint, $indexDefinitions);
     }
 
     private function addForeignKeyToBlueprint(Blueprint $blueprint, $foreignKey): void

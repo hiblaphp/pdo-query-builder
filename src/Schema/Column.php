@@ -29,7 +29,7 @@ class Column
     private ?ForeignKey $foreignKey = null;
     private ?Blueprint $blueprint = null;
     private static ?DoctrineInflector $inflector = null;
-
+    private array $columnIndexes = [];
 
     public function __construct(
         string $name,
@@ -191,6 +191,14 @@ class Column
         return $this->blueprint;
     }
 
+    /**
+     * NEW: Get column indexes
+     */
+    public function getColumnIndexes(): array
+    {
+        return $this->columnIndexes;
+    }
+
     public function nullable(bool $value = true): self
     {
         $this->nullable = $value;
@@ -225,6 +233,13 @@ class Column
     public function unique(bool $value = true): self
     {
         $this->unique = $value;
+        if ($value) {
+            $this->columnIndexes[] = [
+                'type' => 'UNIQUE',
+                'name' => null,
+                'algorithm' => null,
+            ];
+        }
         return $this;
     }
 
@@ -264,6 +279,57 @@ class Column
         return $this;
     }
 
+    /**
+     * Add a regular index to this column
+     * 
+     * @param string|null $name Optional index name
+     * @param string|null $algorithm Optional algorithm (BTREE, HASH, NGRAM, etc.)
+     * @return self
+     */
+    public function index(?string $name = null, ?string $algorithm = null): self
+    {
+        $this->columnIndexes[] = [
+            'type' => 'INDEX',
+            'name' => $name,
+            'algorithm' => $algorithm,
+        ];
+        return $this;
+    }
+
+    /**
+     * Add a fulltext index to this column
+     * 
+     * @param string|null $name Optional index name
+     * @param string|null $algorithm Optional parser (NGRAM, etc.)
+     * @return self
+     */
+    public function fullText(?string $name = null, ?string $algorithm = null): self
+    {
+        $this->columnIndexes[] = [
+            'type' => 'FULLTEXT',
+            'name' => $name,
+            'algorithm' => $algorithm,
+        ];
+        return $this;
+    }
+
+    /**
+     * Add a spatial index to this column
+     * 
+     * @param string|null $name Optional index name
+     * @param string|null $operatorClass Optional operator class (gist, gin, spgist, brin)
+     * @return self
+     */
+    public function spatialIndex(?string $name = null, ?string $operatorClass = null): self
+    {
+        $this->columnIndexes[] = [
+            'type' => 'SPATIAL',
+            'name' => $name,
+            'operatorClass' => $operatorClass,
+        ];
+        return $this;
+    }
+
     public function constrained(?string $table = null, string $column = 'id'): self
     {
         if (!$this->blueprint) {
@@ -289,7 +355,6 @@ class Column
         if (str_ends_with($name, '_id')) {
             $name = substr($name, 0, -3);
         }
-
 
         return self::getInflector()->pluralize($name);
     }
@@ -412,6 +477,7 @@ class Column
             'onUpdate' => $this->onUpdate,
             'enumValues' => $this->enumValues,
             'hasForeignKey' => $this->foreignKey !== null,
+            'columnIndexes' => $this->columnIndexes,
         ];
     }
 
@@ -470,6 +536,10 @@ class Column
 
         if (!empty($data['enumValues'])) {
             $column->setEnumValues($data['enumValues']);
+        }
+
+        if (!empty($data['columnIndexes'])) {
+            $column->columnIndexes = $data['columnIndexes'];
         }
 
         return $column;

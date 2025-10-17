@@ -10,6 +10,7 @@ return new class
     {
         return $schema->create('humans', function (Blueprint $table) {
             $table->id();
+            $table->string('name')->index();
             $table->foreignId('horse_id')->constrained('horses');
             $table->timestamps();
         });

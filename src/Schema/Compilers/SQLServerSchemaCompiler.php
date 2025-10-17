@@ -6,6 +6,7 @@ namespace Hibla\PdoQueryBuilder\Schema\Compilers;
 
 use Hibla\PdoQueryBuilder\Schema\Blueprint;
 use Hibla\PdoQueryBuilder\Schema\Column;
+use Hibla\PdoQueryBuilder\Schema\IndexDefinition;
 use Hibla\PdoQueryBuilder\Schema\SchemaCompiler;
 use PDO;
 
@@ -17,6 +18,7 @@ use PDO;
  * - Transaction support for DDL operations
  * - Better constraint handling
  * - Improved error handling
+ * - FULLTEXT and SPATIAL indexes
  */
 class SQLServerSchemaCompiler implements SchemaCompiler
 {
@@ -26,7 +28,7 @@ class SQLServerSchemaCompiler implements SchemaCompiler
     {
         $table = $blueprint->getTable();
         $columns = $blueprint->getColumns();
-        $indexes = $blueprint->getIndexes();
+        $indexDefinitions = $blueprint->getIndexDefinitions();
         $foreignKeys = $blueprint->getForeignKeys();
 
         $sql = "IF OBJECT_ID('[{$table}]', 'U') IS NULL\nBEGIN\n";
@@ -37,23 +39,18 @@ class SQLServerSchemaCompiler implements SchemaCompiler
             $columnDefinitions[] = '  ' . $this->compileColumn($column);
         }
 
-        foreach ($indexes as $index) {
-            if ($index['type'] === 'PRIMARY') {
-                $cols = implode('], [', $index['columns']);
-                $columnDefinitions[] = "  CONSTRAINT [PK_{$table}] PRIMARY KEY ([{$cols}])";
+        foreach ($indexDefinitions as $indexDef) {
+            if ($indexDef->getType() === 'PRIMARY') {
+                $columnDefinitions[] = '  ' . $this->compilePrimaryIndex($indexDef);
             }
         }
 
         $sql .= implode(",\n", $columnDefinitions);
         $sql .= "\n);\n";
 
-        foreach ($indexes as $index) {
-            if ($index['type'] === 'UNIQUE') {
-                $cols = implode('], [', $index['columns']);
-                $sql .= "CREATE UNIQUE INDEX [{$index['name']}] ON [{$table}] ([{$cols}]);\n";
-            } elseif ($index['type'] === 'INDEX') {
-                $cols = implode('], [', $index['columns']);
-                $sql .= "CREATE INDEX [{$index['name']}] ON [{$table}] ([{$cols}]);\n";
+        foreach ($indexDefinitions as $indexDef) {
+            if ($indexDef->getType() !== 'PRIMARY') {
+                $sql .= $this->compileIndexDefinitionStatement($table, $indexDef) . ";\n";
             }
         }
 
@@ -64,6 +61,57 @@ class SQLServerSchemaCompiler implements SchemaCompiler
         $sql .= "END";
 
         return $sql;
+    }
+
+    /**
+     * Compile primary index for inline definition
+     */
+    private function compilePrimaryIndex(IndexDefinition $indexDef): string
+    {
+        $cols = implode('], [', $indexDef->getColumns());
+        return "CONSTRAINT [PK_{$indexDef->getName()}] PRIMARY KEY ([{$cols}])";
+    }
+
+    /**
+     * Compile index definition as CREATE INDEX statement
+     */
+    private function compileIndexDefinitionStatement(string $table, IndexDefinition $indexDef): string
+    {
+        $type = $indexDef->getType();
+        $cols = implode('], [', $indexDef->getColumns());
+        $name = $indexDef->getName();
+
+        return match ($type) {
+            'UNIQUE' => "CREATE UNIQUE INDEX [{$name}] ON [{$table}] ([{$cols}])",
+            'FULLTEXT' => $this->compileFulltextIndex($table, $indexDef),
+            'SPATIAL' => $this->compileSpatialIndex($table, $indexDef),
+            'INDEX', 'RAW' => "CREATE INDEX [{$name}] ON [{$table}] ([{$cols}])",
+            default => "CREATE INDEX [{$name}] ON [{$table}] ([{$cols}])",
+        };
+    }
+
+    /**
+     * Compile fulltext index for SQL Server
+     */
+    private function compileFulltextIndex(string $table, IndexDefinition $indexDef): string
+    {
+        $cols = implode('], [', $indexDef->getColumns());
+        $name = $indexDef->getName();
+
+        return "CREATE FULLTEXT INDEX ON [{$table}] ([{$cols}]) " .
+            "KEY INDEX [PK_{$table}] WITH STOPLIST = SYSTEM";
+    }
+
+    /**
+     * Compile spatial index for SQL Server
+     */
+    private function compileSpatialIndex(string $table, IndexDefinition $indexDef): string
+    {
+        $cols = implode('], [', $indexDef->getColumns());
+        $name = $indexDef->getName();
+
+        return "CREATE SPATIAL INDEX [{$name}] ON [{$table}] ([{$cols}]) " .
+            "WITH (BOUNDING_BOX = (0, 0, 500, 500))";
     }
 
     private function compileColumn(Column $column): string
@@ -104,21 +152,8 @@ class SQLServerSchemaCompiler implements SchemaCompiler
     }
 
     /**
-     * Check if a default value is an expression
+     * Map column types to SQL Server types
      */
-    private function isDefaultExpression(string $value): bool
-    {
-        $expressions = [
-            'GETDATE()',
-            'GETUTCDATE()',
-            'CURRENT_TIMESTAMP',
-            'NEWID()',
-            'SYSDATETIME()',
-        ];
-
-        return in_array(strtoupper($value), $expressions);
-    }
-
     private function mapType(string $type, Column $column): string
     {
         return match ($type) {
@@ -149,6 +184,22 @@ class SQLServerSchemaCompiler implements SchemaCompiler
     }
 
     /**
+     * Check if a default value is an expression
+     */
+    private function isDefaultExpression(string $value): bool
+    {
+        $expressions = [
+            'GETDATE()',
+            'GETUTCDATE()',
+            'CURRENT_TIMESTAMP',
+            'NEWID()',
+            'SYSDATETIME()',
+        ];
+
+        return in_array(strtoupper($value), $expressions);
+    }
+
+    /**
      * Compile foreign key constraint
      */
     private function compileForeignKey($foreignKey): string
@@ -176,7 +227,7 @@ class SQLServerSchemaCompiler implements SchemaCompiler
         $statements = [];
 
         foreach ($blueprint->getDropColumns() as $column) {
-            $statements[] = "ALTER TABLE \"{$table}\" DROP COLUMN IF EXISTS \"{$column}\"";
+            $statements[] = "ALTER TABLE [{$table}] DROP COLUMN IF EXISTS [{$column}]";
         }
 
         foreach ($blueprint->getDropForeignKeys() as $foreignKey) {
@@ -194,10 +245,6 @@ class SQLServerSchemaCompiler implements SchemaCompiler
             }
         }
 
-        foreach ($blueprint->getDropColumns() as $column) {
-            $statements[] = $this->compileDropColumn($blueprint, [$column]);
-        }
-
         foreach ($blueprint->getRenameColumns() as $rename) {
             $statements[] = $this->compileRenameColumn($blueprint, $rename['from'], $rename['to']);
         }
@@ -211,19 +258,8 @@ class SQLServerSchemaCompiler implements SchemaCompiler
             $statements[] = "ALTER TABLE [{$table}] ADD " . $this->compileColumn($column);
         }
 
-        foreach ($blueprint->getIndexes() as $index) {
-            if ($index['type'] === 'PRIMARY') {
-                $cols = implode('], [', $index['columns']);
-                $statements[] = "ALTER TABLE [{$table}] ADD CONSTRAINT [PK_{$table}] PRIMARY KEY ([{$cols}])";
-            } elseif ($index['type'] === 'UNIQUE') {
-                $cols = implode('], [', $index['columns']);
-                $statements[] = "IF NOT EXISTS (SELECT * FROM sys.indexes WHERE name = '{$index['name']}' AND object_id = OBJECT_ID('[{$table}]'))\n" .
-                    "CREATE UNIQUE INDEX [{$index['name']}] ON [{$table}] ([{$cols}])";
-            } else {
-                $cols = implode('], [', $index['columns']);
-                $statements[] = "IF NOT EXISTS (SELECT * FROM sys.indexes WHERE name = '{$index['name']}' AND object_id = OBJECT_ID('[{$table}]'))\n" .
-                    "CREATE INDEX [{$index['name']}] ON [{$table}] ([{$cols}])";
-            }
+        foreach ($blueprint->getIndexDefinitions() as $indexDef) {
+            $statements = array_merge($statements, $this->compileAddIndexDefinition($table, $indexDef));
         }
 
         foreach ($blueprint->getForeignKeys() as $foreignKey) {
@@ -232,6 +268,34 @@ class SQLServerSchemaCompiler implements SchemaCompiler
         }
 
         return count($statements) === 1 ? $statements[0] : $statements;
+    }
+
+    /**
+     * Compile add index definitions for ALTER TABLE
+     */
+    private function compileAddIndexDefinition(string $table, IndexDefinition $indexDef): array
+    {
+        $type = $indexDef->getType();
+        $statements = [];
+
+        if ($type === 'PRIMARY') {
+            $cols = implode('], [', $indexDef->getColumns());
+            $statements[] = "ALTER TABLE [{$table}] ADD CONSTRAINT [PK_{$indexDef->getName()}] PRIMARY KEY ([{$cols}])";
+        } elseif ($type === 'UNIQUE') {
+            $cols = implode('], [', $indexDef->getColumns());
+            $statements[] = "IF NOT EXISTS (SELECT * FROM sys.indexes WHERE name = '{$indexDef->getName()}' AND object_id = OBJECT_ID('[{$table}]'))\n" .
+                "CREATE UNIQUE INDEX [{$indexDef->getName()}] ON [{$table}] ([{$cols}])";
+        } elseif ($type === 'FULLTEXT') {
+            $statements[] = $this->compileFulltextIndex($table, $indexDef);
+        } elseif ($type === 'SPATIAL') {
+            $statements[] = $this->compileSpatialIndex($table, $indexDef);
+        } elseif ($type === 'INDEX') {
+            $cols = implode('], [', $indexDef->getColumns());
+            $statements[] = "IF NOT EXISTS (SELECT * FROM sys.indexes WHERE name = '{$indexDef->getName()}' AND object_id = OBJECT_ID('[{$table}]'))\n" .
+                "CREATE INDEX [{$indexDef->getName()}] ON [{$table}] ([{$cols}])";
+        }
+
+        return $statements;
     }
 
     /**

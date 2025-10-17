@@ -9,6 +9,7 @@ class Blueprint
     private string $table;
     private array $columns = [];
     private array $indexes = [];
+    private array $indexDefinitions = [];
     private array $foreignKeys = [];
     private string $engine = 'InnoDB';
     private string $charset = 'utf8mb4';
@@ -38,6 +39,11 @@ class Blueprint
     public function getIndexes(): array
     {
         return $this->indexes;
+    }
+
+    public function getIndexDefinitions(): array
+    {
+        return $this->indexDefinitions;
     }
 
     public function getForeignKeys(): array
@@ -347,29 +353,114 @@ class Blueprint
         return $this->unsignedBigInteger($name);
     }
 
-    public function index(string|array $columns, ?string $name = null): self
+    /**
+     * Specify a primary key for the table
+     */
+    public function primary(string|array $columns, ?string $name = null, ?string $algorithm = null): IndexDefinition
     {
         $columns = is_array($columns) ? $columns : [$columns];
-        $name ??= $this->table . '_' . implode('_', $columns) . '_index';
-        $this->indexes[] = ['type' => 'INDEX', 'name' => $name, 'columns' => $columns];
-        return $this;
+        $name ??= $this->table . '_' . implode('_', $columns) . '_primary';
+
+        $indexDef = new IndexDefinition('PRIMARY', $columns, $name);
+        if ($algorithm) {
+            $indexDef->algorithm($algorithm);
+        }
+
+        $this->indexes[] = ['type' => 'PRIMARY', 'name' => $name, 'columns' => $columns];
+        $this->indexDefinitions[] = $indexDef;
+
+        return $indexDef;
     }
 
-    public function unique(string|array $columns, ?string $name = null): self
+    /**
+     * Specify a unique index for the table
+     */
+    public function unique(string|array $columns, ?string $name = null, ?string $algorithm = null): IndexDefinition
     {
         $columns = is_array($columns) ? $columns : [$columns];
         $name ??= $this->table . '_' . implode('_', $columns) . '_unique';
+
+        $indexDef = new IndexDefinition('UNIQUE', $columns, $name);
+        if ($algorithm) {
+            $indexDef->algorithm($algorithm);
+        }
+
         $this->indexes[] = ['type' => 'UNIQUE', 'name' => $name, 'columns' => $columns];
-        return $this;
+        $this->indexDefinitions[] = $indexDef;
+
+        return $indexDef;
     }
 
-    public function primary(string|array $columns): self
+    /**
+     * Specify an index for the table
+     */
+    public function index(string|array $columns, ?string $name = null, ?string $algorithm = null): IndexDefinition
     {
         $columns = is_array($columns) ? $columns : [$columns];
-        $this->indexes[] = ['type' => 'PRIMARY', 'columns' => $columns];
-        return $this;
+        $name ??= $this->table . '_' . implode('_', $columns) . '_index';
+
+        $indexDef = new IndexDefinition('INDEX', $columns, $name);
+        if ($algorithm) {
+            $indexDef->algorithm($algorithm);
+        }
+
+        $this->indexes[] = ['type' => 'INDEX', 'name' => $name, 'columns' => $columns];
+        $this->indexDefinitions[] = $indexDef;
+
+        return $indexDef;
     }
 
+    /**
+     * Specify a fulltext index for the table
+     */
+    public function fullText(string|array $columns, ?string $name = null, ?string $algorithm = null): IndexDefinition
+    {
+        $columns = is_array($columns) ? $columns : [$columns];
+        $name ??= $this->table . '_' . implode('_', $columns) . '_fulltext';
+
+        $indexDef = new IndexDefinition('FULLTEXT', $columns, $name);
+        if ($algorithm) {
+            $indexDef->algorithm($algorithm);
+        }
+
+        $this->indexes[] = ['type' => 'FULLTEXT', 'name' => $name, 'columns' => $columns];
+        $this->indexDefinitions[] = $indexDef;
+
+        return $indexDef;
+    }
+
+    /**
+     * Specify a spatial index for the table
+     */
+    public function spatialIndex(string|array $columns, ?string $name = null, ?string $operatorClass = null): IndexDefinition
+    {
+        $columns = is_array($columns) ? $columns : [$columns];
+        $name ??= $this->table . '_' . implode('_', $columns) . '_spatial';
+
+        $indexDef = new IndexDefinition('SPATIAL', $columns, $name);
+        if ($operatorClass) {
+            $indexDef->operatorClass($operatorClass);
+        }
+
+        $this->indexes[] = ['type' => 'SPATIAL', 'name' => $name, 'columns' => $columns];
+        $this->indexDefinitions[] = $indexDef;
+
+        return $indexDef;
+    }
+
+    /**
+     * Specify a raw index for the table
+     */
+    public function rawIndex(string $expression, string $name): IndexDefinition
+    {
+        $indexDef = new IndexDefinition('RAW', [$expression], $name);
+        $this->indexDefinitions[] = $indexDef;
+        return $indexDef;
+    }
+
+    /**
+     * Define a foreign key constraint
+     */
     public function foreign(string|array $columns, ?string $name = null): ForeignKey
     {
         $columns = is_array($columns) ? $columns : [$columns];
