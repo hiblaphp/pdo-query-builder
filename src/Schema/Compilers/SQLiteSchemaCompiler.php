@@ -7,7 +7,6 @@ namespace Hibla\PdoQueryBuilder\Schema\Compilers;
 use Hibla\PdoQueryBuilder\Schema\Blueprint;
 use Hibla\PdoQueryBuilder\Schema\Column;
 use Hibla\PdoQueryBuilder\Schema\SchemaCompiler;
-use PDO;
 
 class SQLiteSchemaCompiler implements SchemaCompiler
 {
@@ -116,6 +115,10 @@ class SQLiteSchemaCompiler implements SchemaCompiler
     {
         $table = $blueprint->getTable();
         $statements = [];
+
+        foreach ($blueprint->getDropColumns() as $column) {
+            $statements[] = "ALTER TABLE \"{$table}\" DROP COLUMN IF EXISTS \"{$column}\"";
+        }
 
         $needsRecreation = !empty($blueprint->getDropColumns()) ||
             !empty($blueprint->getModifyColumns()) ||

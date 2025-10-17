@@ -12,7 +12,6 @@ class PostgreSQLSchemaCompiler implements SchemaCompiler
 {
     private bool $useConcurrentIndexes = false;
     private bool $useNotValidConstraints = false;
-    private ?int $lockTimeout = null;
 
     public function compileCreate(Blueprint $blueprint): string
     {
@@ -145,8 +144,8 @@ class PostgreSQLSchemaCompiler implements SchemaCompiler
         $table = $blueprint->getTable();
         $statements = [];
 
-        if ($this->lockTimeout !== null) {
-            $statements[] = "SET LOCAL lock_timeout = '{$this->lockTimeout}ms'";
+        foreach ($blueprint->getDropColumns() as $column) {
+            $statements[] = "ALTER TABLE \"{$table}\" DROP COLUMN IF EXISTS \"{$column}\"";
         }
 
         foreach ($blueprint->getDropForeignKeys() as $foreignKey) {
@@ -189,7 +188,7 @@ class PostgreSQLSchemaCompiler implements SchemaCompiler
 
         foreach ($blueprint->getForeignKeys() as $foreignKey) {
             $statements[] = "ALTER TABLE \"{$table}\" ADD " . $this->compileForeignKey($foreignKey, $this->useNotValidConstraints);
-            
+
             if ($this->useNotValidConstraints) {
                 $statements[] = $this->compileValidateConstraint($table, $foreignKey->getName());
             }
@@ -210,10 +209,10 @@ class PostgreSQLSchemaCompiler implements SchemaCompiler
     private function compileAddColumn(string $table, Column $column): array
     {
         $statements = [];
-        
+
         $colDef = $this->compileColumnWithoutDefault($column);
         $statements[] = "ALTER TABLE \"{$table}\" ADD COLUMN IF NOT EXISTS {$colDef}";
-        
+
         if ($column->hasDefault()) {
             $default = $this->formatDefault($column->getDefault());
             $statements[] = "ALTER TABLE \"{$table}\" ALTER COLUMN \"{$column->getName()}\" SET DEFAULT {$default}";

@@ -23,8 +23,6 @@ class MySQLSchemaCompiler implements SchemaCompiler
 {
     private const MINIMUM_VERSION = '8.0';
     private ?PDO $connection = null;
-    private bool $useTransactions = false;
-    private ?int $lockWaitTimeout = null;
 
     public function setConnection(?PDO $connection): void
     {
@@ -241,8 +239,8 @@ class MySQLSchemaCompiler implements SchemaCompiler
         $table = $blueprint->getTable();
         $statements = [];
 
-        if ($this->lockWaitTimeout !== null) {
-            $statements[] = "SET SESSION lock_wait_timeout = {$this->lockWaitTimeout}";
+        foreach ($blueprint->getDropColumns() as $column) {
+            $statements[] = "ALTER TABLE `{$table}` DROP COLUMN IF EXISTS `{$column}`";
         }
 
         foreach ($blueprint->getDropForeignKeys() as $foreignKey) {

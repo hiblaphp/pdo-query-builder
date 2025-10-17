@@ -175,6 +175,10 @@ class SQLServerSchemaCompiler implements SchemaCompiler
         $table = $blueprint->getTable();
         $statements = [];
 
+        foreach ($blueprint->getDropColumns() as $column) {
+            $statements[] = "ALTER TABLE \"{$table}\" DROP COLUMN IF EXISTS \"{$column}\"";
+        }
+
         foreach ($blueprint->getDropForeignKeys() as $foreignKey) {
             $statements[] = $this->compileDropForeignKey($table, $foreignKey);
         }

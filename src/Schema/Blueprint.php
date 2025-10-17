@@ -92,13 +92,15 @@ class Blueprint
 
     public function id(string $name = 'id'): Column
     {
-        return $this->bigIncrements($name);
+        $column = $this->bigIncrements($name);
+        $column->primary();
+        return $column;
     }
 
     public function bigIncrements(string $name): Column
     {
         $column = new Column($name, 'BIGINT');
-        $column->unsigned()->autoIncrement()->primary();
+        $column->unsigned()->autoIncrement();
         $column->setBlueprint($this);
         $this->columns[] = $column;
         return $column;
@@ -107,10 +109,112 @@ class Blueprint
     public function increments(string $name): Column
     {
         $column = new Column($name, 'INT');
-        $column->unsigned()->autoIncrement()->primary();
+        $column->unsigned()->autoIncrement();
         $column->setBlueprint($this);
         $this->columns[] = $column;
         return $column;
+    }
+
+    public function mediumIncrements(string $name): Column
+    {
+        $column = new Column($name, 'MEDIUMINT');
+        $column->unsigned()->autoIncrement();
+        $column->setBlueprint($this);
+        $this->columns[] = $column;
+        return $column;
+    }
+
+    public function smallIncrements(string $name): Column
+    {
+        $column = new Column($name, 'SMALLINT');
+        $column->unsigned()->autoIncrement();
+        $column->setBlueprint($this);
+        $this->columns[] = $column;
+        return $column;
+    }
+
+    public function tinyIncrements(string $name): Column
+    {
+        $column = new Column($name, 'TINYINT');
+        $column->unsigned()->autoIncrement();
+        $column->setBlueprint($this);
+        $this->columns[] = $column;
+        return $column;
+    }
+
+    public function bigInteger(string $name, bool $autoIncrement = false, bool $unsigned = false): Column
+    {
+        $column = new Column($name, 'BIGINT');
+        if ($autoIncrement) $column->autoIncrement();
+        if ($unsigned) $column->unsigned();
+        $column->setBlueprint($this);
+        $this->columns[] = $column;
+        return $column;
+    }
+
+    public function integer(string $name, bool $autoIncrement = false, bool $unsigned = false): Column
+    {
+        $column = new Column($name, 'INT');
+        if ($autoIncrement) $column->autoIncrement();
+        if ($unsigned) $column->unsigned();
+        $column->setBlueprint($this);
+        $this->columns[] = $column;
+        return $column;
+    }
+
+    public function mediumInteger(string $name, bool $autoIncrement = false, bool $unsigned = false): Column
+    {
+        $column = new Column($name, 'MEDIUMINT');
+        if ($autoIncrement) $column->autoIncrement();
+        if ($unsigned) $column->unsigned();
+        $column->setBlueprint($this);
+        $this->columns[] = $column;
+        return $column;
+    }
+
+    public function smallInteger(string $name, bool $autoIncrement = false, bool $unsigned = false): Column
+    {
+        $column = new Column($name, 'SMALLINT');
+        if ($autoIncrement) $column->autoIncrement();
+        if ($unsigned) $column->unsigned();
+        $column->setBlueprint($this);
+        $this->columns[] = $column;
+        return $column;
+    }
+
+    public function tinyInteger(string $name, bool $autoIncrement = false, bool $unsigned = false): Column
+    {
+        $column = new Column($name, 'TINYINT');
+        if ($autoIncrement) $column->autoIncrement();
+        if ($unsigned) $column->unsigned();
+        $column->setBlueprint($this);
+        $this->columns[] = $column;
+        return $column;
+    }
+
+    public function unsignedBigInteger(string $name, bool $autoIncrement = false): Column
+    {
+        return $this->bigInteger($name, $autoIncrement, true);
+    }
+
+    public function unsignedInteger(string $name, bool $autoIncrement = false): Column
+    {
+        return $this->integer($name, $autoIncrement, true);
+    }
+
+    public function unsignedMediumInteger(string $name, bool $autoIncrement = false): Column
+    {
+        return $this->mediumInteger($name, $autoIncrement, true);
+    }
+
+    public function unsignedSmallInteger(string $name, bool $autoIncrement = false): Column
+    {
+        return $this->smallInteger($name, $autoIncrement, true);
+    }
+
+    public function unsignedTinyInteger(string $name, bool $autoIncrement = false): Column
+    {
+        return $this->tinyInteger($name, $autoIncrement, true);
     }
 
     public function string(string $name, int $length = 255): Column
@@ -145,60 +249,36 @@ class Blueprint
         return $column;
     }
 
-    public function integer(string $name): Column
-    {
-        $column = new Column($name, 'INT');
-        $column->setBlueprint($this);
-        $this->columns[] = $column;
-        return $column;
-    }
-
-    public function bigInteger(string $name): Column
-    {
-        $column = new Column($name, 'BIGINT');
-        $column->setBlueprint($this);
-        $this->columns[] = $column;
-        return $column;
-    }
-
-    public function tinyInteger(string $name): Column
-    {
-        $column = new Column($name, 'TINYINT');
-        $column->setBlueprint($this);
-        $this->columns[] = $column;
-        return $column;
-    }
-
-    public function smallInteger(string $name): Column
-    {
-        $column = new Column($name, 'SMALLINT');
-        $column->setBlueprint($this);
-        $this->columns[] = $column;
-        return $column;
-    }
-
-    public function decimal(string $name, int $precision = 8, int $scale = 2): Column
+    public function decimal(string $name, int $precision = 8, int $scale = 2, bool $unsigned = false): Column
     {
         $column = new Column($name, 'DECIMAL', null, $precision, $scale);
+        if ($unsigned) $column->unsigned();
         $column->setBlueprint($this);
         $this->columns[] = $column;
         return $column;
     }
 
-    public function float(string $name, int $precision = 8, int $scale = 2): Column
+    public function float(string $name, int $precision = 8, int $scale = 2, bool $unsigned = false): Column
     {
         $column = new Column($name, 'FLOAT', null, $precision, $scale);
+        if ($unsigned) $column->unsigned();
         $column->setBlueprint($this);
         $this->columns[] = $column;
         return $column;
     }
 
-    public function double(string $name, int $precision = 8, int $scale = 2): Column
+    public function double(string $name, int $precision = 8, int $scale = 2, bool $unsigned = false): Column
     {
         $column = new Column($name, 'DOUBLE', null, $precision, $scale);
+        if ($unsigned) $column->unsigned();
         $column->setBlueprint($this);
         $this->columns[] = $column;
         return $column;
+    }
+
+    public function unsignedDecimal(string $name, int $precision = 8, int $scale = 2): Column
+    {
+        return $this->decimal($name, $precision, $scale, true);
     }
 
     public function boolean(string $name): Column
@@ -264,7 +344,7 @@ class Blueprint
 
     public function foreignId(string $name): Column
     {
-        return $this->bigInteger($name)->unsigned();
+        return $this->unsignedBigInteger($name);
     }
 
     public function index(string|array $columns, ?string $name = null): self
@@ -299,7 +379,6 @@ class Blueprint
         return $foreignKey;
     }
 
-    // Column modification methods
     public function dropColumn(string|array $columns): self
     {
         $columns = is_array($columns) ? $columns : [$columns];
@@ -313,15 +392,7 @@ class Blueprint
         return $this;
     }
 
-    public function modifyColumn(string $name): Column
-    {
-        $column = new Column($name, 'VARCHAR');
-        $column->setBlueprint($this);
-        $this->modifyColumns[] = $column;
-        return $column;
-    }
-
-    public function string_modify(string $name, int $length = 255): Column
+    public function modifyString(string $name, int $length = 255): Column
     {
         $column = new Column($name, 'VARCHAR', $length);
         $column->setBlueprint($this);
@@ -329,12 +400,72 @@ class Blueprint
         return $column;
     }
 
-    public function integer_modify(string $name): Column
+    public function modifyInteger(string $name, bool $unsigned = false): Column
     {
         $column = new Column($name, 'INT');
+        if ($unsigned) $column->unsigned();
         $column->setBlueprint($this);
         $this->modifyColumns[] = $column;
         return $column;
+    }
+
+    public function modifyBigInteger(string $name, bool $unsigned = false): Column
+    {
+        $column = new Column($name, 'BIGINT');
+        if ($unsigned) $column->unsigned();
+        $column->setBlueprint($this);
+        $this->modifyColumns[] = $column;
+        return $column;
+    }
+
+    public function modifySmallInteger(string $name, bool $unsigned = false): Column
+    {
+        $column = new Column($name, 'SMALLINT');
+        if ($unsigned) $column->unsigned();
+        $column->setBlueprint($this);
+        $this->modifyColumns[] = $column;
+        return $column;
+    }
+
+    public function modifyTinyInteger(string $name, bool $unsigned = false): Column
+    {
+        $column = new Column($name, 'TINYINT');
+        if ($unsigned) $column->unsigned();
+        $column->setBlueprint($this);
+        $this->modifyColumns[] = $column;
+        return $column;
+    }
+
+    public function modifyText(string $name): Column
+    {
+        $column = new Column($name, 'TEXT');
+        $column->setBlueprint($this);
+        $this->modifyColumns[] = $column;
+        return $column;
+    }
+
+    public function modifyDecimal(string $name, int $precision = 8, int $scale = 2, bool $unsigned = false): Column
+    {
+        $column = new Column($name, 'DECIMAL', null, $precision, $scale);
+        if ($unsigned) $column->unsigned();
+        $column->setBlueprint($this);
+        $this->modifyColumns[] = $column;
+        return $column;
+    }
+
+    public function modifyBoolean(string $name): Column
+    {
+        $column = new Column($name, 'TINYINT', 1);
+        $column->setBlueprint($this);
+        $this->modifyColumns[] = $column;
+        return $column;
+    }
+
+    public function dropIfExists(string|array $columns): self
+    {
+        $columns = is_array($columns) ? $columns : [$columns];
+        $this->dropColumns = array_merge($this->dropColumns, $columns);
+        return $this;
     }
 
     public function dropIndex(string|array $index): self
