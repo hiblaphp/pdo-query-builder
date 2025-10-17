@@ -270,7 +270,7 @@ class Blueprint
     public function index(string|array $columns, ?string $name = null): self
     {
         $columns = is_array($columns) ? $columns : [$columns];
-         $name ??= $this->table . '_' . implode('_', $columns) . '_index';
+        $name ??= $this->table . '_' . implode('_', $columns) . '_index';
         $this->indexes[] = ['type' => 'INDEX', 'name' => $name, 'columns' => $columns];
         return $this;
     }
@@ -278,7 +278,7 @@ class Blueprint
     public function unique(string|array $columns, ?string $name = null): self
     {
         $columns = is_array($columns) ? $columns : [$columns];
-         $name ??= $this->table . '_' . implode('_', $columns) . '_unique';
+        $name ??= $this->table . '_' . implode('_', $columns) . '_unique';
         $this->indexes[] = ['type' => 'UNIQUE', 'name' => $name, 'columns' => $columns];
         return $this;
     }
@@ -293,13 +293,13 @@ class Blueprint
     public function foreign(string|array $columns, ?string $name = null): ForeignKey
     {
         $columns = is_array($columns) ? $columns : [$columns];
-         $name ??= $this->table . '_' . implode('_', $columns) . '_foreign';
+        $name ??= $this->table . '_' . implode('_', $columns) . '_foreign';
         $foreignKey = new ForeignKey($name, $columns, $this->table);
         $this->foreignKeys[] = $foreignKey;
         return $foreignKey;
     }
 
-    // NEW: Column modification methods
+    // Column modification methods
     public function dropColumn(string|array $columns): self
     {
         $columns = is_array($columns) ? $columns : [$columns];
@@ -315,7 +315,7 @@ class Blueprint
 
     public function modifyColumn(string $name): Column
     {
-        $column = new Column($name, 'VARCHAR'); 
+        $column = new Column($name, 'VARCHAR');
         $column->setBlueprint($this);
         $this->modifyColumns[] = $column;
         return $column;

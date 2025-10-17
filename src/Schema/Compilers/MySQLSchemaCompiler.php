@@ -115,7 +115,7 @@ class MySQLSchemaCompiler implements SchemaCompiler
             $sql .= ' NOT NULL';
         }
 
-        if ($column->isPrimary() && !$column->isAutoIncrement()) {
+        if ($column->isPrimary()) {
             $sql .= ' PRIMARY KEY';
         }
 
