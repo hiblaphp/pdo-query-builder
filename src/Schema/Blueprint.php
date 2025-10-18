@@ -606,4 +606,68 @@ class Blueprint
         $this->collation = $collation;
         return $this;
     }
+
+    public function point(string $name): Column
+    {
+        $column = new Column($name, 'POINT');
+        $column->setBlueprint($this);
+        $this->columns[] = $column;
+        return $column;
+    }
+
+    public function lineString(string $name): Column
+    {
+        $column = new Column($name, 'LINESTRING');
+        $column->setBlueprint($this);
+        $this->columns[] = $column;
+        return $column;
+    }
+
+    public function polygon(string $name): Column
+    {
+        $column = new Column($name, 'POLYGON');
+        $column->setBlueprint($this);
+        $this->columns[] = $column;
+        return $column;
+    }
+
+    public function geometry(string $name): Column
+    {
+        $column = new Column($name, 'GEOMETRY');
+        $column->setBlueprint($this);
+        $this->columns[] = $column;
+        return $column;
+    }
+
+    public function multiPoint(string $name): Column
+    {
+        $column = new Column($name, 'MULTIPOINT');
+        $column->setBlueprint($this);
+        $this->columns[] = $column;
+        return $column;
+    }
+
+    public function multiLineString(string $name): Column
+    {
+        $column = new Column($name, 'MULTILINESTRING');
+        $column->setBlueprint($this);
+        $this->columns[] = $column;
+        return $column;
+    }
+
+    public function multiPolygon(string $name): Column
+    {
+        $column = new Column($name, 'MULTIPOLYGON');
+        $column->setBlueprint($this);
+        $this->columns[] = $column;
+        return $column;
+    }
+
+    public function geometryCollection(string $name): Column
+    {
+        $column = new Column($name, 'GEOMETRYCOLLECTION');
+        $column->setBlueprint($this);
+        $this->columns[] = $column;
+        return $column;
+    }
 }

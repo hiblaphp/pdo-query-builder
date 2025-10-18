@@ -5,12 +5,11 @@ use Tests\Helpers\SchemaTestHelper;
 
 beforeEach(function () {
     SchemaTestHelper::initializeDatabase();
-    $this->schema = SchemaTestHelper::createSchemaBuilder();
-    SchemaTestHelper::cleanupTables($this->schema);
+    SchemaTestHelper::cleanupTables(schema());
 });
 
 afterEach(function () {
-    SchemaTestHelper::cleanupTables($this->schema);
+    SchemaTestHelper::cleanupTables(schema());
 });
 
 describe('Stress Tests', function () {
@@ -18,44 +17,44 @@ describe('Stress Tests', function () {
         for ($i = 1; $i <= 5; $i++) {
             $tableName = "test_table_{$i}";
             
-            $this->schema->create($tableName, function (Blueprint $table) {
+            schema()->create($tableName, function (Blueprint $table) {
                 $table->id();
                 $table->string('name');
             })->await();
 
-            $exists = $this->schema->hasTable($tableName)->await();
-            expect($exists)->toBeTrue();
+            $exists = schema()->hasTable($tableName)->await();
+            expect($exists)->toBeTruthy();
 
-            $this->schema->drop($tableName)->await();
+            schema()->drop($tableName)->await();
 
-            $exists = $this->schema->hasTable($tableName)->await();
-            expect($exists)->toBeFalse();
+            $exists = schema()->hasTable($tableName)->await();
+            expect($exists)->toBeFalsy();
         }
     });
 
     it('handles multiple alterations in sequence', function () {
-        $this->schema->create('users', function (Blueprint $table) {
+        schema()->create('users', function (Blueprint $table) {
             $table->id();
             $table->string('name');
         })->await();
 
-        $this->schema->table('users', function (Blueprint $table) {
+        schema()->table('users', function (Blueprint $table) {
             $table->string('email')->nullable();
         })->await();
 
-        $this->schema->table('users', function (Blueprint $table) {
+        schema()->table('users', function (Blueprint $table) {
             $table->index('email');
         })->await();
 
-        $this->schema->table('users', function (Blueprint $table) {
+        schema()->table('users', function (Blueprint $table) {
             $table->renameColumn('name', 'full_name');
         })->await();
 
-        $this->schema->table('users', function (Blueprint $table) {
+        schema()->table('users', function (Blueprint $table) {
             $table->integer('age')->default(0);
         })->await();
 
-        $exists = $this->schema->hasTable('users')->await();
-        expect($exists)->toBeTrue();
+        $exists = schema()->hasTable('users')->await();
+        expect($exists)->toBeTruthy();
     });
 });

@@ -334,14 +334,17 @@ class MySQLSchemaCompiler implements SchemaCompiler
         $table = $blueprint->getTable();
         $statements = [];
 
-        foreach ($blueprint->getDropColumns() as $column) {
-            $statements[] = "ALTER TABLE `{$table}` DROP COLUMN IF EXISTS `{$column}`";
+        // 1. Rename columns FIRST (before anything references new names)
+        foreach ($blueprint->getRenameColumns() as $rename) {
+            $statements[] = "ALTER TABLE `{$table}` RENAME COLUMN `{$rename['from']}` TO `{$rename['to']}`";
         }
 
+        // 2. Drop foreign keys (before dropping columns/indexes)
         foreach ($blueprint->getDropForeignKeys() as $foreignKey) {
             $statements[] = "ALTER TABLE `{$table}` DROP FOREIGN KEY `{$foreignKey}`";
         }
 
+        // 3. Drop indexes (before dropping columns)
         foreach ($blueprint->getDropIndexes() as $index) {
             if ($index[0] === 'PRIMARY') {
                 $statements[] = "ALTER TABLE `{$table}` DROP PRIMARY KEY";
@@ -351,10 +354,12 @@ class MySQLSchemaCompiler implements SchemaCompiler
             }
         }
 
-        foreach ($blueprint->getRenameColumns() as $rename) {
-            $statements[] = "ALTER TABLE `{$table}` RENAME COLUMN `{$rename['from']}` TO `{$rename['to']}`";
+        // 4. Drop columns
+        foreach ($blueprint->getDropColumns() as $column) {
+            $statements[] = "ALTER TABLE `{$table}` DROP COLUMN `{$column}`";
         }
 
+        // 5. Modify columns
         if (!empty($blueprint->getModifyColumns())) {
             $modifications = array_map(
                 fn($col) => "MODIFY COLUMN " . $this->compileColumn($col),
@@ -363,6 +368,7 @@ class MySQLSchemaCompiler implements SchemaCompiler
             $statements[] = "ALTER TABLE `{$table}` " . implode(', ', $modifications);
         }
 
+        // 6. Add columns
         if (!empty($blueprint->getColumns())) {
             $additions = array_map(
                 fn($col) => "ADD COLUMN " . $this->compileColumn($col),
@@ -371,10 +377,12 @@ class MySQLSchemaCompiler implements SchemaCompiler
             $statements[] = "ALTER TABLE `{$table}` " . implode(', ', $additions);
         }
 
+        // 7. Add indexes
         foreach ($blueprint->getIndexDefinitions() as $indexDef) {
             $statements = array_merge($statements, $this->compileAddIndexDefinition($table, $indexDef));
         }
 
+        // 8. Add foreign keys (last, after all columns exist)
         foreach ($blueprint->getForeignKeys() as $foreignKey) {
             $statements[] = "ALTER TABLE `{$table}` ADD " . $this->compileForeignKey($foreignKey);
         }

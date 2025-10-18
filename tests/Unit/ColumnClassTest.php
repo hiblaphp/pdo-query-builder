@@ -15,14 +15,14 @@ describe('Column Class', function () {
         $column = new Column('email', 'VARCHAR', 255);
         $column->nullable();
         
-        expect($column->isNullable())->toBeTrue();
+        expect($column->isNullable())->toBeTruthy();
     });
 
     it('sets column default value', function () {
         $column = new Column('age', 'INT');
         $column->default(0);
         
-        expect($column->hasDefault())->toBeTrue();
+        expect($column->hasDefault())->toBeTruthy();
         expect($column->getDefault())->toBe(0);
     });
 
@@ -30,28 +30,28 @@ describe('Column Class', function () {
         $column = new Column('count', 'INT');
         $column->unsigned();
         
-        expect($column->isUnsigned())->toBeTrue();
+        expect($column->isUnsigned())->toBeTruthy();
     });
 
     it('sets column auto increment', function () {
         $column = new Column('id', 'BIGINT');
         $column->autoIncrement();
         
-        expect($column->isAutoIncrement())->toBeTrue();
+        expect($column->isAutoIncrement())->toBeTruthy();
     });
 
     it('sets column primary', function () {
         $column = new Column('id', 'BIGINT');
         $column->primary();
         
-        expect($column->isPrimary())->toBeTrue();
+        expect($column->isPrimary())->toBeTruthy();
     });
 
     it('sets column unique', function () {
         $column = new Column('email', 'VARCHAR', 255);
         $column->unique();
         
-        expect($column->isUnique())->toBeTrue();
+        expect($column->isUnique())->toBeTruthy();
     });
 
     it('sets column comment', function () {
@@ -70,7 +70,7 @@ describe('Column Class', function () {
         expect($array['name'])->toBe('name');
         expect($array['type'])->toBe('VARCHAR');
         expect($array['length'])->toBe(255);
-        expect($array['nullable'])->toBeTrue();
+        expect($array['nullable'])->toBeTruthy();
         expect($array['default'])->toBe('John');
         expect($array['comment'])->toBe('User name');
     });
@@ -92,9 +92,9 @@ describe('Column Class', function () {
         expect($column->getName())->toBe('email');
         expect($column->getType())->toBe('VARCHAR');
         expect($column->getLength())->toBe(255);
-        expect($column->isNullable())->toBeTrue();
+        expect($column->isNullable())->toBeTruthy();
         expect($column->getDefault())->toBe('test@example.com');
-        expect($column->isUnique())->toBeTrue();
+        expect($column->isUnique())->toBeTruthy();
         expect($column->getComment())->toBe('User email');
     });
 
@@ -107,7 +107,7 @@ describe('Column Class', function () {
         expect($newColumn->getName())->toBe('new_name');
         expect($newColumn->getType())->toBe('VARCHAR');
         expect($newColumn->getLength())->toBe(255);
-        expect($newColumn->isNullable())->toBeTrue();
+        expect($newColumn->isNullable())->toBeTruthy();
         expect($newColumn->getDefault())->toBe('test');
     });
 });

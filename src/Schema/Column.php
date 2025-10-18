@@ -315,9 +315,10 @@ class Column
 
     /**
      * Add a spatial index to this column
+     * Note: MySQL requires spatial indexed columns to be NOT NULL
      * 
      * @param string|null $name Optional index name
-     * @param string|null $operatorClass Optional operator class (gist, gin, spgist, brin)
+     * @param string|null $operatorClass Optional operator class (for PostgreSQL: gist, gin, spgist, brin)
      * @return self
      */
     public function spatialIndex(?string $name = null, ?string $operatorClass = null): self
@@ -327,6 +328,7 @@ class Column
             'name' => $name,
             'operatorClass' => $operatorClass,
         ];
+        
         return $this;
     }
 

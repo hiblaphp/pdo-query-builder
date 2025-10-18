@@ -6,17 +6,16 @@ use Tests\Helpers\SchemaTestHelper;
 
 beforeEach(function () {
     SchemaTestHelper::initializeDatabase();
-    $this->schema = SchemaTestHelper::createSchemaBuilder();
-    SchemaTestHelper::cleanupTables($this->schema);
+    SchemaTestHelper::cleanupTables(schema());
 });
 
 afterEach(function () {
-    SchemaTestHelper::cleanupTables($this->schema);
+    SchemaTestHelper::cleanupTables(schema());
 });
 
 describe('Data Insertion and Verification', function () {
     it('creates table and inserts data', function () {
-        $this->schema->create('users', function (Blueprint $table) {
+        schema()->create('users', function (Blueprint $table) {
             $table->id();
             $table->string('name');
             $table->string('email')->unique();
@@ -37,7 +36,7 @@ describe('Data Insertion and Verification', function () {
     });
 
     it('respects default values', function () {
-        $this->schema->create('products', function (Blueprint $table) {
+        schema()->create('products', function (Blueprint $table) {
             $table->id();
             $table->string('name');
             $table->decimal('price', 10, 2)->default(0.00);
@@ -57,11 +56,11 @@ describe('Data Insertion and Verification', function () {
         expect((int)$product['stock'])->toBe(0);
         expect((int)$product['active'])->toBe(1);
         
-        $this->schema->dropIfExists('products')->await();
+        schema()->dropIfExists('products')->await();
     });
 
     it('respects nullable constraints', function () {
-        $this->schema->create('profiles', function (Blueprint $table) {
+        schema()->create('profiles', function (Blueprint $table) {
             $table->id();
             $table->string('bio')->nullable();
             $table->string('website')->nullable();
@@ -78,11 +77,11 @@ describe('Data Insertion and Verification', function () {
         expect($profile['bio'])->toBeNull();
         expect($profile['website'])->toBeNull();
         
-        $this->schema->dropIfExists('profiles')->await();
+        schema()->dropIfExists('profiles')->await();
     });
 
     it('enforces unique constraints', function () {
-        $this->schema->create('users', function (Blueprint $table) {
+        schema()->create('users', function (Blueprint $table) {
             $table->id();
             $table->string('email')->unique();
         })->await();
@@ -101,12 +100,12 @@ describe('Data Insertion and Verification', function () {
     });
 
     it('enforces foreign key constraints', function () {
-        $this->schema->create('users', function (Blueprint $table) {
+        schema()->create('users', function (Blueprint $table) {
             $table->id();
             $table->string('name');
         })->await();
 
-        $this->schema->create('posts', function (Blueprint $table) {
+        schema()->create('posts', function (Blueprint $table) {
             $table->id();
             $table->foreignId('user_id')->constrained();
             $table->string('title');
@@ -137,12 +136,12 @@ describe('Data Insertion and Verification', function () {
     });
 
     it('cascades deletes correctly', function () {
-        $this->schema->create('users', function (Blueprint $table) {
+        schema()->create('users', function (Blueprint $table) {
             $table->id();
             $table->string('name');
         })->await();
 
-        $this->schema->create('posts', function (Blueprint $table) {
+        schema()->create('posts', function (Blueprint $table) {
             $table->id();
             $table->foreignId('user_id')->constrained()->cascadeOnDelete();
             $table->string('title');

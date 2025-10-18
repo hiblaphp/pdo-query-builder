@@ -6,32 +6,31 @@ use Tests\Helpers\SchemaTestHelper;
 
 beforeEach(function () {
     SchemaTestHelper::initializeDatabase();
-    $this->schema = SchemaTestHelper::createSchemaBuilder();
-    SchemaTestHelper::cleanupTables($this->schema);
+    SchemaTestHelper::cleanupTables(schema());
 });
 
 afterEach(function () {
-    SchemaTestHelper::cleanupTables($this->schema);
+    SchemaTestHelper::cleanupTables(schema());
 });
 
 describe('Column Helper Methods', function () {
     it('uses foreignId helper correctly', function () {
-        $this->schema->create('users', function (Blueprint $table) {
+        schema()->create('users', function (Blueprint $table) {
             $table->id();
             $table->string('name');
         })->await();
 
-        $this->schema->create('posts', function (Blueprint $table) {
+        schema()->create('posts', function (Blueprint $table) {
             $table->id();
             $table->foreignId('user_id')->constrained();
         })->await();
 
-        $exists = $this->schema->hasTable('posts')->await();
-        expect($exists)->toBeTrue();
+        $exists = schema()->hasTable('posts')->await();
+        expect($exists)->toBeTruthy();
     });
 
     it('creates timestamps helper correctly', function () {
-        $this->schema->create('users', function (Blueprint $table) {
+        schema()->create('users', function (Blueprint $table) {
             $table->id();
             $table->string('name');
             $table->timestamps();
@@ -49,14 +48,14 @@ describe('Column Helper Methods', function () {
     });
 
     it('creates softDeletes helper correctly', function () {
-        $this->schema->create('users', function (Blueprint $table) {
+        schema()->create('users', function (Blueprint $table) {
             $table->id();
             $table->string('name');
             $table->timestamps();
             $table->softDeletes();
         })->await();
 
-        $exists = $this->schema->hasTable('users')->await();
-        expect($exists)->toBeTrue();
+        $exists = schema()->hasTable('users')->await();
+        expect($exists)->toBeTruthy();
     });
 });

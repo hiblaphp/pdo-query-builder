@@ -5,12 +5,11 @@ use Tests\Helpers\SchemaTestHelper;
 
 beforeEach(function () {
     SchemaTestHelper::initializeDatabase();
-    $this->schema = SchemaTestHelper::createSchemaBuilder();
-    SchemaTestHelper::cleanupTables($this->schema);
+    SchemaTestHelper::cleanupTables(schema());
 });
 
 afterEach(function () {
-    SchemaTestHelper::cleanupTables($this->schema);
+    SchemaTestHelper::cleanupTables(schema());
 });
 
 describe('Blueprint Methods', function () {
@@ -24,25 +23,25 @@ describe('Blueprint Methods', function () {
     });
 
     it('sets blueprint engine correctly', function () {
-        $this->schema->create('users', function (Blueprint $table) {
+        schema()->create('users', function (Blueprint $table) {
             $table->id();
             $table->string('name');
             $table->engine('MyISAM');
         })->await();
 
-        $exists = $this->schema->hasTable('users')->await();
-        expect($exists)->toBeTrue();
+        $exists = schema()->hasTable('users')->await();
+        expect($exists)->toBeTruthy();
     });
 
     it('sets blueprint charset and collation correctly', function () {
-        $this->schema->create('users', function (Blueprint $table) {
+        schema()->create('users', function (Blueprint $table) {
             $table->id();
             $table->string('name');
             $table->charset('utf8');
             $table->collation('utf8_general_ci');
         })->await();
 
-        $exists = $this->schema->hasTable('users')->await();
-        expect($exists)->toBeTrue();
+        $exists = schema()->hasTable('users')->await();
+        expect($exists)->toBeTruthy();
     });
 });
