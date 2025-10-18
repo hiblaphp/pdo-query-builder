@@ -7,13 +7,14 @@ namespace Hibla\PdoQueryBuilder\Schema;
 use Hibla\AsyncPDO\AsyncPDO;
 use Hibla\PdoQueryBuilder\Utilities\ConfigLoader;
 use Hibla\Promise\Interfaces\PromiseInterface;
-use Hibla\Promise\Promise;
 
+use function Hibla\async;
 use function Hibla\await;
 
 class SchemaBuilder
 {
     private string $driver;
+    private ?SQLiteSchemaBuilder $sqliteBuilder = null;
 
     public function __construct(?string $driver = null)
     {
@@ -36,24 +37,26 @@ class SchemaBuilder
         return strtolower($connectionConfig['driver'] ?? 'mysql');
     }
 
+    private function getSQLiteBuilder(): SQLiteSchemaBuilder
+    {
+        if ($this->sqliteBuilder === null) {
+            $this->sqliteBuilder = new SQLiteSchemaBuilder($this->getCompiler());
+        }
+        return $this->sqliteBuilder;
+    }
+
     public function create(string $table, callable $callback): PromiseInterface
     {
         $blueprint = new Blueprint($table);
         $callback($blueprint);
 
-        // Process column-level indexes
         $this->processColumnIndexes($blueprint);
 
         $compiler = $this->getCompiler();
         $sql = $compiler->compileCreate($blueprint);
 
-        // For SQLite, enable foreign keys before creating table
         if ($this->driver === 'sqlite') {
-            return Promise::resolved(null)
-                ->then(function () use ($sql) {
-                    await(AsyncPDO::execute('PRAGMA foreign_keys = ON', []));
-                    return await(AsyncPDO::execute($sql, []));
-                });
+            return $this->getSQLiteBuilder()->handleCreate($sql);
         }
 
         return AsyncPDO::execute($sql, []);
@@ -88,57 +91,14 @@ class SchemaBuilder
         $blueprint = new Blueprint($table);
         $callback($blueprint);
 
-        // Process column-level indexes
         $this->processColumnIndexes($blueprint);
 
         $compiler = $this->getCompiler();
-        
+
         if ($this->driver === 'sqlite') {
-            $needsRecreation = !empty($blueprint->getDropColumns()) ||
-                !empty($blueprint->getModifyColumns()) ||
-                !empty($blueprint->getDropForeignKeys()) ||
-                !empty($blueprint->getDropIndexes());
-                
-            if ($needsRecreation) {
-                return Promise::resolved(null)
-                    ->then(function () use ($table, $blueprint, $compiler) {
-                        // Fetch existing columns from database
-                        $existingColumns = await(AsyncPDO::query("PRAGMA table_info(`{$table}`)", []));
-                        
-                        // Pass to compiler
-                        if (method_exists($compiler, 'setExistingTableColumns')) {
-                            $compiler->setExistingTableColumns($existingColumns);
-                        }
-                        
-                        // Enable foreign keys
-                        await(AsyncPDO::execute('PRAGMA foreign_keys = ON', []));
-                        
-                        // Compile with complete information
-                        $sql = $compiler->compileAlter($blueprint);
-                        
-                        if (is_array($sql)) {
-                            // Execute all statements, handle errors properly
-                            try {
-                                foreach ($sql as $statement) {
-                                    await(AsyncPDO::execute($statement, []));
-                                }
-                                return true;
-                            } catch (\Throwable $e) {
-                                // Try to rollback if we're in a transaction
-                                try {
-                                    await(AsyncPDO::execute('ROLLBACK', []));
-                                } catch (\Throwable $rollbackError) {
-                                    // Ignore rollback errors
-                                }
-                                throw $e;
-                            }
-                        }
-                        
-                        return await(AsyncPDO::execute($sql, []));
-                    });
-            }
+            return $this->getSQLiteBuilder()->handleTable($table, $blueprint);
         }
-        
+
         $sql = $compiler->compileAlter($blueprint);
 
         if (is_array($sql)) {
@@ -162,10 +122,15 @@ class SchemaBuilder
         $blueprint->dropColumn($columns);
 
         $compiler = $this->getCompiler();
+
+        if ($this->driver === 'sqlite') {
+            return $this->getSQLiteBuilder()->handleDropColumn($table, $blueprint);
+        }
+
         $sql = $compiler->compileAlter($blueprint);
 
         if (is_array($sql)) {
-            return $this->executeMultiple($sql);
+            return empty($sql) ? async(function () {}) : $this->executeMultiple($sql);
         }
 
         return AsyncPDO::execute($sql, []);
@@ -192,10 +157,15 @@ class SchemaBuilder
         $blueprint->dropIndex($index);
 
         $compiler = $this->getCompiler();
+
+        if ($this->driver === 'sqlite') {
+            return $this->getSQLiteBuilder()->handleDropIndex($table, $blueprint);
+        }
+
         $sql = $compiler->compileAlter($blueprint);
 
         if (is_array($sql)) {
-            return $this->executeMultiple($sql);
+            return empty($sql) ? async(function () {}) : $this->executeMultiple($sql);
         }
 
         return AsyncPDO::execute($sql, []);
@@ -207,10 +177,15 @@ class SchemaBuilder
         $blueprint->dropForeign($foreignKey);
 
         $compiler = $this->getCompiler();
+
+        if ($this->driver === 'sqlite') {
+            return $this->getSQLiteBuilder()->handleDropForeign($table, $blueprint);
+        }
+
         $sql = $compiler->compileAlter($blueprint);
 
         if (is_array($sql)) {
-            return $this->executeMultiple($sql);
+            return empty($sql) ? async(function () {}) : $this->executeMultiple($sql);
         }
 
         return AsyncPDO::execute($sql, []);
@@ -218,14 +193,13 @@ class SchemaBuilder
 
     private function executeMultiple(array $statements): PromiseInterface
     {
-        return Promise::resolved(null)
-            ->then(function () use ($statements) {
-                $results = [];
-                foreach ($statements as $sql) {
-                    $results[] = await(AsyncPDO::execute($sql, []));
-                }
-                return $results;
-            });
+        return async(function () use ($statements) {
+            $results = [];
+            foreach ($statements as $sql) {
+                $results[] = await(AsyncPDO::execute($sql, []));
+            }
+            return $results;
+        });
     }
 
     private function getCompiler(): SchemaCompiler

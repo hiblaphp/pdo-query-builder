@@ -115,7 +115,7 @@ class SQLiteSchemaCompiler implements SchemaCompiler
             'DATETIME', 'TIMESTAMP', 'DATE' => 'TEXT',
             'JSON' => 'TEXT',
             'BOOLEAN' => 'INTEGER',
-            'POINT', 'LINESTRING', 'POLYGON', 'GEOMETRY', 
+            'POINT', 'LINESTRING', 'POLYGON', 'GEOMETRY',
             'MULTIPOINT', 'MULTILINESTRING', 'MULTIPOLYGON', 'GEOMETRYCOLLECTION' => 'TEXT',
             default => $type,
         };
@@ -126,7 +126,6 @@ class SQLiteSchemaCompiler implements SchemaCompiler
         $table = $blueprint->getTable();
         $statements = [];
 
-        // Check if we need table recreation (SQLite limitation)
         $needsRecreation = !empty($blueprint->getDropColumns()) ||
             !empty($blueprint->getModifyColumns()) ||
             !empty($blueprint->getDropForeignKeys()) ||
@@ -136,31 +135,27 @@ class SQLiteSchemaCompiler implements SchemaCompiler
             return $this->compileTableRecreation($blueprint);
         }
 
-        // Simple additions
         foreach ($blueprint->getColumns() as $column) {
             $statements[] = "ALTER TABLE `{$table}` ADD COLUMN " . $this->compileColumn($column);
         }
 
-        // Rename columns
         foreach ($blueprint->getRenameColumns() as $rename) {
             $statements[] = "ALTER TABLE `{$table}` RENAME COLUMN `{$rename['from']}` TO `{$rename['to']}`";
         }
 
-        // Table rename
         foreach ($blueprint->getCommands() as $command) {
             if ($command['type'] === 'rename') {
                 $statements[] = $this->compileRename($table, $command['to']);
             }
         }
 
-        // Add indexes
         foreach ($blueprint->getIndexDefinitions() as $indexDef) {
             if ($indexDef->getType() !== 'PRIMARY') {
                 $statements = array_merge($statements, $this->compileAddIndexDefinition($table, $indexDef));
             }
         }
 
-        return empty($statements) ? '' : $statements;
+        return empty($statements) ? [] : $statements;  
     }
 
     private function compileAddIndexDefinition(string $table, IndexDefinition $indexDef): array
@@ -190,7 +185,7 @@ class SQLiteSchemaCompiler implements SchemaCompiler
         $statements = [];
 
         $statements[] = "PRAGMA foreign_keys=OFF";
-        
+
         $newBlueprint = $this->buildNewBlueprint($blueprint, $tempTable);
         $statements[] = $this->compileCreate($newBlueprint);
 
@@ -281,29 +276,29 @@ class SQLiteSchemaCompiler implements SchemaCompiler
     private function createColumnFromPragma(array $pragmaRow): Column
     {
         $column = new Column($pragmaRow['name'], $this->mapSqliteTypeToGeneric($pragmaRow['type']));
-        
+
         if ($pragmaRow['notnull'] == 0) {
             $column->nullable();
         }
-        
+
         if ($pragmaRow['dflt_value'] !== null) {
             $column->default($this->parseDefaultValue($pragmaRow['dflt_value']));
         }
-        
+
         if ($pragmaRow['pk'] == 1) {
             $column->primary();
             if (stripos($pragmaRow['type'], 'INTEGER') !== false) {
                 $column->autoIncrement();
             }
         }
-        
+
         return $column;
     }
 
     private function mapSqliteTypeToGeneric(string $sqliteType): string
     {
         $sqliteType = strtoupper($sqliteType);
-        
+
         if (str_contains($sqliteType, 'INT')) {
             return 'INTEGER';
         } elseif (str_contains($sqliteType, 'CHAR') || str_contains($sqliteType, 'TEXT')) {
@@ -311,7 +306,7 @@ class SQLiteSchemaCompiler implements SchemaCompiler
         } elseif (str_contains($sqliteType, 'REAL') || str_contains($sqliteType, 'FLOA') || str_contains($sqliteType, 'DOUB')) {
             return 'REAL';
         }
-        
+
         return 'TEXT';
     }
 
@@ -320,15 +315,15 @@ class SQLiteSchemaCompiler implements SchemaCompiler
         if (preg_match("/^'(.*)'$/", $value, $matches)) {
             return $matches[1];
         }
-        
+
         if (is_numeric($value)) {
             return strpos($value, '.') !== false ? (float)$value : (int)$value;
         }
-        
+
         if (strtoupper($value) === 'NULL') {
             return null;
         }
-        
+
         return $value;
     }
 
@@ -347,7 +342,7 @@ class SQLiteSchemaCompiler implements SchemaCompiler
             }
 
             $oldColumns[] = $columnName;
-            
+
             if (isset($renameMap[$columnName])) {
                 $newColumns[] = $renameMap[$columnName];
             } else {
