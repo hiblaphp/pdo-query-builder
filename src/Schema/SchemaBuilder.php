@@ -47,9 +47,17 @@ class SchemaBuilder
         $compiler = $this->getCompiler();
         $sql = $compiler->compileCreate($blueprint);
 
+        // For SQLite, enable foreign keys before creating table
+        if ($this->driver === 'sqlite') {
+            return Promise::resolved(null)
+                ->then(function () use ($sql) {
+                    await(AsyncPDO::execute('PRAGMA foreign_keys = ON', []));
+                    return await(AsyncPDO::execute($sql, []));
+                });
+        }
+
         return AsyncPDO::execute($sql, []);
     }
-
 
     public function dropIfExists(string $table): PromiseInterface
     {
@@ -84,6 +92,53 @@ class SchemaBuilder
         $this->processColumnIndexes($blueprint);
 
         $compiler = $this->getCompiler();
+        
+        if ($this->driver === 'sqlite') {
+            $needsRecreation = !empty($blueprint->getDropColumns()) ||
+                !empty($blueprint->getModifyColumns()) ||
+                !empty($blueprint->getDropForeignKeys()) ||
+                !empty($blueprint->getDropIndexes());
+                
+            if ($needsRecreation) {
+                return Promise::resolved(null)
+                    ->then(function () use ($table, $blueprint, $compiler) {
+                        // Fetch existing columns from database
+                        $existingColumns = await(AsyncPDO::query("PRAGMA table_info(`{$table}`)", []));
+                        
+                        // Pass to compiler
+                        if (method_exists($compiler, 'setExistingTableColumns')) {
+                            $compiler->setExistingTableColumns($existingColumns);
+                        }
+                        
+                        // Enable foreign keys
+                        await(AsyncPDO::execute('PRAGMA foreign_keys = ON', []));
+                        
+                        // Compile with complete information
+                        $sql = $compiler->compileAlter($blueprint);
+                        
+                        if (is_array($sql)) {
+                            // Execute all statements, handle errors properly
+                            try {
+                                foreach ($sql as $statement) {
+                                    await(AsyncPDO::execute($statement, []));
+                                }
+                                return true;
+                            } catch (\Throwable $e) {
+                                // Try to rollback if we're in a transaction
+                                try {
+                                    await(AsyncPDO::execute('ROLLBACK', []));
+                                } catch (\Throwable $rollbackError) {
+                                    // Ignore rollback errors
+                                }
+                                throw $e;
+                            }
+                        }
+                        
+                        return await(AsyncPDO::execute($sql, []));
+                    });
+            }
+        }
+        
         $sql = $compiler->compileAlter($blueprint);
 
         if (is_array($sql)) {
