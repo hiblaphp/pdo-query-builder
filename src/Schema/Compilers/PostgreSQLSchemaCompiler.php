@@ -70,30 +70,29 @@ class PostgreSQLSchemaCompiler implements SchemaCompiler
             $sql .= ' NOT NULL';
         }
 
-        if ($column->isPrimary() && !$column->isAutoIncrement()) {
+        if ($column->isPrimary() || $column->isAutoIncrement()) {
             $sql .= ' PRIMARY KEY';
         }
 
         if ($column->hasDefault()) {
-            $sql .= ' DEFAULT ' . $this->formatDefault($column->getDefault());
+            $sql .= ' DEFAULT ' . $this->formatDefault($column->getDefault(), $column);
         } elseif ($column->shouldUseCurrent()) {
             $sql .= ' DEFAULT CURRENT_TIMESTAMP';
-        }
-
-        if ($column->getComment() !== null) {
-            // Comments are added separately in PostgreSQL
         }
 
         return $sql;
     }
 
-    private function formatDefault(mixed $default): string
+    private function formatDefault(mixed $default, ?Column $column = null): string
     {
         if ($default === null) {
             return 'NULL';
         } elseif (is_bool($default)) {
             return $default ? 'true' : 'false';
         } elseif (is_numeric($default)) {
+            if ($column && $column->getType() === 'TINYINT' && $column->getLength() === 1) {
+                return $default ? 'true' : 'false';
+            }
             return (string) $default;
         } else {
             return "'" . addslashes((string) $default) . "'";
@@ -103,8 +102,8 @@ class PostgreSQLSchemaCompiler implements SchemaCompiler
     private function mapType(string $type, Column $column): string
     {
         return match ($type) {
-            'BIGINT' => $column->isAutoIncrement() ? 'BIGSERIAL' : ($column->isUnsigned() ? 'BIGINT' : 'BIGINT'),
-            'INT' => $column->isAutoIncrement() ? 'SERIAL' : ($column->isUnsigned() ? 'INTEGER' : 'INTEGER'),
+            'BIGINT' => $column->isAutoIncrement() ? 'BIGSERIAL' : 'BIGINT',
+            'INT' => $column->isAutoIncrement() ? 'SERIAL' : 'INTEGER',
             'TINYINT' => $column->getLength() === 1 ? 'BOOLEAN' : 'SMALLINT',
             'SMALLINT' => $column->isAutoIncrement() ? 'SMALLSERIAL' : 'SMALLINT',
             'VARCHAR' => $column->getLength() ? "VARCHAR({$column->getLength()})" : 'VARCHAR',
@@ -117,6 +116,11 @@ class PostgreSQLSchemaCompiler implements SchemaCompiler
             'DATE' => 'DATE',
             'JSON' => 'JSONB',
             'ENUM' => $this->compileEnum($column),
+            // Map spatial types to PostGIS types
+            'POINT' => 'GEOMETRY(POINT)',
+            'LINESTRING' => 'GEOMETRY(LINESTRING)',
+            'POLYGON' => 'GEOMETRY(POLYGON)',
+            'GEOMETRY' => 'GEOMETRY',
             default => $type,
         };
     }
@@ -167,7 +171,10 @@ class PostgreSQLSchemaCompiler implements SchemaCompiler
             if ($index[0] === 'PRIMARY') {
                 $statements[] = "ALTER TABLE \"{$table}\" DROP CONSTRAINT IF EXISTS \"{$table}_pkey\"";
             } else {
-                $statements[] = "DROP INDEX IF EXISTS \"{$index[0]}\"";
+                $indexName = $index[0];
+                // Try to drop as constraint first (for unique constraints), then as index
+                $statements[] = "DO $$ BEGIN ALTER TABLE \"{$table}\" DROP CONSTRAINT IF EXISTS \"{$indexName}\"; EXCEPTION WHEN undefined_object THEN NULL; END $$";
+                $statements[] = "DROP INDEX IF EXISTS \"{$indexName}\"";
             }
         }
 
@@ -204,9 +211,6 @@ class PostgreSQLSchemaCompiler implements SchemaCompiler
         return count($statements) === 1 ? $statements[0] : $statements;
     }
 
-    /**
-     * Compile add index definitions for ALTER TABLE
-     */
     private function compileAddIndexDefinition(string $table, IndexDefinition $indexDef): array
     {
         $type = $indexDef->getType();
@@ -224,9 +228,12 @@ class PostgreSQLSchemaCompiler implements SchemaCompiler
             $statements = array_merge($statements, $this->compileSpatialIndex($table, $indexDef));
         } elseif ($type === 'INDEX') {
             $cols = implode('", "', $indexDef->getColumns());
-            $sql = "CREATE INDEX CONCURRENTLY IF NOT EXISTS \"{$indexDef->getName()}\" ON \"{$table}\" (\"{$cols}\")";
+            $sql = "CREATE INDEX IF NOT EXISTS \"{$indexDef->getName()}\" ON \"{$table}\" (\"{$cols}\")";
             if ($indexDef->getAlgorithm()) {
-                $sql .= " USING {$indexDef->getAlgorithm()}";
+                $algo = strtoupper($indexDef->getAlgorithm());
+                if (in_array($algo, ['BTREE', 'HASH', 'GIST', 'GIN', 'BRIN'])) {
+                    $sql .= " USING {$algo}";
+                }
             }
             $statements[] = $sql;
         }
@@ -234,23 +241,17 @@ class PostgreSQLSchemaCompiler implements SchemaCompiler
         return $statements;
     }
 
-    /**
-     * Compile fulltext index for PostgreSQL (GIN with tsvector)
-     */
     private function compileFulltextIndex(string $table, IndexDefinition $indexDef): array
     {
         $statements = [];
-        $cols = implode('", "', $indexDef->getColumns());
+        $cols = implode(" || ' ' || ", array_map(fn($c) => "\"{$c}\"", $indexDef->getColumns()));
         $name = $indexDef->getName();
 
-        $statements[] = "CREATE INDEX CONCURRENTLY IF NOT EXISTS \"{$name}\" ON \"{$table}\" USING gin(to_tsvector('english', \"{$cols}\"))";
+        $statements[] = "CREATE INDEX IF NOT EXISTS \"{$name}\" ON \"{$table}\" USING gin(to_tsvector('english', {$cols}))";
 
         return $statements;
     }
 
-    /**
-     * Compile spatial index for PostgreSQL (GiST/GIN)
-     */
     private function compileSpatialIndex(string $table, IndexDefinition $indexDef): array
     {
         $statements = [];
@@ -258,14 +259,11 @@ class PostgreSQLSchemaCompiler implements SchemaCompiler
         $name = $indexDef->getName();
         $operatorClass = $indexDef->getOperatorClass() ?? 'gist';
 
-        $statements[] = "CREATE INDEX CONCURRENTLY IF NOT EXISTS \"{$name}\" ON \"{$table}\" USING {$operatorClass} (\"{$cols}\")";
+        $statements[] = "CREATE INDEX IF NOT EXISTS \"{$name}\" ON \"{$table}\" USING {$operatorClass} (\"{$cols}\")";
 
         return $statements;
     }
 
-    /**
-     * Compile optimized column addition to avoid table rewrites
-     */
     private function compileAddColumn(string $table, Column $column): array
     {
         $statements = [];
@@ -274,7 +272,7 @@ class PostgreSQLSchemaCompiler implements SchemaCompiler
         $statements[] = "ALTER TABLE \"{$table}\" ADD COLUMN IF NOT EXISTS {$colDef}";
 
         if ($column->hasDefault()) {
-            $default = $this->formatDefault($column->getDefault());
+            $default = $this->formatDefault($column->getDefault(), $column);
             $statements[] = "ALTER TABLE \"{$table}\" ALTER COLUMN \"{$column->getName()}\" SET DEFAULT {$default}";
         } elseif ($column->shouldUseCurrent()) {
             $statements[] = "ALTER TABLE \"{$table}\" ALTER COLUMN \"{$column->getName()}\" SET DEFAULT CURRENT_TIMESTAMP";
@@ -288,9 +286,6 @@ class PostgreSQLSchemaCompiler implements SchemaCompiler
         return $statements;
     }
 
-    /**
-     * Compile column definition without default value
-     */
     private function compileColumnWithoutDefault(Column $column): string
     {
         $sql = "\"{$column->getName()}\" ";
@@ -311,10 +306,12 @@ class PostgreSQLSchemaCompiler implements SchemaCompiler
     {
         $statements = [];
         $columnName = $column->getName();
-        $type = $this->mapType($column->getType(), $column);
+        $newType = $this->mapType($column->getType(), $column);
 
-        $using = $this->getTypeConversionUsing($column);
-        $statements[] = "ALTER TABLE \"{$table}\" ALTER COLUMN \"{$columnName}\" TYPE {$type} USING {$using}";
+        $statements[] = "DO $$ BEGIN ALTER TABLE \"{$table}\" ALTER COLUMN \"{$columnName}\" DROP DEFAULT; EXCEPTION WHEN undefined_column THEN NULL; END $$";
+
+        $using = $this->getTypeConversionUsing($column, $newType);
+        $statements[] = "ALTER TABLE \"{$table}\" ALTER COLUMN \"{$columnName}\" TYPE {$newType} USING {$using}";
 
         if (!$column->isNullable()) {
             $statements[] = "ALTER TABLE \"{$table}\" ALTER COLUMN \"{$columnName}\" SET NOT NULL";
@@ -323,12 +320,10 @@ class PostgreSQLSchemaCompiler implements SchemaCompiler
         }
 
         if ($column->hasDefault()) {
-            $default = $this->formatDefault($column->getDefault());
+            $default = $this->formatDefault($column->getDefault(), $column);
             $statements[] = "ALTER TABLE \"{$table}\" ALTER COLUMN \"{$columnName}\" SET DEFAULT {$default}";
         } elseif ($column->shouldUseCurrent()) {
             $statements[] = "ALTER TABLE \"{$table}\" ALTER COLUMN \"{$columnName}\" SET DEFAULT CURRENT_TIMESTAMP";
-        } else {
-            $statements[] = "ALTER TABLE \"{$table}\" ALTER COLUMN \"{$columnName}\" DROP DEFAULT";
         }
 
         return $statements;
@@ -337,34 +332,18 @@ class PostgreSQLSchemaCompiler implements SchemaCompiler
     /**
      * Get USING clause for type conversion
      */
-    private function getTypeConversionUsing(Column $column): string
+    private function getTypeConversionUsing(Column $column, string $newType): string
     {
         $name = $column->getName();
-        $type = $this->mapType($column->getType(), $column);
 
-        return match ($column->getType()) {
-            'BIGINT', 'INT', 'SMALLINT', 'TINYINT' => "\"{$name}\"::INTEGER",
-            'DECIMAL', 'FLOAT', 'DOUBLE' => "\"{$name}\"::NUMERIC",
-            'TEXT', 'VARCHAR' => "\"{$name}\"::TEXT",
-            'BOOLEAN' => "(\"{$name}\" = '1' OR \"{$name}\" = 'true' OR \"{$name}\" = 't')::BOOLEAN",
-            'TIMESTAMP', 'DATETIME' => "\"{$name}\"::TIMESTAMP",
-            'DATE' => "\"{$name}\"::DATE",
-            'JSON' => "\"{$name}\"::JSONB",
-            default => "\"{$name}\"::{$type}",
-        };
+        return "\"{$name}\"::{$newType}";
     }
 
-    /**
-     * Compile constraint validation
-     */
     public function compileValidateConstraint(string $table, string $constraint): string
     {
         return "ALTER TABLE \"{$table}\" VALIDATE CONSTRAINT \"{$constraint}\"";
     }
 
-    /**
-     * Compile drop foreign key with IF EXISTS
-     */
     private function compileDropForeignKey(string $table, string $foreignKey): string
     {
         return "ALTER TABLE \"{$table}\" DROP CONSTRAINT IF EXISTS \"{$foreignKey}\"";

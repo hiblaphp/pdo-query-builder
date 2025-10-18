@@ -1,5 +1,6 @@
 <?php
 
+use Hibla\PdoQueryBuilder\DB;
 use Hibla\PdoQueryBuilder\Schema\Blueprint;
 use Tests\Helpers\SchemaTestHelper;
 
@@ -72,11 +73,17 @@ describe('Indexes', function () {
     });
 
     it('creates table with various spatial types', function () {
+        try {
+            DB::rawExecute('CREATE EXTENSION IF NOT EXISTS postgis', [])->await();
+        } catch (\Exception $e) {
+            $this->markTestSkipped('PostGIS extension not available');
+        }
+
         schema()->create('geo_test', function (Blueprint $table) {
             $table->id();
-            $table->point('location')->spatialIndex(); 
+            $table->point('location')->spatialIndex();
             $table->lineString('route')->nullable();
-            $table->polygon('area')->spatialIndex();   
+            $table->polygon('area')->spatialIndex();
             $table->geometry('shape')->nullable();
         })->await();
 
@@ -87,14 +94,18 @@ describe('Indexes', function () {
     });
 
     it('creates table with SRID specification', function () {
+        try {
+            DB::rawExecute('CREATE EXTENSION IF NOT EXISTS postgis', [])->await();
+        } catch (\Exception $e) {
+            $this->markTestSkipped('PostGIS extension not available');
+        }
+
         schema()->create('stores', function (Blueprint $table) {
             $table->id();
             $table->string('name');
             $table->point('location');
             $table->spatialIndex('location');
         })->await();
-
-
 
         $exists = schema()->hasTable('stores')->await();
         expect($exists)->toBeTruthy();
