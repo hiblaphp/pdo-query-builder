@@ -1,4 +1,4 @@
-<?php 
+<?php
 
 use Hibla\PdoQueryBuilder\Schema\Blueprint;
 use Tests\Helpers\SchemaTestHelper;
@@ -50,7 +50,7 @@ describe('Complex Scenarios', function () {
         schema()->create('comments', function (Blueprint $table) {
             $table->id();
             $table->foreignId('user_id')->constrained()->cascadeOnDelete();
-            $table->foreignId('post_id')->constrained()->cascadeOnDelete();
+            $table->foreignId('post_id')->constrained()->noActionOnDelete();
             $table->text('content');
             $table->timestamps();
         })->await();

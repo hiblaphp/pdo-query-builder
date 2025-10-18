@@ -28,7 +28,7 @@ describe('Data Insertion and Verification', function () {
         )->await();
 
         $user = AsyncPDO::fetchOne('SELECT * FROM users WHERE email = ?', ['john@example.com'])->await();
-        
+
         expect($user)->not->toBeNull();
         expect($user['name'])->toBe('John Doe');
         expect($user['email'])->toBe('john@example.com');
@@ -50,12 +50,12 @@ describe('Data Insertion and Verification', function () {
         )->await();
 
         $product = AsyncPDO::fetchOne('SELECT * FROM products WHERE name = ?', ['Test Product'])->await();
-        
+
         expect($product)->not->toBeNull();
         expect((float)$product['price'])->toBe(0.00);
         expect((int)$product['stock'])->toBe(0);
         expect((int)$product['active'])->toBe(1);
-        
+
         schema()->dropIfExists('products')->await();
     });
 
@@ -71,12 +71,12 @@ describe('Data Insertion and Verification', function () {
             [null]
         )->await();
 
-        $profile = AsyncPDO::fetchOne('SELECT * FROM profiles ORDER BY id DESC LIMIT 1', [])->await();
-        
+        $profile = AsyncPDO::fetchOne('SELECT TOP 1 * FROM profiles ORDER BY id DESC', [])->await();
+
         expect($profile)->not->toBeNull();
         expect($profile['bio'])->toBeNull();
         expect($profile['website'])->toBeNull();
-        
+
         schema()->dropIfExists('profiles')->await();
     });
 

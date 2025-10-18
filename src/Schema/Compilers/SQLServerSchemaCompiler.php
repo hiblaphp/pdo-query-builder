@@ -10,16 +10,6 @@ use Hibla\PdoQueryBuilder\Schema\IndexDefinition;
 use Hibla\PdoQueryBuilder\Schema\SchemaCompiler;
 use PDO;
 
-/**
- * SQL Server Schema Compiler
- * 
- * Supports SQL Server 2016+ features including:
- * - Proper spatial index handling (geometry/geography types)
- * - IF EXISTS/IF NOT EXISTS syntax
- * - Proper foreign key handling with primary key dependencies
- * - OFFSET/FETCH instead of LIMIT
- * - Full-text search only in user databases
- */
 class SQLServerSchemaCompiler implements SchemaCompiler
 {
     private ?PDO $connection = null;
@@ -41,22 +31,33 @@ class SQLServerSchemaCompiler implements SchemaCompiler
         $sql .= "CREATE TABLE [{$table}] (\n";
 
         $columnDefinitions = [];
+        $hasPrimaryKey = false;
+        $primaryKeyColumn = null;
+        
         foreach ($columns as $column) {
             $columnDefinitions[] = '  ' . $this->compileColumn($column);
+            
+            if ($column->getName() === 'id' && $column->isAutoIncrement()) {
+                $primaryKeyColumn = 'id';
+            }
         }
 
-        // Add primary key inline if it exists
         foreach ($indexDefinitions as $indexDef) {
             if ($indexDef->getType() === 'PRIMARY') {
                 $columnDefinitions[] = '  ' . $this->compilePrimaryIndex($indexDef);
+                $hasPrimaryKey = true;
+                break;
             }
+        }
+
+        if (!$hasPrimaryKey && $primaryKeyColumn !== null) {
+            $columnDefinitions[] = "  CONSTRAINT [PK_{$table}] PRIMARY KEY CLUSTERED ([{$primaryKeyColumn}])";
+            $hasPrimaryKey = true;
         }
 
         $sql .= implode(",\n", $columnDefinitions);
         $sql .= "\n);\n";
 
-        // Add non-primary indexes after table creation
-        // Spatial indexes MUST come after primary key is created
         foreach ($indexDefinitions as $indexDef) {
             if ($indexDef->getType() !== 'PRIMARY') {
                 $indexSql = $this->compileIndexDefinitionStatement($table, $indexDef);
@@ -66,7 +67,6 @@ class SQLServerSchemaCompiler implements SchemaCompiler
             }
         }
 
-        // Add foreign keys AFTER table is created with primary key
         foreach ($foreignKeys as $foreignKey) {
             $sql .= "ALTER TABLE [{$table}] ADD " . $this->compileForeignKey($foreignKey) . ";\n";
         }
@@ -76,18 +76,12 @@ class SQLServerSchemaCompiler implements SchemaCompiler
         return $sql;
     }
 
-    /**
-     * Compile primary index for inline definition
-     */
     private function compilePrimaryIndex(IndexDefinition $indexDef): string
     {
         $cols = implode('], [', $indexDef->getColumns());
-        return "CONSTRAINT [PK_{$indexDef->getName()}] PRIMARY KEY ([{$cols}])";
+        return "CONSTRAINT [PK_{$indexDef->getName()}] PRIMARY KEY CLUSTERED ([{$cols}])";
     }
 
-    /**
-     * Compile index definition as CREATE INDEX statement
-     */
     private function compileIndexDefinitionStatement(string $table, IndexDefinition $indexDef): string
     {
         $type = $indexDef->getType();
@@ -103,44 +97,46 @@ class SQLServerSchemaCompiler implements SchemaCompiler
         };
     }
 
-    /**
-     * Compile fulltext index for SQL Server
-     * Full-text search is NOT available in master, tempdb, or model databases
-     */
     private function compileFulltextIndex(string $table, IndexDefinition $indexDef): string
     {
-        // Skip full-text indexes in system databases
         if ($this->isSystemDatabase) {
-            $cols = implode('], [', $indexDef->getColumns());
-            $name = $indexDef->getName();
-            // Create a regular index as fallback
-            return "CREATE INDEX [{$name}] ON [{$table}] ([{$cols}])";
+            return "-- Full-text index skipped in system database for [{$table}]";
         }
 
         $cols = implode('], [', $indexDef->getColumns());
         $name = $indexDef->getName();
 
-        return "CREATE FULLTEXT INDEX ON [{$table}] ([{$cols}]) " .
-            "KEY INDEX [PK_{$table}] WITH STOPLIST = SYSTEM";
+        return "BEGIN TRY\n" .
+               "  IF NOT EXISTS (SELECT * FROM sys.fulltext_catalogs WHERE is_default = 1)\n" .
+               "    CREATE FULLTEXT CATALOG ftCatalog AS DEFAULT;\n" .
+               "  \n" .
+               "  DECLARE @PKName_{$name} NVARCHAR(200);\n" .
+               "  SELECT @PKName_{$name} = i.name\n" .
+               "  FROM sys.indexes i\n" .
+               "  WHERE i.object_id = OBJECT_ID('[{$table}]') AND i.is_primary_key = 1;\n" .
+               "  \n" .
+               "  IF @PKName_{$name} IS NOT NULL\n" .
+               "    EXEC('CREATE FULLTEXT INDEX ON [{$table}] ([{$cols}]) KEY INDEX ' + @PKName_{$name} + ' WITH STOPLIST = SYSTEM');\n" .
+               "END TRY\n" .
+               "BEGIN CATCH\n" .
+               "  -- Full-Text Search not available or other error, skip index creation\n" .
+               "  -- Cannot create regular index on TEXT/NVARCHAR(MAX) columns\n" .
+               "  PRINT 'Warning: Could not create full-text index [{$name}] on table [{$table}]: ' + ERROR_MESSAGE();\n" .
+               "END CATCH";
     }
 
-    /**
-     * Compile spatial index for SQL Server
-     * Spatial indexes work with geometry and geography types
-     */
     private function compileSpatialIndex(string $table, IndexDefinition $indexDef): string
     {
         $cols = implode('], [', $indexDef->getColumns());
         $name = $indexDef->getName();
 
-        // Use GEOMETRY_AUTO_GRID tessellation scheme for automatic spatial index creation
-        return "CREATE SPATIAL INDEX [{$name}] ON [{$table}] ([{$cols}]) " .
-            "USING GEOMETRY_AUTO_GRID WITH (BOUNDING_BOX = (0, 0, 500, 500))";
+        return "IF EXISTS (SELECT * FROM sys.indexes WHERE object_id = OBJECT_ID('[{$table}]') AND is_primary_key = 1 AND type_desc = 'CLUSTERED')\n" .
+               "  CREATE SPATIAL INDEX [{$name}] ON [{$table}] ([{$cols}]) " .
+               "USING GEOMETRY_AUTO_GRID WITH (BOUNDING_BOX = (0, 0, 500, 500));\n" .
+               "ELSE\n" .
+               "  RAISERROR('Table [{$table}] must have a clustered primary key before creating spatial index', 16, 1)";
     }
 
-    /**
-     * Compile a single column definition
-     */
     private function compileColumn(Column $column): string
     {
         $sql = "[{$column->getName()}] ";
@@ -234,6 +230,9 @@ class SQLServerSchemaCompiler implements SchemaCompiler
     /**
      * Compile foreign key constraint
      * Must be added AFTER table creation to ensure primary key exists
+     * 
+     * Note: SQL Server does not allow CASCADE on self-referencing foreign keys
+     * as it may cause cycles or multiple cascade paths
      */
     private function compileForeignKey($foreignKey): string
     {
@@ -243,40 +242,56 @@ class SQLServerSchemaCompiler implements SchemaCompiler
         $sql = "CONSTRAINT [{$foreignKey->getName()}] FOREIGN KEY ([{$cols}]) " .
             "REFERENCES [{$foreignKey->getReferenceTable()}] ([{$refCols}])";
 
-        // Only add ON DELETE if specified and not RESTRICT (default)
-        if ($foreignKey->getOnDelete() && $foreignKey->getOnDelete() !== 'RESTRICT') {
-            $sql .= " ON DELETE {$foreignKey->getOnDelete()}";
+        if ($foreignKey->getOnDelete()) {
+            $action = $foreignKey->getOnDelete();
+            
+            if ($action === 'NULL') {
+                $action = 'SET NULL';
+            }
+            
+            if ($action === 'RESTRICT') {
+                $action = 'NO ACTION';
+            }
+            
+            if ($action !== 'NO ACTION') {
+                $sql .= " ON DELETE {$action}";
+            }
         }
 
-        // Only add ON UPDATE if specified and not RESTRICT (default)
-        if ($foreignKey->getOnUpdate() && $foreignKey->getOnUpdate() !== 'RESTRICT') {
-            $sql .= " ON UPDATE {$foreignKey->getOnUpdate()}";
+        if ($foreignKey->getOnUpdate()) {
+            $action = $foreignKey->getOnUpdate();
+            
+            if ($action === 'NULL') {
+                $action = 'SET NULL';
+            }
+            
+            if ($action === 'RESTRICT') {
+                $action = 'NO ACTION';
+            }
+            
+            if ($action !== 'NO ACTION') {
+                $sql .= " ON UPDATE {$action}";
+            }
         }
 
         return $sql;
     }
 
-    /**
-     * Compile ALTER TABLE statements
-     */
     public function compileAlter(Blueprint $blueprint): string|array
     {
         $table = $blueprint->getTable();
         $statements = [];
 
-        // Drop columns first
         foreach ($blueprint->getDropColumns() as $column) {
             $statements[] = $this->compileDropDefaultConstraint($table, $column);
             $statements[] = "IF EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('[{$table}]') AND name = '{$column}')\n" .
                 "ALTER TABLE [{$table}] DROP COLUMN [{$column}]";
         }
 
-        // Drop foreign keys
         foreach ($blueprint->getDropForeignKeys() as $foreignKey) {
             $statements[] = $this->compileDropForeignKey($table, $foreignKey);
         }
 
-        // Drop indexes
         foreach ($blueprint->getDropIndexes() as $index) {
             if ($index[0] === 'PRIMARY') {
                 $statements[] = "IF EXISTS (SELECT * FROM sys.key_constraints WHERE name = 'PK_{$table}' AND parent_object_id = OBJECT_ID('[{$table}]'))\n" .
@@ -288,29 +303,24 @@ class SQLServerSchemaCompiler implements SchemaCompiler
             }
         }
 
-        // Rename columns
         foreach ($blueprint->getRenameColumns() as $rename) {
             $statements[] = $this->compileRenameColumn($blueprint, $rename['from'], $rename['to']);
         }
 
-        // Modify columns
         foreach ($blueprint->getModifyColumns() as $column) {
             $statements[] = $this->compileDropDefaultConstraint($table, $column->getName());
             $statements[] = "ALTER TABLE [{$table}] ALTER COLUMN " . $this->compileColumn($column);
         }
 
-        // Add new columns
         foreach ($blueprint->getColumns() as $column) {
             $statements[] = "ALTER TABLE [{$table}] ADD " . $this->compileColumn($column);
         }
 
-        // Add indexes (including spatial indexes)
         foreach ($blueprint->getIndexDefinitions() as $indexDef) {
             $indexStatements = $this->compileAddIndexDefinition($table, $indexDef);
             $statements = array_merge($statements, array_filter($indexStatements));
         }
 
-        // Add foreign keys
         foreach ($blueprint->getForeignKeys() as $foreignKey) {
             $statements[] = "IF NOT EXISTS (SELECT * FROM sys.foreign_keys WHERE name = '{$foreignKey->getName()}' AND parent_object_id = OBJECT_ID('[{$table}]'))\n" .
                 "ALTER TABLE [{$table}] ADD " . $this->compileForeignKey($foreignKey);
@@ -319,9 +329,6 @@ class SQLServerSchemaCompiler implements SchemaCompiler
         return count($statements) === 1 ? $statements[0] : $statements;
     }
 
-    /**
-     * Compile add index definitions for ALTER TABLE
-     */
     private function compileAddIndexDefinition(string $table, IndexDefinition $indexDef): array
     {
         $type = $indexDef->getType();
@@ -329,7 +336,7 @@ class SQLServerSchemaCompiler implements SchemaCompiler
 
         if ($type === 'PRIMARY') {
             $cols = implode('], [', $indexDef->getColumns());
-            $statements[] = "ALTER TABLE [{$table}] ADD CONSTRAINT [PK_{$indexDef->getName()}] PRIMARY KEY ([{$cols}])";
+            $statements[] = "ALTER TABLE [{$table}] ADD CONSTRAINT [PK_{$indexDef->getName()}] PRIMARY KEY CLUSTERED ([{$cols}])";
         } elseif ($type === 'UNIQUE') {
             $cols = implode('], [', $indexDef->getColumns());
             $statements[] = "IF NOT EXISTS (SELECT * FROM sys.indexes WHERE name = '{$indexDef->getName()}' AND object_id = OBJECT_ID('[{$table}]'))\n" .
@@ -414,9 +421,6 @@ class SQLServerSchemaCompiler implements SchemaCompiler
             "EXEC sp_rename '[{$table}].[{$from}]', '{$to}', 'COLUMN'";
     }
 
-    /**
-     * Properly escape and quote a value for SQL
-     */
     private function quoteValue(string $value): string
     {
         if ($this->connection) {

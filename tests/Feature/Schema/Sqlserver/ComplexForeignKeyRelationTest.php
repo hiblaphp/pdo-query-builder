@@ -35,17 +35,18 @@ describe('Complex Foreign Key Relationships', function () {
         expect($exists)->toBeTruthy();
     });
 
-    it('creates self-referencing foreign key', function () {
-        schema()->create('categories', function (Blueprint $table) {
-            $table->id();
-            $table->unsignedBigInteger('parent_id')->nullable();
-            $table->string('name');
-            $table->foreign('parent_id')->references('id')->on('categories')->nullOnDelete();
-        })->await();
+  it('creates self-referencing foreign key', function () {
+    schema()->create('categories', function (Blueprint $table) {
+        $table->id();
+        $table->unsignedBigInteger('parent_id')->nullable();
+        $table->string('name');
+        
+        $table->foreign('parent_id')->references('id')->on('categories')->noActionOnDelete()->noActionOnUpdate();
+    })->await();
 
-        $exists = schema()->hasTable('categories')->await();
-        expect($exists)->toBeTruthy();
-    });
+    $exists = schema()->hasTable('categories')->await();
+    expect($exists)->toBeTruthy();
+});
 
     it('creates composite foreign key', function () {
         schema()->create('users', function (Blueprint $table) {
