@@ -4,29 +4,29 @@ use Hibla\PdoQueryBuilder\Schema\Blueprint;
 use Tests\Helpers\SchemaTestHelper;
 
 beforeEach(function () {
-  initializeSchemaForSqlserver();
+    initializeSchemaForSqlserver();
 });
 
 afterEach(function () {
-   cleanupSchema();
+    cleanupSchema('sqlsrv');
 });
 
 
 describe('Table Creation', function () {
     it('creates a basic table', function () {
-        schema()->create('users', function (Blueprint $table) {
+        schema('sqlsrv')->create('users', function (Blueprint $table) {
             $table->id();
             $table->string('name');
             $table->string('email')->unique();
             $table->timestamps();
         })->await();
 
-        $exists = schema()->hasTable('users')->await();
+        $exists =    schema('sqlsrv')->hasTable('users')->await();
         expect($exists)->toBeTruthy();
     });
 
     it('creates a table with various column types', function () {
-        schema()->create('posts', function (Blueprint $table) {
+        schema('sqlsrv')->create('posts', function (Blueprint $table) {
             $table->id();
             $table->string('title', 200);
             $table->text('content');
@@ -38,12 +38,12 @@ describe('Table Creation', function () {
             $table->timestamps();
         })->await();
 
-        $exists = schema()->hasTable('posts')->await();
+        $exists =    schema('sqlsrv')->hasTable('posts')->await();
         expect($exists)->toBeTruthy();
     });
 
     it('creates a table with auto-increment columns', function () {
-        schema()->create('categories', function (Blueprint $table) {
+        schema('sqlsrv')->create('categories', function (Blueprint $table) {
             $table->id();
             $table->increments('legacy_id');
             $table->bigIncrements('big_id');
@@ -51,12 +51,12 @@ describe('Table Creation', function () {
             $table->string('name');
         })->await();
 
-        $exists = schema()->hasTable('categories')->await();
+        $exists =    schema('sqlsrv')->hasTable('categories')->await();
         expect($exists)->toBeTruthy();
     });
 
     it('creates a table with integer variations', function () {
-        schema()->create('stats', function (Blueprint $table) {
+        schema('sqlsrv')->create('stats', function (Blueprint $table) {
             $table->id();
             $table->tinyInteger('tiny_num');
             $table->smallInteger('small_num');
@@ -67,12 +67,12 @@ describe('Table Creation', function () {
             $table->unsignedBigInteger('unsigned_big');
         })->await();
 
-        $exists = schema()->hasTable('stats')->await();
+        $exists =    schema('sqlsrv')->hasTable('stats')->await();
         expect($exists)->toBeTruthy();
     });
 
     it('creates a table with text variations', function () {
-        schema()->create('documents', function (Blueprint $table) {
+        schema('sqlsrv')->create('documents', function (Blueprint $table) {
             $table->id();
             $table->text('short_text');
             $table->mediumText('medium_text');
@@ -80,12 +80,12 @@ describe('Table Creation', function () {
             $table->string('title', 100);
         })->await();
 
-        $exists = schema()->hasTable('documents')->await();
+        $exists =    schema('sqlsrv')->hasTable('documents')->await();
         expect($exists)->toBeTruthy();
     });
 
     it('creates a table with decimal variations', function () {
-        schema()->create('financials', function (Blueprint $table) {
+        schema('sqlsrv')->create('financials', function (Blueprint $table) {
             $table->id();
             $table->decimal('amount', 10, 2);
             $table->float('rate', 5, 2);
@@ -93,12 +93,12 @@ describe('Table Creation', function () {
             $table->unsignedDecimal('positive_amount', 8, 2);
         })->await();
 
-        $exists = schema()->hasTable('financials')->await();
+        $exists =    schema('sqlsrv')->hasTable('financials')->await();
         expect($exists)->toBeTruthy();
     });
 
     it('creates a table with date/time columns', function () {
-        schema()->create('events', function (Blueprint $table) {
+        schema('sqlsrv')->create('events', function (Blueprint $table) {
             $table->id();
             $table->date('event_date');
             $table->dateTime('event_datetime');
@@ -106,53 +106,53 @@ describe('Table Creation', function () {
             $table->timestamps();
         })->await();
 
-        $exists = schema()->hasTable('events')->await();
+        $exists =    schema('sqlsrv')->hasTable('events')->await();
         expect($exists)->toBeTruthy();
     });
 
     it('creates a table with enum column', function () {
-        schema()->create('orders', function (Blueprint $table) {
+        schema('sqlsrv')->create('orders', function (Blueprint $table) {
             $table->id();
             $table->enum('status', ['pending', 'processing', 'completed', 'cancelled']);
             $table->timestamps();
         })->await();
 
-        $exists = schema()->hasTable('orders')->await();
+        $exists =    schema('sqlsrv')->hasTable('orders')->await();
         expect($exists)->toBeTruthy();
     });
 
     it('creates a table with soft deletes', function () {
-        schema()->create('users', function (Blueprint $table) {
+        schema('sqlsrv')->create('users', function (Blueprint $table) {
             $table->id();
             $table->string('name');
             $table->timestamps();
             $table->softDeletes();
         })->await();
 
-        $exists = schema()->hasTable('users')->await();
+        $exists =    schema('sqlsrv')->hasTable('users')->await();
         expect($exists)->toBeTruthy();
     });
 
     it('creates a table with comments', function () {
-        schema()->create('users', function (Blueprint $table) {
+        schema('sqlsrv')->create('users', function (Blueprint $table) {
             $table->id();
             $table->string('name')->comment('User full name');
             $table->string('email')->comment('User email address')->unique();
         })->await();
 
-        $exists = schema()->hasTable('users')->await();
+        $exists =    schema('sqlsrv')->hasTable('users')->await();
         expect($exists)->toBeTruthy();
     });
 
     it('creates a table with after positioning', function () {
-        schema()->create('users', function (Blueprint $table) {
+        schema('sqlsrv')->create('users', function (Blueprint $table) {
             $table->id();
             $table->string('name');
             $table->string('email')->after('name');
             $table->timestamps();
         })->await();
 
-        $exists = schema()->hasTable('users')->await();
+        $exists =    schema('sqlsrv')->hasTable('users')->await();
         expect($exists)->toBeTruthy();
     });
 });

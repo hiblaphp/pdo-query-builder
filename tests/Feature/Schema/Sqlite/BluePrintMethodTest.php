@@ -7,7 +7,7 @@ beforeEach(function () {
 });
 
 afterEach(function () {
-    cleanupSchema();
+    cleanupSchema('sqlite');
 });
 
 
@@ -21,26 +21,15 @@ describe('Blueprint Methods', function () {
         expect($blueprint->getCollation())->toBe('utf8mb4_unicode_ci');
     });
 
-    it('sets blueprint engine correctly', function () {
-        schema()->create('users', function (Blueprint $table) {
-            $table->id();
-            $table->string('name');
-            $table->engine('MyISAM');
-        })->await();
-
-        $exists = schema()->hasTable('users')->await();
-        expect($exists)->toBeTruthy();
-    });
-
     it('sets blueprint charset and collation correctly', function () {
-        schema()->create('users', function (Blueprint $table) {
+        schema('sqlite')->create('users', function (Blueprint $table) {
             $table->id();
             $table->string('name');
             $table->charset('utf8');
             $table->collation('utf8_general_ci');
         })->await();
 
-        $exists = schema()->hasTable('users')->await();
+        $exists = schema('sqlite')->hasTable('users')->await();
         expect($exists)->toBeTruthy();
     });
 });

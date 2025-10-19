@@ -33,10 +33,10 @@ class SQLServerSchemaCompiler implements SchemaCompiler
         $columnDefinitions = [];
         $hasPrimaryKey = false;
         $primaryKeyColumn = null;
-        
+
         foreach ($columns as $column) {
             $columnDefinitions[] = '  ' . $this->compileColumn($column);
-            
+
             if ($column->getName() === 'id' && $column->isAutoIncrement()) {
                 $primaryKeyColumn = 'id';
             }
@@ -107,22 +107,22 @@ class SQLServerSchemaCompiler implements SchemaCompiler
         $name = $indexDef->getName();
 
         return "BEGIN TRY\n" .
-               "  IF NOT EXISTS (SELECT * FROM sys.fulltext_catalogs WHERE is_default = 1)\n" .
-               "    CREATE FULLTEXT CATALOG ftCatalog AS DEFAULT;\n" .
-               "  \n" .
-               "  DECLARE @PKName_{$name} NVARCHAR(200);\n" .
-               "  SELECT @PKName_{$name} = i.name\n" .
-               "  FROM sys.indexes i\n" .
-               "  WHERE i.object_id = OBJECT_ID('[{$table}]') AND i.is_primary_key = 1;\n" .
-               "  \n" .
-               "  IF @PKName_{$name} IS NOT NULL\n" .
-               "    EXEC('CREATE FULLTEXT INDEX ON [{$table}] ([{$cols}]) KEY INDEX ' + @PKName_{$name} + ' WITH STOPLIST = SYSTEM');\n" .
-               "END TRY\n" .
-               "BEGIN CATCH\n" .
-               "  -- Full-Text Search not available or other error, skip index creation\n" .
-               "  -- Cannot create regular index on TEXT/NVARCHAR(MAX) columns\n" .
-               "  PRINT 'Warning: Could not create full-text index [{$name}] on table [{$table}]: ' + ERROR_MESSAGE();\n" .
-               "END CATCH";
+            "  IF NOT EXISTS (SELECT * FROM sys.fulltext_catalogs WHERE is_default = 1)\n" .
+            "    CREATE FULLTEXT CATALOG ftCatalog AS DEFAULT;\n" .
+            "  \n" .
+            "  DECLARE @PKName_{$name} NVARCHAR(200);\n" .
+            "  SELECT @PKName_{$name} = i.name\n" .
+            "  FROM sys.indexes i\n" .
+            "  WHERE i.object_id = OBJECT_ID('[{$table}]') AND i.is_primary_key = 1;\n" .
+            "  \n" .
+            "  IF @PKName_{$name} IS NOT NULL\n" .
+            "    EXEC('CREATE FULLTEXT INDEX ON [{$table}] ([{$cols}]) KEY INDEX ' + @PKName_{$name} + ' WITH STOPLIST = SYSTEM');\n" .
+            "END TRY\n" .
+            "BEGIN CATCH\n" .
+            "  -- Full-Text Search not available or other error, skip index creation\n" .
+            "  -- Cannot create regular index on TEXT/NVARCHAR(MAX) columns\n" .
+            "  PRINT 'Warning: Could not create full-text index [{$name}] on table [{$table}]: ' + ERROR_MESSAGE();\n" .
+            "END CATCH";
     }
 
     private function compileSpatialIndex(string $table, IndexDefinition $indexDef): string
@@ -131,10 +131,10 @@ class SQLServerSchemaCompiler implements SchemaCompiler
         $name = $indexDef->getName();
 
         return "IF EXISTS (SELECT * FROM sys.indexes WHERE object_id = OBJECT_ID('[{$table}]') AND is_primary_key = 1 AND type_desc = 'CLUSTERED')\n" .
-               "  CREATE SPATIAL INDEX [{$name}] ON [{$table}] ([{$cols}]) " .
-               "USING GEOMETRY_AUTO_GRID WITH (BOUNDING_BOX = (0, 0, 500, 500));\n" .
-               "ELSE\n" .
-               "  RAISERROR('Table [{$table}] must have a clustered primary key before creating spatial index', 16, 1)";
+            "  CREATE SPATIAL INDEX [{$name}] ON [{$table}] ([{$cols}]) " .
+            "USING GEOMETRY_AUTO_GRID WITH (BOUNDING_BOX = (0, 0, 500, 500));\n" .
+            "ELSE\n" .
+            "  RAISERROR('Table [{$table}] must have a clustered primary key before creating spatial index', 16, 1)";
     }
 
     private function compileColumn(Column $column): string
@@ -144,7 +144,7 @@ class SQLServerSchemaCompiler implements SchemaCompiler
         $type = $this->mapType($column->getType(), $column);
         $sql .= $type;
 
-        if ($column->isAutoIncrement()) {
+        if ($column->isAutoIncrement() && $column->isPrimary()) {
             $sql .= ' IDENTITY(1,1)';
         }
 
@@ -182,6 +182,7 @@ class SQLServerSchemaCompiler implements SchemaCompiler
         return match ($type) {
             'BIGINT' => 'BIGINT',
             'INT' => 'INT',
+            'MEDIUMINT' => 'SMALLINT',
             'TINYINT' => 'TINYINT',
             'SMALLINT' => 'SMALLINT',
             'VARCHAR' => $column->getLength() ? "NVARCHAR({$column->getLength()})" : 'NVARCHAR(255)',
@@ -244,15 +245,15 @@ class SQLServerSchemaCompiler implements SchemaCompiler
 
         if ($foreignKey->getOnDelete()) {
             $action = $foreignKey->getOnDelete();
-            
+
             if ($action === 'NULL') {
                 $action = 'SET NULL';
             }
-            
+
             if ($action === 'RESTRICT') {
                 $action = 'NO ACTION';
             }
-            
+
             if ($action !== 'NO ACTION') {
                 $sql .= " ON DELETE {$action}";
             }
@@ -260,15 +261,15 @@ class SQLServerSchemaCompiler implements SchemaCompiler
 
         if ($foreignKey->getOnUpdate()) {
             $action = $foreignKey->getOnUpdate();
-            
+
             if ($action === 'NULL') {
                 $action = 'SET NULL';
             }
-            
+
             if ($action === 'RESTRICT') {
                 $action = 'NO ACTION';
             }
-            
+
             if ($action !== 'NO ACTION') {
                 $sql .= " ON UPDATE {$action}";
             }

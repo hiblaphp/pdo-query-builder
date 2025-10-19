@@ -4,18 +4,18 @@ use Hibla\PdoQueryBuilder\Schema\Blueprint;
 use Tests\Helpers\SchemaTestHelper;
 
 beforeEach(function () {
-  initializeSchemaForSqlserver();
+    initializeSchemaForSqlserver();
 });
 
 afterEach(function () {
-   cleanupSchema();
+    cleanupSchema('sqlsrv');
 });
 
 
 describe('Blueprint Methods', function () {
     it('gets blueprint properties correctly', function () {
         $blueprint = new Blueprint('test_table');
-        
+
         expect($blueprint->getTable())->toBe('test_table');
         expect($blueprint->getEngine())->toBe('InnoDB');
         expect($blueprint->getCharset())->toBe('utf8mb4');
@@ -23,25 +23,25 @@ describe('Blueprint Methods', function () {
     });
 
     it('sets blueprint engine correctly', function () {
-        schema()->create('users', function (Blueprint $table) {
+        schema('sqlsrv')->create('users', function (Blueprint $table) {
             $table->id();
             $table->string('name');
             $table->engine('MyISAM');
         })->await();
 
-        $exists = schema()->hasTable('users')->await();
+        $exists =   schema('sqlsrv')->hasTable('users')->await();
         expect($exists)->toBeTruthy();
     });
 
     it('sets blueprint charset and collation correctly', function () {
-        schema()->create('users', function (Blueprint $table) {
+        schema('sqlsrv')->create('users', function (Blueprint $table) {
             $table->id();
             $table->string('name');
             $table->charset('utf8');
             $table->collation('utf8_general_ci');
         })->await();
 
-        $exists = schema()->hasTable('users')->await();
+        $exists =   schema('sqlsrv')->hasTable('users')->await();
         expect($exists)->toBeTruthy();
     });
 });

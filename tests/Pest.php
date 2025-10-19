@@ -16,7 +16,7 @@ function schema(?string $driver = null)
 function initializeSchemaForSqlite()
 {
     SchemaTestHelper::initializeDatabaseForDriver('sqlite');
-    SchemaTestHelper::cleanupTables(schema());
+    SchemaTestHelper::cleanupTables(schema('sqlite'));
 }
 
 function initializeSchemaForMysql()
@@ -34,7 +34,7 @@ function initializeSchemaForPostgres()
 function initializeSchemaForSqlServer()
 {
     SchemaTestHelper::initializeDatabaseForDriver('sqlsrv');
-    SchemaTestHelper::cleanupTables(schema());
+    SchemaTestHelper::cleanupTables(schema('sqlsrv'));
 }
 
 function cleanupSchema(?string $driver = null)

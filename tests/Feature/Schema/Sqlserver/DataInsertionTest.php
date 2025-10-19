@@ -5,17 +5,17 @@ use Hibla\AsyncPDO\AsyncPDO;
 use Tests\Helpers\SchemaTestHelper;
 
 beforeEach(function () {
-  initializeSchemaForSqlserver();
+    initializeSchemaForSqlserver();
 });
 
 afterEach(function () {
-   cleanupSchema();
+    cleanupSchema('sqlsrv');
 });
 
 
 describe('Data Insertion and Verification', function () {
     it('creates table and inserts data', function () {
-        schema()->create('users', function (Blueprint $table) {
+        schema('sqlsrv')->create('users', function (Blueprint $table) {
             $table->id();
             $table->string('name');
             $table->string('email')->unique();
@@ -36,7 +36,7 @@ describe('Data Insertion and Verification', function () {
     });
 
     it('respects default values', function () {
-        schema()->create('products', function (Blueprint $table) {
+        schema('sqlsrv')->create('products', function (Blueprint $table) {
             $table->id();
             $table->string('name');
             $table->decimal('price', 10, 2)->default(0.00);
@@ -56,11 +56,11 @@ describe('Data Insertion and Verification', function () {
         expect((int)$product['stock'])->toBe(0);
         expect((int)$product['active'])->toBe(1);
 
-        schema()->dropIfExists('products')->await();
+        schema('sqlsrv')->dropIfExists('products')->await();
     });
 
     it('respects nullable constraints', function () {
-        schema()->create('profiles', function (Blueprint $table) {
+        schema('sqlsrv')->create('profiles', function (Blueprint $table) {
             $table->id();
             $table->string('bio')->nullable();
             $table->string('website')->nullable();
@@ -77,11 +77,11 @@ describe('Data Insertion and Verification', function () {
         expect($profile['bio'])->toBeNull();
         expect($profile['website'])->toBeNull();
 
-        schema()->dropIfExists('profiles')->await();
+        schema('sqlsrv')->dropIfExists('profiles')->await();
     });
 
     it('enforces unique constraints', function () {
-        schema()->create('users', function (Blueprint $table) {
+        schema('sqlsrv')->create('users', function (Blueprint $table) {
             $table->id();
             $table->string('email')->unique();
         })->await();
@@ -100,12 +100,12 @@ describe('Data Insertion and Verification', function () {
     });
 
     it('enforces foreign key constraints', function () {
-        schema()->create('users', function (Blueprint $table) {
+        schema('sqlsrv')->create('users', function (Blueprint $table) {
             $table->id();
             $table->string('name');
         })->await();
 
-        schema()->create('posts', function (Blueprint $table) {
+        schema('sqlsrv')->create('posts', function (Blueprint $table) {
             $table->id();
             $table->foreignId('user_id')->constrained();
             $table->string('title');
@@ -136,12 +136,12 @@ describe('Data Insertion and Verification', function () {
     });
 
     it('cascades deletes correctly', function () {
-        schema()->create('users', function (Blueprint $table) {
+        schema('sqlsrv')->create('users', function (Blueprint $table) {
             $table->id();
             $table->string('name');
         })->await();
 
-        schema()->create('posts', function (Blueprint $table) {
+        schema('sqlsrv')->create('posts', function (Blueprint $table) {
             $table->id();
             $table->foreignId('user_id')->constrained()->cascadeOnDelete();
             $table->string('title');
