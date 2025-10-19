@@ -1,16 +1,17 @@
 <?php
 
+use Hibla\PdoQueryBuilder\DB;
 use Hibla\PdoQueryBuilder\Schema\Blueprint;
 use Tests\Helpers\SchemaTestHelper;
 
 beforeEach(function () {
-    SchemaTestHelper::initializeDatabase();
-    SchemaTestHelper::cleanupTables(schema());
+    initializeSchemaForSqlite();
 });
 
 afterEach(function () {
-    SchemaTestHelper::cleanupTables(schema());
+    cleanupSchema();
 });
+
 
 describe('Table Modification', function () {
     it('adds columns to existing table', function () {

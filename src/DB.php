@@ -24,6 +24,29 @@ class DB
 {
     private static bool $isInitialized = false;
     private static bool $hasValidationError = false;
+    private static bool $isManuallyConfigured = false;
+
+    /**
+     * Manually initialize the database with custom configuration.
+     * This bypasses the auto-configuration from config files.
+     *
+     * @param array<string, mixed> $connectionConfig Database connection configuration
+     * @param int $poolSize Connection pool size (default: 10)
+     * @return void
+     * @throws InvalidPoolSizeException
+     */
+    public static function init(array $connectionConfig, int $poolSize = 10): void
+    {
+        if ($poolSize < 1) {
+            throw new InvalidPoolSizeException();
+        }
+
+        AsyncPDO::init($connectionConfig, $poolSize);
+
+        self::$isManuallyConfigured = true;
+        self::$isInitialized = true;
+        self::$hasValidationError = false;
+    }
 
     /**
      * The core of the new design: A private, self-configuring initializer.
@@ -32,7 +55,11 @@ class DB
      */
     private static function initializeIfNeeded(): void
     {
-        if (self::$isInitialized && ! self::$hasValidationError) {
+        if (self::$isManuallyConfigured && self::$isInitialized) {
+            return;
+        }
+
+        if (self::$isInitialized && !self::$hasValidationError) {
             return;
         }
 
@@ -42,21 +69,21 @@ class DB
             $configLoader = ConfigLoader::getInstance();
             $dbConfigAll = $configLoader->get('pdo-query-builder');
 
-            if (! is_array($dbConfigAll)) {
+            if (!is_array($dbConfigAll)) {
                 throw new DatabaseConfigNotFoundException();
             }
 
             $defaultConnection = $dbConfigAll['default'] ?? null;
-            if (! is_string($defaultConnection)) {
+            if (!is_string($defaultConnection)) {
                 throw new InvalidConnectionConfigException('Default connection name must be a string in your database config.');
             }
 
             $connections = $dbConfigAll['connections'] ?? null;
-            if (! is_array($connections)) {
+            if (!is_array($connections)) {
                 throw new InvalidConnectionConfigException('Database connections configuration must be an array.');
             }
 
-            if (! isset($connections[$defaultConnection]) || ! is_array($connections[$defaultConnection])) {
+            if (!isset($connections[$defaultConnection]) || !is_array($connections[$defaultConnection])) {
                 throw new InvalidDefaultConnectionException($defaultConnection);
             }
 
@@ -65,7 +92,7 @@ class DB
             /** @var array<string, mixed> $validatedConfig */
             $validatedConfig = [];
             foreach ($connectionConfig as $key => $value) {
-                if (! is_string($key)) {
+                if (!is_string($key)) {
                     throw new InvalidConnectionConfigException('Database connection configuration must have string keys only.');
                 }
                 $validatedConfig[$key] = $value;
@@ -73,7 +100,7 @@ class DB
 
             $poolSize = 10;
             if (isset($dbConfigAll['pool_size'])) {
-                if (! is_int($dbConfigAll['pool_size']) || $dbConfigAll['pool_size'] < 1) {
+                if (!is_int($dbConfigAll['pool_size']) || $dbConfigAll['pool_size'] < 1) {
                     throw new InvalidPoolSizeException();
                 }
                 $poolSize = $dbConfigAll['pool_size'];
@@ -96,9 +123,10 @@ class DB
     {
         AsyncPDO::reset();
         ConfigLoader::reset();
-        PDOQueryBuilder::resetDriverCache(); 
+        PDOQueryBuilder::resetDriverCache();
         self::$isInitialized = false;
         self::$hasValidationError = false;
+        self::$isManuallyConfigured = false;
     }
 
     /**
@@ -189,6 +217,9 @@ class DB
         return AsyncPDO::transaction($callback, $attempts);
     }
 
+    /**
+     * Register a callback to be executed when a transaction is committed.
+     */
     public static function onCommit(callable $callback): void
     {
         self::initializeIfNeeded();
@@ -196,6 +227,9 @@ class DB
         AsyncPDO::onCommit($callback);
     }
 
+    /**
+     * Register a callback to be executed when a transaction is rolled back.
+     */
     public static function onRollback(callable $callback): void
     {
         self::initializeIfNeeded();
