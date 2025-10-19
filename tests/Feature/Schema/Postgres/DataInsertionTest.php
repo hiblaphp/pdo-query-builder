@@ -9,13 +9,13 @@ beforeEach(function () {
 });
 
 afterEach(function () {
-    cleanupSchema();
+    cleanupSchema('pgsql');
 });
 
 
 describe('Data Insertion and Verification', function () {
     it('creates table and inserts data', function () {
-        schema()->create('users', function (Blueprint $table) {
+        schema('pgsql')->create('users', function (Blueprint $table) {
             $table->id();
             $table->string('name');
             $table->string('email')->unique();
@@ -28,7 +28,7 @@ describe('Data Insertion and Verification', function () {
         )->await();
 
         $user = AsyncPDO::fetchOne('SELECT * FROM users WHERE email = ?', ['john@example.com'])->await();
-        
+
         expect($user)->not->toBeNull();
         expect($user['name'])->toBe('John Doe');
         expect($user['email'])->toBe('john@example.com');
@@ -36,7 +36,7 @@ describe('Data Insertion and Verification', function () {
     });
 
     it('respects default values', function () {
-        schema()->create('products', function (Blueprint $table) {
+        schema('pgsql')->create('products', function (Blueprint $table) {
             $table->id();
             $table->string('name');
             $table->decimal('price', 10, 2)->default(0.00);
@@ -50,17 +50,17 @@ describe('Data Insertion and Verification', function () {
         )->await();
 
         $product = AsyncPDO::fetchOne('SELECT * FROM products WHERE name = ?', ['Test Product'])->await();
-        
+
         expect($product)->not->toBeNull();
         expect((float)$product['price'])->toBe(0.00);
         expect((int)$product['stock'])->toBe(0);
         expect((int)$product['active'])->toBe(1);
-        
-        schema()->dropIfExists('products')->await();
+
+        schema('pgsql')->dropIfExists('products')->await();
     });
 
     it('respects nullable constraints', function () {
-        schema()->create('profiles', function (Blueprint $table) {
+        schema('pgsql')->create('profiles', function (Blueprint $table) {
             $table->id();
             $table->string('bio')->nullable();
             $table->string('website')->nullable();
@@ -72,16 +72,16 @@ describe('Data Insertion and Verification', function () {
         )->await();
 
         $profile = AsyncPDO::fetchOne('SELECT * FROM profiles ORDER BY id DESC LIMIT 1', [])->await();
-        
+
         expect($profile)->not->toBeNull();
         expect($profile['bio'])->toBeNull();
         expect($profile['website'])->toBeNull();
-        
-        schema()->dropIfExists('profiles')->await();
+
+        schema('pgsql')->dropIfExists('profiles')->await();
     });
 
     it('enforces unique constraints', function () {
-        schema()->create('users', function (Blueprint $table) {
+        schema('pgsql')->create('users', function (Blueprint $table) {
             $table->id();
             $table->string('email')->unique();
         })->await();
@@ -100,12 +100,12 @@ describe('Data Insertion and Verification', function () {
     });
 
     it('enforces foreign key constraints', function () {
-        schema()->create('users', function (Blueprint $table) {
+        schema('pgsql')->create('users', function (Blueprint $table) {
             $table->id();
             $table->string('name');
         })->await();
 
-        schema()->create('posts', function (Blueprint $table) {
+        schema('pgsql')->create('posts', function (Blueprint $table) {
             $table->id();
             $table->foreignId('user_id')->constrained();
             $table->string('title');
@@ -136,12 +136,12 @@ describe('Data Insertion and Verification', function () {
     });
 
     it('cascades deletes correctly', function () {
-        schema()->create('users', function (Blueprint $table) {
+        schema('pgsql')->create('users', function (Blueprint $table) {
             $table->id();
             $table->string('name');
         })->await();
 
-        schema()->create('posts', function (Blueprint $table) {
+        schema('pgsql')->create('posts', function (Blueprint $table) {
             $table->id();
             $table->foreignId('user_id')->constrained()->cascadeOnDelete();
             $table->string('title');

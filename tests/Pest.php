@@ -8,9 +8,9 @@ pest()->extend(Tests\TestCase::class)->in('Stress');
 pest()->extend(Tests\TestCase::class)->in('Unit');
 pest()->extend(Tests\TestCase::class)->in('Integration');
 
-function schema()
+function schema(?string $driver = null)
 {
-    return SchemaTestHelper::createSchemaBuilder();
+    return SchemaTestHelper::createSchemaBuilder($driver);
 }
 
 function initializeSchemaForSqlite()
@@ -28,7 +28,7 @@ function initializeSchemaForMysql()
 function initializeSchemaForPostgres()
 {
     SchemaTestHelper::initializeDatabaseForDriver('pgsql');
-    SchemaTestHelper::cleanupTables(schema());
+    SchemaTestHelper::cleanupTables(schema('pgsql'));
 }
 
 function initializeSchemaForSqlServer()
@@ -37,8 +37,8 @@ function initializeSchemaForSqlServer()
     SchemaTestHelper::cleanupTables(schema());
 }
 
-function cleanupSchema()
+function cleanupSchema(?string $driver = null)
 {
-    SchemaTestHelper::cleanupTables(schema());
+    SchemaTestHelper::cleanupTables(schema($driver));
     DB::reset();
 }

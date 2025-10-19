@@ -61,11 +61,11 @@ class SchemaTestHelper
         return match ($driver) {
             'mysql' => [
                 'driver' => 'mysql',
-                'host' => $_ENV['MYSQL_HOST'] ?? '127.0.0.1',
-                'port' => (int) ($_ENV['MYSQL_PORT'] ?? 3306),
-                'database' => $_ENV['MYSQL_DATABASE'] ?? 'test_db',
-                'username' => $_ENV['MYSQL_USERNAME'] ?? 'test_user',
-                'password' => $_ENV['MYSQL_PASSWORD'] ?? 'test_password',
+                'host' => $_ENV['MYSQL_HOST'],
+                'port' => (int) ($_ENV['MYSQL_PORT']),
+                'database' => $_ENV['MYSQL_DATABASE'],
+                'username' => $_ENV['MYSQL_USERNAME'],
+                'password' => $_ENV['MYSQL_PASSWORD'],
                 'charset' => 'utf8mb4',
                 'options' => [
                     \PDO::ATTR_ERRMODE => \PDO::ERRMODE_EXCEPTION,
@@ -75,11 +75,11 @@ class SchemaTestHelper
             ],
             'pgsql' => [
                 'driver' => 'pgsql',
-                'host' => $_ENV['PGSQL_HOST'] ?? '127.0.0.1',
-                'port' => (int) ($_ENV['PGSQL_PORT'] ?? 5443),
-                'database' => $_ENV['PGSQL_DATABASE'] ?? 'test_db',
-                'username' => $_ENV['PGSQL_USERNAME'] ?? 'postgres',
-                'password' => $_ENV['PGSQL_PASSWORD'] ?? 'postgres',
+                'host' => $_ENV['PGSQL_HOST'],
+                'port' => (int) ($_ENV['PGSQL_PORT']),
+                'database' => $_ENV['PGSQL_DATABASE'],
+                'username' => $_ENV['PGSQL_USERNAME'],
+                'password' => $_ENV['PGSQL_PASSWORD'],
                 'charset' => 'utf8',
                 'options' => [
                     \PDO::ATTR_ERRMODE => \PDO::ERRMODE_EXCEPTION,
@@ -97,11 +97,11 @@ class SchemaTestHelper
             ],
             'sqlsrv' => [
                 'driver' => 'sqlsrv',
-                'host' => $_ENV['SQLSRV_HOST'] ?? '127.0.0.1',
-                'port' => (int) ($_ENV['SQLSRV_PORT'] ?? 1433),
-                'database' => $_ENV['SQLSRV_DATABASE'] ?? 'test_db',
-                'username' => $_ENV['SQLSRV_USERNAME'] ?? 'sa',
-                'password' => $_ENV['SQLSRV_PASSWORD'] ?? 'Testpassword123@',
+                'host' => $_ENV['SQLSRV_HOST'],
+                'port' => (int) ($_ENV['SQLSRV_PORT']),
+                'database' => $_ENV['SQLSRV_DATABASE'],
+                'username' => $_ENV['SQLSRV_USERNAME'],
+                'password' => $_ENV['SQLSRV_PASSWORD'],
                 'options' => [
                     \PDO::ATTR_ERRMODE => \PDO::ERRMODE_EXCEPTION,
                     \PDO::ATTR_DEFAULT_FETCH_MODE => \PDO::FETCH_ASSOC,
@@ -116,9 +116,9 @@ class SchemaTestHelper
         DB::rawExecute("SELECT 1")->await();
     }
 
-    public static function createSchemaBuilder(): SchemaBuilder
+    public static function createSchemaBuilder(?string $driver = null): SchemaBuilder
     {
-        return new SchemaBuilder();
+        return new SchemaBuilder($driver);
     }
 
     public static function cleanupTables(SchemaBuilder $schema): void

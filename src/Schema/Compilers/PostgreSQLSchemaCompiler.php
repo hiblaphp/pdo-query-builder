@@ -70,7 +70,7 @@ class PostgreSQLSchemaCompiler implements SchemaCompiler
             $sql .= ' NOT NULL';
         }
 
-        if ($column->isPrimary() || $column->isAutoIncrement()) {
+        if ($column->isPrimary()) {
             $sql .= ' PRIMARY KEY';
         }
 
@@ -104,6 +104,7 @@ class PostgreSQLSchemaCompiler implements SchemaCompiler
         return match ($type) {
             'BIGINT' => $column->isAutoIncrement() ? 'BIGSERIAL' : 'BIGINT',
             'INT' => $column->isAutoIncrement() ? 'SERIAL' : 'INTEGER',
+            'MEDIUMINT' => $column->isAutoIncrement() ? 'SERIAL' : 'INTEGER', 
             'TINYINT' => $column->getLength() === 1 ? 'BOOLEAN' : 'SMALLINT',
             'SMALLINT' => $column->isAutoIncrement() ? 'SMALLSERIAL' : 'SMALLINT',
             'VARCHAR' => $column->getLength() ? "VARCHAR({$column->getLength()})" : 'VARCHAR',
@@ -116,7 +117,6 @@ class PostgreSQLSchemaCompiler implements SchemaCompiler
             'DATE' => 'DATE',
             'JSON' => 'JSONB',
             'ENUM' => $this->compileEnum($column),
-            // Map spatial types to PostGIS types
             'POINT' => 'GEOMETRY(POINT)',
             'LINESTRING' => 'GEOMETRY(LINESTRING)',
             'POLYGON' => 'GEOMETRY(POLYGON)',

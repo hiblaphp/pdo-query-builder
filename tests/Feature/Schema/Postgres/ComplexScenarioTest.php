@@ -1,4 +1,4 @@
-<?php 
+<?php
 
 use Hibla\PdoQueryBuilder\Schema\Blueprint;
 use Tests\Helpers\SchemaTestHelper;
@@ -8,13 +8,13 @@ beforeEach(function () {
 });
 
 afterEach(function () {
-    cleanupSchema();
+    cleanupSchema('pgsql');
 });
 
 
 describe('Complex Scenarios', function () {
     it('creates a complete blog schema', function () {
-        schema()->create('users', function (Blueprint $table) {
+        schema('pgsql')->create('users', function (Blueprint $table) {
             $table->id();
             $table->string('name');
             $table->string('email')->unique();
@@ -23,14 +23,14 @@ describe('Complex Scenarios', function () {
             $table->softDeletes();
         })->await();
 
-        schema()->create('categories', function (Blueprint $table) {
+        schema('pgsql')->create('categories', function (Blueprint $table) {
             $table->id();
             $table->string('name');
             $table->string('slug')->unique();
             $table->timestamps();
         })->await();
 
-        schema()->create('posts', function (Blueprint $table) {
+        schema('pgsql')->create('posts', function (Blueprint $table) {
             $table->id();
             $table->foreignId('user_id')->constrained()->cascadeOnDelete();
             $table->foreignId('category_id')->constrained()->restrictOnDelete();
@@ -47,7 +47,7 @@ describe('Complex Scenarios', function () {
             $table->fullText(['title', 'content']);
         })->await();
 
-        schema()->create('comments', function (Blueprint $table) {
+        schema('pgsql')->create('comments', function (Blueprint $table) {
             $table->id();
             $table->foreignId('user_id')->constrained()->cascadeOnDelete();
             $table->foreignId('post_id')->constrained()->cascadeOnDelete();
@@ -55,10 +55,10 @@ describe('Complex Scenarios', function () {
             $table->timestamps();
         })->await();
 
-        $usersExists = schema()->hasTable('users')->await();
-        $categoriesExists = schema()->hasTable('categories')->await();
-        $postsExists = schema()->hasTable('posts')->await();
-        $commentsExists = schema()->hasTable('comments')->await();
+        $usersExists = schema('pgsql')->hasTable('users')->await();
+        $categoriesExists = schema('pgsql')->hasTable('categories')->await();
+        $postsExists = schema('pgsql')->hasTable('posts')->await();
+        $commentsExists = schema('pgsql')->hasTable('comments')->await();
 
         expect($usersExists)->toBeTruthy();
         expect($categoriesExists)->toBeTruthy();
@@ -67,16 +67,16 @@ describe('Complex Scenarios', function () {
     });
 
     it('performs multiple alterations on a table', function () {
-        schema()->dropIfExists('users')->await();
+        schema('pgsql')->dropIfExists('users')->await();
 
-        schema()->create('users', function (Blueprint $table) {
+        schema('pgsql')->create('users', function (Blueprint $table) {
             $table->id();
             $table->string('name');
             $table->string('old_email');
             $table->integer('age');
         })->await();
 
-        schema()->table('users', function (Blueprint $table) {
+        schema('pgsql')->table('users', function (Blueprint $table) {
             $table->renameColumn('old_email', 'email');
             $table->dropColumn('age');
             $table->string('phone')->nullable();
@@ -84,7 +84,7 @@ describe('Complex Scenarios', function () {
             $table->unique('email');
         })->await();
 
-        $exists = schema()->hasTable('users')->await();
+        $exists = schema('pgsql')->hasTable('users')->await();
         expect($exists)->toBeTruthy();
     });
 });
