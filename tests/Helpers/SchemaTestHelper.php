@@ -8,11 +8,30 @@ use Hibla\PdoQueryBuilder\DB;
 class SchemaTestHelper
 {
     private static array $testTables = [
-        'users', 'posts', 'comments', 'categories', 'tags', 'profiles',
-        'articles', 'locations', 'stats', 'documents', 'financials',
-        'events', 'orders', 'settings', 'temp_table', 'old_name', 'new_name',
-        'counters', 'logs', 'products', 'empty_table', 'wide_table',
-        'user_roles', 'user_profiles'
+        'users',
+        'posts',
+        'comments',
+        'categories',
+        'tags',
+        'profiles',
+        'articles',
+        'locations',
+        'stats',
+        'documents',
+        'financials',
+        'events',
+        'orders',
+        'settings',
+        'temp_table',
+        'old_name',
+        'new_name',
+        'counters',
+        'logs',
+        'products',
+        'empty_table',
+        'wide_table',
+        'user_roles',
+        'user_profiles'
     ];
 
     /**
@@ -27,7 +46,7 @@ class SchemaTestHelper
         DB::reset();
         $config = self::getDriverConfig($driver);
         DB::init($config, $poolSize);
-    
+
         DB::rawExecute("SELECT 1")->await();
     }
 
@@ -42,11 +61,11 @@ class SchemaTestHelper
         return match ($driver) {
             'mysql' => [
                 'driver' => 'mysql',
-                'host' => getenv('MYSQL_HOST') ?: '127.0.0.1',
-                'port' => (int) (getenv('MYSQL_PORT') ?: 3306),
-                'database' => getenv('MYSQL_DATABASE') ?: 'test_db',
-                'username' => getenv('MYSQL_USERNAME') ?: 'test_user',
-                'password' => getenv('MYSQL_PASSWORD') ?: 'test_password',
+                'host' => $_ENV['MYSQL_HOST'] ?? '127.0.0.1',
+                'port' => (int) ($_ENV['MYSQL_PORT'] ?? 3306),
+                'database' => $_ENV['MYSQL_DATABASE'] ?? 'test_db',
+                'username' => $_ENV['MYSQL_USERNAME'] ?? 'test_user',
+                'password' => $_ENV['MYSQL_PASSWORD'] ?? 'test_password',
                 'charset' => 'utf8mb4',
                 'options' => [
                     \PDO::ATTR_ERRMODE => \PDO::ERRMODE_EXCEPTION,
@@ -56,11 +75,11 @@ class SchemaTestHelper
             ],
             'pgsql' => [
                 'driver' => 'pgsql',
-                'host' => getenv('PGSQL_HOST') ?: '127.0.0.1',
-                'port' => (int) (getenv('PGSQL_PORT') ?: 5432),
-                'database' => getenv('PGSQL_DATABASE') ?: 'test_db',
-                'username' => getenv('PGSQL_USERNAME') ?: 'postgres',
-                'password' => getenv('PGSQL_PASSWORD') ?: 'postgres',
+                'host' => $_ENV['PGSQL_HOST'] ?? '127.0.0.1',
+                'port' => (int) ($_ENV['PGSQL_PORT'] ?? 5443),
+                'database' => $_ENV['PGSQL_DATABASE'] ?? 'test_db',
+                'username' => $_ENV['PGSQL_USERNAME'] ?? 'postgres',
+                'password' => $_ENV['PGSQL_PASSWORD'] ?? 'postgres',
                 'charset' => 'utf8',
                 'options' => [
                     \PDO::ATTR_ERRMODE => \PDO::ERRMODE_EXCEPTION,
@@ -70,7 +89,7 @@ class SchemaTestHelper
             ],
             'sqlite' => [
                 'driver' => 'sqlite',
-                'database' => getenv('SQLITE_DATABASE') ?: ':memory:',
+                'database' => $_ENV['SQLITE_DATABASE'] ?? ':memory:',
                 'options' => [
                     \PDO::ATTR_ERRMODE => \PDO::ERRMODE_EXCEPTION,
                     \PDO::ATTR_DEFAULT_FETCH_MODE => \PDO::FETCH_ASSOC,
@@ -78,11 +97,11 @@ class SchemaTestHelper
             ],
             'sqlsrv' => [
                 'driver' => 'sqlsrv',
-                'host' => getenv('SQLSRV_HOST') ?: '127.0.0.1',
-                'port' => (int) (getenv('SQLSRV_PORT') ?: 1433),
-                'database' => getenv('SQLSRV_DATABASE') ?: 'test_db',
-                'username' => getenv('SQLSRV_USERNAME') ?: 'sa',
-                'password' => getenv('SQLSRV_PASSWORD') ?: 'Testpassword123@',
+                'host' => $_ENV['SQLSRV_HOST'] ?? '127.0.0.1',
+                'port' => (int) ($_ENV['SQLSRV_PORT'] ?? 1433),
+                'database' => $_ENV['SQLSRV_DATABASE'] ?? 'test_db',
+                'username' => $_ENV['SQLSRV_USERNAME'] ?? 'sa',
+                'password' => $_ENV['SQLSRV_PASSWORD'] ?? 'Testpassword123@',
                 'options' => [
                     \PDO::ATTR_ERRMODE => \PDO::ERRMODE_EXCEPTION,
                     \PDO::ATTR_DEFAULT_FETCH_MODE => \PDO::FETCH_ASSOC,

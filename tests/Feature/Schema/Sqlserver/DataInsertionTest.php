@@ -5,13 +5,13 @@ use Hibla\AsyncPDO\AsyncPDO;
 use Tests\Helpers\SchemaTestHelper;
 
 beforeEach(function () {
-    SchemaTestHelper::initializeDatabase();
-    SchemaTestHelper::cleanupTables(schema());
+  initializeSchemaForSqlserver();
 });
 
 afterEach(function () {
-    SchemaTestHelper::cleanupTables(schema());
+   cleanupSchema();
 });
+
 
 describe('Data Insertion and Verification', function () {
     it('creates table and inserts data', function () {

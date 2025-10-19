@@ -4,13 +4,13 @@ use Hibla\PdoQueryBuilder\Schema\Blueprint;
 use Tests\Helpers\SchemaTestHelper;
 
 beforeEach(function () {
-    SchemaTestHelper::initializeDatabase();
-    SchemaTestHelper::cleanupTables(schema());
+    initializeSchemaForPostgres();
 });
 
 afterEach(function () {
-    SchemaTestHelper::cleanupTables(schema());
+    cleanupSchema();
 });
+
 
 describe('Complex Scenarios', function () {
     it('creates a complete blog schema', function () {

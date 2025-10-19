@@ -5,13 +5,13 @@ use Hibla\AsyncPDO\AsyncPDO;
 use Tests\Helpers\SchemaTestHelper;
 
 beforeEach(function () {
-    SchemaTestHelper::initializeDatabase();
-    SchemaTestHelper::cleanupTables(schema());
+    initializeSchemaForPostgres();
 });
 
 afterEach(function () {
-    SchemaTestHelper::cleanupTables(schema());
+    cleanupSchema();
 });
+
 
 describe('Column Helper Methods', function () {
     it('uses foreignId helper correctly', function () {
