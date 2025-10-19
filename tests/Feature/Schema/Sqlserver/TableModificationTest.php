@@ -4,7 +4,8 @@ use Hibla\PdoQueryBuilder\Schema\Blueprint;
 use Tests\Helpers\SchemaTestHelper;
 
 beforeEach(function () {
-  initializeSchemaForSqlserver();
+    skipIfPhp84OrHigher();
+    initializeSchemaForSqlserver();
 });
 
 afterEach(function () {

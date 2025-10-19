@@ -5,6 +5,7 @@ use Hibla\AsyncPDO\AsyncPDO;
 use Tests\Helpers\SchemaTestHelper;
 
 beforeEach(function () {
+    skipIfPhp84OrHigher();
     initializeSchemaForSqlserver();
 });
 
