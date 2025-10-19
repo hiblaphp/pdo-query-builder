@@ -3,7 +3,7 @@ services:
     image: mysql:8.0
     environment:
       MYSQL_ROOT_PASSWORD: root_password
-      MYSQL_DATABASE: test
+      MYSQL_DATABASE: test_db
       MYSQL_USER: test_user
       MYSQL_PASSWORD: test_password
     ports:

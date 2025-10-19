@@ -24,11 +24,10 @@ class SchemaTestHelper
      */
     public static function initializeDatabaseForDriver(string $driver, int $poolSize = 10): void
     {
-        DB::reset(); // Reset before initializing with new config
+        DB::reset();
         $config = self::getDriverConfig($driver);
         DB::init($config, $poolSize);
-        
-        // Test connection
+    
         DB::rawExecute("SELECT 1")->await();
     }
 

@@ -4,12 +4,11 @@ use Hibla\PdoQueryBuilder\Schema\Blueprint;
 use Tests\Helpers\SchemaTestHelper;
 
 beforeEach(function () {
-    SchemaTestHelper::initializeDatabase();
-    SchemaTestHelper::cleanupTables(schema());
+    initializeSchemaForMysql();
 });
 
 afterEach(function () {
-    SchemaTestHelper::cleanupTables(schema());
+    cleanupSchema();
 });
 
 describe('Advanced Index Scenarios', function () {
@@ -35,7 +34,7 @@ describe('Advanced Index Scenarios', function () {
 
         $exists = schema()->hasTable('user_roles')->await();
         expect($exists)->toBeTruthy();
-        
+
         schema()->dropIfExists('user_roles')->await();
     });
 
@@ -48,7 +47,7 @@ describe('Advanced Index Scenarios', function () {
 
         $exists = schema()->hasTable('products')->await();
         expect($exists)->toBeTruthy();
-        
+
         schema()->dropIfExists('products')->await();
     });
 });

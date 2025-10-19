@@ -5,12 +5,11 @@ use Hibla\AsyncPDO\AsyncPDO;
 use Tests\Helpers\SchemaTestHelper;
 
 beforeEach(function () {
-    SchemaTestHelper::initializeDatabase();
-    SchemaTestHelper::cleanupTables(schema());
+    initializeSchemaForMysql();
 });
 
 afterEach(function () {
-    SchemaTestHelper::cleanupTables(schema());
+    cleanupSchema();
 });
 
 describe('Column Helper Methods', function () {

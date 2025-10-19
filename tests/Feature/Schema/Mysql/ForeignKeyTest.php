@@ -4,12 +4,11 @@ use Hibla\PdoQueryBuilder\Schema\Blueprint;
 use Tests\Helpers\SchemaTestHelper;
 
 beforeEach(function () {
-    SchemaTestHelper::initializeDatabase();
-    SchemaTestHelper::cleanupTables(schema());
+    initializeSchemaForMysql();
 });
 
 afterEach(function () {
-    SchemaTestHelper::cleanupTables(schema());
+    cleanupSchema();
 });
 
 describe('Foreign Keys', function () {
