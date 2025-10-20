@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Hibla\PdoQueryBuilder\Console;
 
+use Carbon\Carbon;
 use Hibla\PdoQueryBuilder\Console\Traits\LoadsSchemaConfiguration;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Input\InputArgument;
@@ -123,7 +124,8 @@ class MakeMigrationCommand extends Command
 
     private function generateTimestampFileName(): string
     {
-        $timestamp = date('Y_m_d_His');
+        $timezone = $this->getTimezone();
+        $timestamp = Carbon::now($timezone)->format('Y_m_d_His');
 
         return "{$timestamp}_{$this->migrationName}.php";
     }

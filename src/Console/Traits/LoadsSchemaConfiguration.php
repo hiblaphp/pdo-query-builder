@@ -10,11 +10,10 @@ trait LoadsSchemaConfiguration
 {
     /**
      * @return array{
-     *     schema_path: string,
      *     migrations_path: string,
      *     migrations_table: string,
      *     naming_convention: string,
-     *     auto_migrate: bool
+     *     timezone: string
      * }
      */
     private function getSchemaConfig(): array
@@ -36,11 +35,10 @@ trait LoadsSchemaConfiguration
         $finalConfig = array_merge($defaults, $loadedConfig);
 
         return [
-            'schema_path' => is_string($finalConfig['schema_path']) ? $finalConfig['schema_path'] : $defaults['schema_path'],
             'migrations_path' => is_string($finalConfig['migrations_path']) ? $finalConfig['migrations_path'] : $defaults['migrations_path'],
             'migrations_table' => is_string($finalConfig['migrations_table']) ? $finalConfig['migrations_table'] : $defaults['migrations_table'],
             'naming_convention' => is_string($finalConfig['naming_convention']) ? $finalConfig['naming_convention'] : $defaults['naming_convention'],
-            'auto_migrate' => is_bool($finalConfig['auto_migrate']) ? $finalConfig['auto_migrate'] : $defaults['auto_migrate'],
+            'timezone' => is_string($finalConfig['timezone'] ?? null) ? $finalConfig['timezone'] : $defaults['timezone'],
         ];
     }
 
@@ -50,6 +48,7 @@ trait LoadsSchemaConfiguration
      *     migrations_path: string,
      *     migrations_table: string,
      *     naming_convention: string,
+     *     timezone: string,
      *     auto_migrate: bool
      * }
      */
@@ -63,6 +62,7 @@ trait LoadsSchemaConfiguration
             'migrations_path' => $projectRoot.'/database/migrations',
             'migrations_table' => 'migrations',
             'naming_convention' => 'timestamp',
+            'timezone' => 'UTC',
             'auto_migrate' => false,
         ];
     }
@@ -94,6 +94,13 @@ trait LoadsSchemaConfiguration
         $config = $this->getSchemaConfig();
 
         return $config['naming_convention'];
+    }
+
+    private function getTimezone(): string
+    {
+        $config = $this->getSchemaConfig();
+
+        return $config['timezone'];
     }
 
     private function isAbsolutePath(string $path): bool

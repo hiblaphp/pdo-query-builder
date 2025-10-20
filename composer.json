@@ -22,7 +22,8 @@
         "rcalicdan/query-builder-primitives": "dev-main",
         "ext-pdo": "*",
         "symfony/console": "^7.3",
-        "doctrine/inflector": "^2.1"
+        "doctrine/inflector": "^2.1",
+        "nesbot/carbon": "^3.10"
     },
     "require-dev": {
         "laravel/pint": "^1.10",
