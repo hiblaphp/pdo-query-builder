@@ -1,7 +1,6 @@
 <?php
 
 use Hibla\PdoQueryBuilder\Schema\Blueprint;
-use Tests\Helpers\SchemaTestHelper;
 
 beforeEach(function () {
     skipIfPhp84OrHigher();
@@ -12,7 +11,6 @@ afterEach(function () {
     cleanupSchema('sqlsrv');
 });
 
-
 describe('Table Configuration', function () {
     it('creates table with custom engine', function () {
         schema('sqlsrv')->create('users', function (Blueprint $table) {
@@ -21,7 +19,7 @@ describe('Table Configuration', function () {
             $table->engine('MyISAM');
         })->await();
 
-        $exists =    schema('sqlsrv')->hasTable('users')->await();
+        $exists = schema('sqlsrv')->hasTable('users')->await();
         expect($exists)->toBeTruthy();
     });
 
@@ -33,7 +31,7 @@ describe('Table Configuration', function () {
             $table->collation('utf8_general_ci');
         })->await();
 
-        $exists =    schema('sqlsrv')->hasTable('users')->await();
+        $exists = schema('sqlsrv')->hasTable('users')->await();
         expect($exists)->toBeTruthy();
     });
 });

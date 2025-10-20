@@ -22,7 +22,8 @@ class InitCommand extends Command
             ->setName('init')
             ->setDescription('Initialize PDO Query Builder configuration')
             ->setHelp('Copies the default configuration files to your project\'s config directory.')
-            ->addOption('force', 'f', InputOption::VALUE_NONE, 'Overwrite existing configuration');
+            ->addOption('force', 'f', InputOption::VALUE_NONE, 'Overwrite existing configuration')
+        ;
     }
 
     protected function execute(InputInterface $input, OutputInterface $output): int
@@ -33,8 +34,9 @@ class InitCommand extends Command
         $this->io->title('PDO Query Builder - Initialize');
 
         $this->projectRoot = $this->findProjectRoot();
-        if (!$this->projectRoot) {
+        if (! $this->projectRoot) {
             $this->io->error('Could not find project root');
+
             return Command::FAILURE;
         }
 
@@ -56,11 +58,13 @@ class InitCommand extends Command
 
     private function ensureConfigDirectoryExists(): ?string
     {
-        $configDir = $this->projectRoot . '/config';
-        if (!is_dir($configDir) && !mkdir($configDir, 0755, true)) {
-            $this->io->error("Failed to create config directory");
+        $configDir = $this->projectRoot.'/config';
+        if (! is_dir($configDir) && ! mkdir($configDir, 0755, true)) {
+            $this->io->error('Failed to create config directory');
+
             return null;
         }
+
         return $configDir;
     }
 
@@ -86,22 +90,25 @@ class InitCommand extends Command
 
     private function copyFile(string $filename, string $sourceConfig, string $configDir): bool
     {
-        $destConfig = $configDir . '/' . $filename;
+        $destConfig = $configDir.'/'.$filename;
 
-        if (file_exists($destConfig) && !$this->force) {
-            if (!$this->io->confirm("File '{$filename}' already exists. Overwrite?", false)) {
+        if (file_exists($destConfig) && ! $this->force) {
+            if (! $this->io->confirm("File '{$filename}' already exists. Overwrite?", false)) {
                 $this->io->warning("Skipped: {$filename}");
+
                 return true;
             }
         }
 
-        if (!file_exists($sourceConfig)) {
+        if (! file_exists($sourceConfig)) {
             $this->io->error("Source config not found: {$sourceConfig}");
+
             return false;
         }
 
-        if (!copy($sourceConfig, $destConfig)) {
+        if (! copy($sourceConfig, $destConfig)) {
             $this->io->error("Failed to copy {$filename}");
+
             return false;
         }
 
@@ -110,10 +117,11 @@ class InitCommand extends Command
 
     private function createAsyncPdoExecutable(): void
     {
-        $asyncPdoPath = $this->projectRoot . '/async-pdo';
+        $asyncPdoPath = $this->projectRoot.'/async-pdo';
 
-        if (file_exists($asyncPdoPath) && !$this->force) {
+        if (file_exists($asyncPdoPath) && ! $this->force) {
             $this->io->warning('async-pdo file already exists. Use --force to overwrite.');
+
             return;
         }
 
@@ -121,6 +129,7 @@ class InitCommand extends Command
 
         if (file_put_contents($asyncPdoPath, $stub) === false) {
             $this->io->error('Failed to create async-pdo file');
+
             return;
         }
 
@@ -177,7 +186,7 @@ PHP;
 
     private function promptEnvFileCreation(): void
     {
-        if (!file_exists($this->projectRoot . '/.env')) {
+        if (! file_exists($this->projectRoot.'/.env')) {
             $this->io->section('Create .env file with:');
             $this->io->listing([
                 'DB_CONNECTION=mysql',
@@ -194,25 +203,32 @@ PHP;
     {
         $dir = getcwd() ?: __DIR__;
         for ($i = 0; $i < 10; $i++) {
-            if (file_exists($dir . '/composer.json')) return $dir;
+            if (file_exists($dir.'/composer.json')) {
+                return $dir;
+            }
             $parent = dirname($dir);
-            if ($parent === $dir) break;
+            if ($parent === $dir) {
+                break;
+            }
             $dir = $parent;
         }
+
         return null;
     }
 
     private function getSourceConfigPath(string $filename): string
     {
         $paths = [
-            __DIR__ . "/../../config/{$filename}",
-            __DIR__ . "/../../../config/{$filename}",
+            __DIR__."/../../config/{$filename}",
+            __DIR__."/../../../config/{$filename}",
         ];
 
         foreach ($paths as $path) {
-            if (file_exists($path)) return $path;
+            if (file_exists($path)) {
+                return $path;
+            }
         }
 
-        return __DIR__ . "/../../config/{$filename}";
+        return __DIR__."/../../config/{$filename}";
     }
 }

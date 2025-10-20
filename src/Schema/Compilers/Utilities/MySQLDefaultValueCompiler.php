@@ -4,8 +4,6 @@ declare(strict_types=1);
 
 namespace Hibla\PdoQueryBuilder\Schema\Compilers\Utilities;
 
-use Hibla\PdoQueryBuilder\Schema\Column;
-
 /**
  * MySQL-specific default value compilation
  */
@@ -24,7 +22,7 @@ class MySQLDefaultValueCompiler extends DefaultValueCompiler
 
     public function compileWithPrefix(mixed $default): string
     {
-        return ' DEFAULT ' . $this->compile($default);
+        return ' DEFAULT '.$this->compile($default);
     }
 
     public function compileCurrentTimestamp(): string

@@ -30,6 +30,7 @@ class ValueQuoter
     protected function escapeAndQuote(string $value): string
     {
         $escaped = str_replace("'", "''", $value);
+
         return "'{$escaped}'";
     }
 }

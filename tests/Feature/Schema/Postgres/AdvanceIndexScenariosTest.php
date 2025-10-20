@@ -1,7 +1,6 @@
 <?php
 
 use Hibla\PdoQueryBuilder\Schema\Blueprint;
-use Tests\Helpers\SchemaTestHelper;
 
 beforeEach(function () {
     initializeSchemaForPostgres();
@@ -34,7 +33,7 @@ describe('Advanced Index Scenarios', function () {
 
         $exists = schema('pgsql')->hasTable('user_roles')->await();
         expect($exists)->toBeTruthy();
-        
+
         schema('pgsql')->dropIfExists('user_roles')->await();
     });
 
@@ -47,7 +46,7 @@ describe('Advanced Index Scenarios', function () {
 
         $exists = schema('pgsql')->hasTable('products')->await();
         expect($exists)->toBeTruthy();
-        
+
         schema('pgsql')->dropIfExists('products')->await();
     });
 });

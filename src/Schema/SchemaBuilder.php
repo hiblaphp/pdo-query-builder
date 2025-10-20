@@ -4,12 +4,14 @@ declare(strict_types=1);
 
 namespace Hibla\PdoQueryBuilder\Schema;
 
+use function Hibla\async;
+
 use Hibla\AsyncPDO\AsyncPDO;
+
+use function Hibla\await;
+
 use Hibla\PdoQueryBuilder\Utilities\ConfigLoader;
 use Hibla\Promise\Interfaces\PromiseInterface;
-
-use function Hibla\async;
-use function Hibla\await;
 
 class SchemaBuilder
 {
@@ -26,7 +28,7 @@ class SchemaBuilder
         $configLoader = ConfigLoader::getInstance();
         $dbConfig = $configLoader->get('pdo-query-builder');
 
-        if (!is_array($dbConfig)) {
+        if (! is_array($dbConfig)) {
             return 'mysql';
         }
 
@@ -42,6 +44,7 @@ class SchemaBuilder
         if ($this->sqliteBuilder === null) {
             $this->sqliteBuilder = new SQLiteSchemaBuilder($this->getCompiler());
         }
+
         return $this->sqliteBuilder;
     }
 
@@ -198,6 +201,7 @@ class SchemaBuilder
             foreach ($statements as $sql) {
                 $results[] = await(AsyncPDO::execute($sql, []));
             }
+
             return $results;
         });
     }
@@ -220,7 +224,7 @@ class SchemaBuilder
     {
         foreach ($blueprint->getColumns() as $column) {
             foreach ($column->getColumnIndexes() as $indexInfo) {
-                $indexName = $indexInfo['name'] ?? $blueprint->getTable() . '_' . $column->getName() . '_' . strtolower($indexInfo['type']);
+                $indexName = $indexInfo['name'] ?? $blueprint->getTable().'_'.$column->getName().'_'.strtolower($indexInfo['type']);
 
                 $indexDef = new IndexDefinition($indexInfo['type'], [$column->getName()], $indexName);
 

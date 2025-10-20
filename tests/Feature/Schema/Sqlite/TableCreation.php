@@ -10,7 +10,6 @@ afterEach(function () {
     cleanupSchema('sqlite');
 });
 
-
 describe('Table Creation', function () {
     it('creates a basic table', function () {
         schema('sqlite')->create('users', function (Blueprint $table) {

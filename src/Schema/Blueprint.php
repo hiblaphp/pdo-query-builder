@@ -100,6 +100,7 @@ class Blueprint
     {
         $column = $this->bigIncrements($name);
         $column->primary();
+
         return $column;
     }
 
@@ -109,6 +110,7 @@ class Blueprint
         $column->unsigned()->autoIncrement();
         $column->setBlueprint($this);
         $this->columns[] = $column;
+
         return $column;
     }
 
@@ -118,6 +120,7 @@ class Blueprint
         $column->unsigned()->autoIncrement();
         $column->setBlueprint($this);
         $this->columns[] = $column;
+
         return $column;
     }
 
@@ -127,6 +130,7 @@ class Blueprint
         $column->unsigned()->autoIncrement();
         $column->setBlueprint($this);
         $this->columns[] = $column;
+
         return $column;
     }
 
@@ -136,6 +140,7 @@ class Blueprint
         $column->unsigned()->autoIncrement();
         $column->setBlueprint($this);
         $this->columns[] = $column;
+
         return $column;
     }
 
@@ -145,56 +150,82 @@ class Blueprint
         $column->unsigned()->autoIncrement();
         $column->setBlueprint($this);
         $this->columns[] = $column;
+
         return $column;
     }
 
     public function bigInteger(string $name, bool $autoIncrement = false, bool $unsigned = false): Column
     {
         $column = new Column($name, 'BIGINT');
-        if ($autoIncrement) $column->autoIncrement();
-        if ($unsigned) $column->unsigned();
+        if ($autoIncrement) {
+            $column->autoIncrement();
+        }
+        if ($unsigned) {
+            $column->unsigned();
+        }
         $column->setBlueprint($this);
         $this->columns[] = $column;
+
         return $column;
     }
 
     public function integer(string $name, bool $autoIncrement = false, bool $unsigned = false): Column
     {
         $column = new Column($name, 'INT');
-        if ($autoIncrement) $column->autoIncrement();
-        if ($unsigned) $column->unsigned();
+        if ($autoIncrement) {
+            $column->autoIncrement();
+        }
+        if ($unsigned) {
+            $column->unsigned();
+        }
         $column->setBlueprint($this);
         $this->columns[] = $column;
+
         return $column;
     }
 
     public function mediumInteger(string $name, bool $autoIncrement = false, bool $unsigned = false): Column
     {
         $column = new Column($name, 'MEDIUMINT');
-        if ($autoIncrement) $column->autoIncrement();
-        if ($unsigned) $column->unsigned();
+        if ($autoIncrement) {
+            $column->autoIncrement();
+        }
+        if ($unsigned) {
+            $column->unsigned();
+        }
         $column->setBlueprint($this);
         $this->columns[] = $column;
+
         return $column;
     }
 
     public function smallInteger(string $name, bool $autoIncrement = false, bool $unsigned = false): Column
     {
         $column = new Column($name, 'SMALLINT');
-        if ($autoIncrement) $column->autoIncrement();
-        if ($unsigned) $column->unsigned();
+        if ($autoIncrement) {
+            $column->autoIncrement();
+        }
+        if ($unsigned) {
+            $column->unsigned();
+        }
         $column->setBlueprint($this);
         $this->columns[] = $column;
+
         return $column;
     }
 
     public function tinyInteger(string $name, bool $autoIncrement = false, bool $unsigned = false): Column
     {
         $column = new Column($name, 'TINYINT');
-        if ($autoIncrement) $column->autoIncrement();
-        if ($unsigned) $column->unsigned();
+        if ($autoIncrement) {
+            $column->autoIncrement();
+        }
+        if ($unsigned) {
+            $column->unsigned();
+        }
         $column->setBlueprint($this);
         $this->columns[] = $column;
+
         return $column;
     }
 
@@ -228,6 +259,7 @@ class Blueprint
         $column = new Column($name, 'VARCHAR', $length);
         $column->setBlueprint($this);
         $this->columns[] = $column;
+
         return $column;
     }
 
@@ -236,6 +268,7 @@ class Blueprint
         $column = new Column($name, 'TEXT');
         $column->setBlueprint($this);
         $this->columns[] = $column;
+
         return $column;
     }
 
@@ -244,6 +277,7 @@ class Blueprint
         $column = new Column($name, 'MEDIUMTEXT');
         $column->setBlueprint($this);
         $this->columns[] = $column;
+
         return $column;
     }
 
@@ -252,33 +286,43 @@ class Blueprint
         $column = new Column($name, 'LONGTEXT');
         $column->setBlueprint($this);
         $this->columns[] = $column;
+
         return $column;
     }
 
     public function decimal(string $name, int $precision = 8, int $scale = 2, bool $unsigned = false): Column
     {
         $column = new Column($name, 'DECIMAL', null, $precision, $scale);
-        if ($unsigned) $column->unsigned();
+        if ($unsigned) {
+            $column->unsigned();
+        }
         $column->setBlueprint($this);
         $this->columns[] = $column;
+
         return $column;
     }
 
     public function float(string $name, int $precision = 8, int $scale = 2, bool $unsigned = false): Column
     {
         $column = new Column($name, 'FLOAT', null, $precision, $scale);
-        if ($unsigned) $column->unsigned();
+        if ($unsigned) {
+            $column->unsigned();
+        }
         $column->setBlueprint($this);
         $this->columns[] = $column;
+
         return $column;
     }
 
     public function double(string $name, int $precision = 8, int $scale = 2, bool $unsigned = false): Column
     {
         $column = new Column($name, 'DOUBLE', null, $precision, $scale);
-        if ($unsigned) $column->unsigned();
+        if ($unsigned) {
+            $column->unsigned();
+        }
         $column->setBlueprint($this);
         $this->columns[] = $column;
+
         return $column;
     }
 
@@ -293,6 +337,7 @@ class Blueprint
         $column->default(0);
         $column->setBlueprint($this);
         $this->columns[] = $column;
+
         return $column;
     }
 
@@ -301,6 +346,7 @@ class Blueprint
         $column = new Column($name, 'DATE');
         $column->setBlueprint($this);
         $this->columns[] = $column;
+
         return $column;
     }
 
@@ -309,6 +355,7 @@ class Blueprint
         $column = new Column($name, 'DATETIME');
         $column->setBlueprint($this);
         $this->columns[] = $column;
+
         return $column;
     }
 
@@ -317,6 +364,7 @@ class Blueprint
         $column = new Column($name, 'TIMESTAMP');
         $column->setBlueprint($this);
         $this->columns[] = $column;
+
         return $column;
     }
 
@@ -336,6 +384,7 @@ class Blueprint
         $column = new Column($name, 'JSON');
         $column->setBlueprint($this);
         $this->columns[] = $column;
+
         return $column;
     }
 
@@ -345,6 +394,7 @@ class Blueprint
         $column->setEnumValues($values);
         $column->setBlueprint($this);
         $this->columns[] = $column;
+
         return $column;
     }
 
@@ -359,7 +409,7 @@ class Blueprint
     public function primary(string|array $columns, ?string $name = null, ?string $algorithm = null): IndexDefinition
     {
         $columns = is_array($columns) ? $columns : [$columns];
-        $name ??= $this->table . '_' . implode('_', $columns) . '_primary';
+        $name ??= $this->table.'_'.implode('_', $columns).'_primary';
 
         $indexDef = new IndexDefinition('PRIMARY', $columns, $name);
         if ($algorithm) {
@@ -378,7 +428,7 @@ class Blueprint
     public function unique(string|array $columns, ?string $name = null, ?string $algorithm = null): IndexDefinition
     {
         $columns = is_array($columns) ? $columns : [$columns];
-        $name ??= $this->table . '_' . implode('_', $columns) . '_unique';
+        $name ??= $this->table.'_'.implode('_', $columns).'_unique';
 
         $indexDef = new IndexDefinition('UNIQUE', $columns, $name);
         if ($algorithm) {
@@ -397,7 +447,7 @@ class Blueprint
     public function index(string|array $columns, ?string $name = null, ?string $algorithm = null): IndexDefinition
     {
         $columns = is_array($columns) ? $columns : [$columns];
-        $name ??= $this->table . '_' . implode('_', $columns) . '_index';
+        $name ??= $this->table.'_'.implode('_', $columns).'_index';
 
         $indexDef = new IndexDefinition('INDEX', $columns, $name);
         if ($algorithm) {
@@ -416,7 +466,7 @@ class Blueprint
     public function fullText(string|array $columns, ?string $name = null, ?string $algorithm = null): IndexDefinition
     {
         $columns = is_array($columns) ? $columns : [$columns];
-        $name ??= $this->table . '_' . implode('_', $columns) . '_fulltext';
+        $name ??= $this->table.'_'.implode('_', $columns).'_fulltext';
 
         $indexDef = new IndexDefinition('FULLTEXT', $columns, $name);
         if ($algorithm) {
@@ -435,7 +485,7 @@ class Blueprint
     public function spatialIndex(string|array $columns, ?string $name = null, ?string $operatorClass = null): IndexDefinition
     {
         $columns = is_array($columns) ? $columns : [$columns];
-        $name ??= $this->table . '_' . implode('_', $columns) . '_spatial';
+        $name ??= $this->table.'_'.implode('_', $columns).'_spatial';
 
         $indexDef = new IndexDefinition('SPATIAL', $columns, $name);
         if ($operatorClass) {
@@ -455,6 +505,7 @@ class Blueprint
     {
         $indexDef = new IndexDefinition('RAW', [$expression], $name);
         $this->indexDefinitions[] = $indexDef;
+
         return $indexDef;
     }
 
@@ -464,9 +515,10 @@ class Blueprint
     public function foreign(string|array $columns, ?string $name = null): ForeignKey
     {
         $columns = is_array($columns) ? $columns : [$columns];
-        $name ??= $this->table . '_' . implode('_', $columns) . '_foreign';
+        $name ??= $this->table.'_'.implode('_', $columns).'_foreign';
         $foreignKey = new ForeignKey($name, $columns, $this->table);
         $this->foreignKeys[] = $foreignKey;
+
         return $foreignKey;
     }
 
@@ -474,12 +526,14 @@ class Blueprint
     {
         $columns = is_array($columns) ? $columns : [$columns];
         $this->dropColumns = array_merge($this->dropColumns, $columns);
+
         return $this;
     }
 
     public function renameColumn(string $from, string $to): self
     {
         $this->renameColumns[] = ['from' => $from, 'to' => $to];
+
         return $this;
     }
 
@@ -488,42 +542,55 @@ class Blueprint
         $column = new Column($name, 'VARCHAR', $length);
         $column->setBlueprint($this);
         $this->modifyColumns[] = $column;
+
         return $column;
     }
 
     public function modifyInteger(string $name, bool $unsigned = false): Column
     {
         $column = new Column($name, 'INT');
-        if ($unsigned) $column->unsigned();
+        if ($unsigned) {
+            $column->unsigned();
+        }
         $column->setBlueprint($this);
         $this->modifyColumns[] = $column;
+
         return $column;
     }
 
     public function modifyBigInteger(string $name, bool $unsigned = false): Column
     {
         $column = new Column($name, 'BIGINT');
-        if ($unsigned) $column->unsigned();
+        if ($unsigned) {
+            $column->unsigned();
+        }
         $column->setBlueprint($this);
         $this->modifyColumns[] = $column;
+
         return $column;
     }
 
     public function modifySmallInteger(string $name, bool $unsigned = false): Column
     {
         $column = new Column($name, 'SMALLINT');
-        if ($unsigned) $column->unsigned();
+        if ($unsigned) {
+            $column->unsigned();
+        }
         $column->setBlueprint($this);
         $this->modifyColumns[] = $column;
+
         return $column;
     }
 
     public function modifyTinyInteger(string $name, bool $unsigned = false): Column
     {
         $column = new Column($name, 'TINYINT');
-        if ($unsigned) $column->unsigned();
+        if ($unsigned) {
+            $column->unsigned();
+        }
         $column->setBlueprint($this);
         $this->modifyColumns[] = $column;
+
         return $column;
     }
 
@@ -532,15 +599,19 @@ class Blueprint
         $column = new Column($name, 'TEXT');
         $column->setBlueprint($this);
         $this->modifyColumns[] = $column;
+
         return $column;
     }
 
     public function modifyDecimal(string $name, int $precision = 8, int $scale = 2, bool $unsigned = false): Column
     {
         $column = new Column($name, 'DECIMAL', null, $precision, $scale);
-        if ($unsigned) $column->unsigned();
+        if ($unsigned) {
+            $column->unsigned();
+        }
         $column->setBlueprint($this);
         $this->modifyColumns[] = $column;
+
         return $column;
     }
 
@@ -549,6 +620,7 @@ class Blueprint
         $column = new Column($name, 'TINYINT', 1);
         $column->setBlueprint($this);
         $this->modifyColumns[] = $column;
+
         return $column;
     }
 
@@ -556,12 +628,14 @@ class Blueprint
     {
         $columns = is_array($columns) ? $columns : [$columns];
         $this->dropColumns = array_merge($this->dropColumns, $columns);
+
         return $this;
     }
 
     public function dropIndex(string|array $index): self
     {
         $this->dropIndexes[] = is_array($index) ? $index : [$index];
+
         return $this;
     }
 
@@ -573,6 +647,7 @@ class Blueprint
     public function dropPrimary(?string $index = null): self
     {
         $this->dropIndexes[] = $index ? [$index] : ['PRIMARY'];
+
         return $this;
     }
 
@@ -580,30 +655,35 @@ class Blueprint
     {
         $keys = is_array($index) ? $index : [$index];
         $this->dropForeignKeys = array_merge($this->dropForeignKeys, $keys);
+
         return $this;
     }
 
     public function rename(string $to): self
     {
         $this->commands[] = ['type' => 'rename', 'to' => $to];
+
         return $this;
     }
 
     public function engine(string $engine): self
     {
         $this->engine = $engine;
+
         return $this;
     }
 
     public function charset(string $charset): self
     {
         $this->charset = $charset;
+
         return $this;
     }
 
     public function collation(string $collation): self
     {
         $this->collation = $collation;
+
         return $this;
     }
 
@@ -612,6 +692,7 @@ class Blueprint
         $column = new Column($name, 'POINT');
         $column->setBlueprint($this);
         $this->columns[] = $column;
+
         return $column;
     }
 
@@ -620,6 +701,7 @@ class Blueprint
         $column = new Column($name, 'LINESTRING');
         $column->setBlueprint($this);
         $this->columns[] = $column;
+
         return $column;
     }
 
@@ -628,6 +710,7 @@ class Blueprint
         $column = new Column($name, 'POLYGON');
         $column->setBlueprint($this);
         $this->columns[] = $column;
+
         return $column;
     }
 
@@ -636,6 +719,7 @@ class Blueprint
         $column = new Column($name, 'GEOMETRY');
         $column->setBlueprint($this);
         $this->columns[] = $column;
+
         return $column;
     }
 
@@ -644,6 +728,7 @@ class Blueprint
         $column = new Column($name, 'MULTIPOINT');
         $column->setBlueprint($this);
         $this->columns[] = $column;
+
         return $column;
     }
 
@@ -652,6 +737,7 @@ class Blueprint
         $column = new Column($name, 'MULTILINESTRING');
         $column->setBlueprint($this);
         $this->columns[] = $column;
+
         return $column;
     }
 
@@ -660,6 +746,7 @@ class Blueprint
         $column = new Column($name, 'MULTIPOLYGON');
         $column->setBlueprint($this);
         $this->columns[] = $column;
+
         return $column;
     }
 
@@ -668,6 +755,7 @@ class Blueprint
         $column = new Column($name, 'GEOMETRYCOLLECTION');
         $column->setBlueprint($this);
         $this->columns[] = $column;
+
         return $column;
     }
 }

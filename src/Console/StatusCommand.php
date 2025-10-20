@@ -22,7 +22,8 @@ class StatusCommand extends Command
     {
         $this
             ->setName('status')
-            ->setDescription('Check PDO Query Builder configuration status');
+            ->setDescription('Check PDO Query Builder configuration status')
+        ;
     }
 
     protected function execute(InputInterface $input, OutputInterface $output): int
@@ -31,19 +32,22 @@ class StatusCommand extends Command
         $this->io->title('PDO Query Builder - Status');
 
         $this->projectRoot = $this->findProjectRoot();
-        if (!$this->projectRoot) {
+        if (! $this->projectRoot) {
             $this->io->error('Could not find project root');
+
             return Command::FAILURE;
         }
 
         $this->displayStatusTable();
 
-        if (!$this->allRequiredFilesExist()) {
+        if (! $this->allRequiredFilesExist()) {
             $this->io->note('Run: ./vendor/bin/pdo-query-builder init');
+
             return Command::FAILURE;
         }
 
         $this->io->success('All configured!');
+
         return Command::SUCCESS;
     }
 
@@ -65,7 +69,7 @@ class StatusCommand extends Command
             $rows[] = [$label, $status];
         }
 
-        $envFile = $this->projectRoot . '/.env';
+        $envFile = $this->projectRoot.'/.env';
         $envStatus = file_exists($envFile) ? '✓ Found' : '✗ Missing';
         $rows[] = ['.env File', $envStatus];
 
@@ -76,27 +80,33 @@ class StatusCommand extends Command
     {
         foreach ($this->configFiles as $filename => $label) {
             $filePath = $this->getConfigFilePath($filename);
-            if (!file_exists($filePath)) {
+            if (! file_exists($filePath)) {
                 return false;
             }
         }
+
         return true;
     }
 
     private function getConfigFilePath(string $filename): string
     {
-        return $this->projectRoot . '/config/' . $filename;
+        return $this->projectRoot.'/config/'.$filename;
     }
 
     private function findProjectRoot(): ?string
     {
         $dir = getcwd() ?: __DIR__;
         for ($i = 0; $i < 10; $i++) {
-            if (file_exists($dir . '/composer.json')) return $dir;
+            if (file_exists($dir.'/composer.json')) {
+                return $dir;
+            }
             $parent = dirname($dir);
-            if ($parent === $dir) break;
+            if ($parent === $dir) {
+                break;
+            }
             $dir = $parent;
         }
+
         return null;
     }
 }

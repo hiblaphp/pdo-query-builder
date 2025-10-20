@@ -1,7 +1,6 @@
 <?php
 
 use Hibla\PdoQueryBuilder\Schema\Blueprint;
-use Tests\Helpers\SchemaTestHelper;
 
 beforeEach(function () {
     skipIfPhp84OrHigher();
@@ -11,7 +10,6 @@ beforeEach(function () {
 afterEach(function () {
     cleanupSchema('sqlsrv');
 });
-
 
 describe('Blueprint Methods', function () {
     it('gets blueprint properties correctly', function () {
@@ -30,7 +28,7 @@ describe('Blueprint Methods', function () {
             $table->engine('MyISAM');
         })->await();
 
-        $exists =   schema('sqlsrv')->hasTable('users')->await();
+        $exists = schema('sqlsrv')->hasTable('users')->await();
         expect($exists)->toBeTruthy();
     });
 
@@ -42,7 +40,7 @@ describe('Blueprint Methods', function () {
             $table->collation('utf8_general_ci');
         })->await();
 
-        $exists =   schema('sqlsrv')->hasTable('users')->await();
+        $exists = schema('sqlsrv')->hasTable('users')->await();
         expect($exists)->toBeTruthy();
     });
 });

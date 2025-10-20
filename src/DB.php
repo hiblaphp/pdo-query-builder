@@ -30,9 +30,9 @@ class DB
      * Manually initialize the database with custom configuration.
      * This bypasses the auto-configuration from config files.
      *
-     * @param array<string, mixed> $connectionConfig Database connection configuration
-     * @param int $poolSize Connection pool size (default: 10)
-     * @return void
+     * @param  array<string, mixed>  $connectionConfig  Database connection configuration
+     * @param  int  $poolSize  Connection pool size (default: 10)
+     *
      * @throws InvalidPoolSizeException
      */
     public static function init(array $connectionConfig, int $poolSize = 10): void
@@ -59,7 +59,7 @@ class DB
             return;
         }
 
-        if (self::$isInitialized && !self::$hasValidationError) {
+        if (self::$isInitialized && ! self::$hasValidationError) {
             return;
         }
 
@@ -69,21 +69,21 @@ class DB
             $configLoader = ConfigLoader::getInstance();
             $dbConfigAll = $configLoader->get('pdo-query-builder');
 
-            if (!is_array($dbConfigAll)) {
+            if (! is_array($dbConfigAll)) {
                 throw new DatabaseConfigNotFoundException();
             }
 
             $defaultConnection = $dbConfigAll['default'] ?? null;
-            if (!is_string($defaultConnection)) {
+            if (! is_string($defaultConnection)) {
                 throw new InvalidConnectionConfigException('Default connection name must be a string in your database config.');
             }
 
             $connections = $dbConfigAll['connections'] ?? null;
-            if (!is_array($connections)) {
+            if (! is_array($connections)) {
                 throw new InvalidConnectionConfigException('Database connections configuration must be an array.');
             }
 
-            if (!isset($connections[$defaultConnection]) || !is_array($connections[$defaultConnection])) {
+            if (! isset($connections[$defaultConnection]) || ! is_array($connections[$defaultConnection])) {
                 throw new InvalidDefaultConnectionException($defaultConnection);
             }
 
@@ -92,7 +92,7 @@ class DB
             /** @var array<string, mixed> $validatedConfig */
             $validatedConfig = [];
             foreach ($connectionConfig as $key => $value) {
-                if (!is_string($key)) {
+                if (! is_string($key)) {
                     throw new InvalidConnectionConfigException('Database connection configuration must have string keys only.');
                 }
                 $validatedConfig[$key] = $value;
@@ -100,7 +100,7 @@ class DB
 
             $poolSize = 10;
             if (isset($dbConfigAll['pool_size'])) {
-                if (!is_int($dbConfigAll['pool_size']) || $dbConfigAll['pool_size'] < 1) {
+                if (! is_int($dbConfigAll['pool_size']) || $dbConfigAll['pool_size'] < 1) {
                     throw new InvalidPoolSizeException();
                 }
                 $poolSize = $dbConfigAll['pool_size'];
@@ -148,6 +148,7 @@ class DB
         self::initializeIfNeeded();
 
         $builder = new PDOQueryBuilder($table);
+
         return $builder->setDriver($driver);
     }
 
@@ -206,7 +207,6 @@ class DB
     /**
      * Run a database transaction with automatic retry on failure.
      *
-     * @param  callable  $callback
      * @param  int  $attempts  Number of times to attempt the transaction (default: 1)
      * @return PromiseInterface<mixed>
      */

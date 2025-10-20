@@ -1,8 +1,6 @@
 <?php
 
-use Hibla\PdoQueryBuilder\DB;
 use Hibla\PdoQueryBuilder\Schema\Blueprint;
-use Tests\Helpers\SchemaTestHelper;
 
 beforeEach(function () {
     initializeSchemaForSqlite();
@@ -11,7 +9,6 @@ beforeEach(function () {
 afterEach(function () {
     cleanupSchema('sqlite');
 });
-
 
 describe('Table Modification', function () {
     it('adds columns to existing table', function () {

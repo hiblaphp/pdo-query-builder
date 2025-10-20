@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace Hibla\PdoQueryBuilder\Schema;
 
-use Doctrine\Inflector\InflectorFactory;
 use Doctrine\Inflector\Inflector as DoctrineInflector;
+use Doctrine\Inflector\InflectorFactory;
 
 class Column
 {
@@ -74,6 +74,7 @@ class Column
     public function setName(string $name): self
     {
         $this->name = $name;
+
         return $this;
     }
 
@@ -85,6 +86,7 @@ class Column
     public function setType(string $type): self
     {
         $this->type = $type;
+
         return $this;
     }
 
@@ -96,6 +98,7 @@ class Column
     public function setLength(?int $length): self
     {
         $this->length = $length;
+
         return $this;
     }
 
@@ -107,6 +110,7 @@ class Column
     public function setPrecision(?int $precision): self
     {
         $this->precision = $precision;
+
         return $this;
     }
 
@@ -118,6 +122,7 @@ class Column
     public function setScale(?int $scale): self
     {
         $this->scale = $scale;
+
         return $this;
     }
 
@@ -202,6 +207,7 @@ class Column
     public function nullable(bool $value = true): self
     {
         $this->nullable = $value;
+
         return $this;
     }
 
@@ -209,24 +215,28 @@ class Column
     {
         $this->default = $value;
         $this->hasDefault = true;
+
         return $this;
     }
 
     public function unsigned(bool $value = true): self
     {
         $this->unsigned = $value;
+
         return $this;
     }
 
     public function autoIncrement(bool $value = true): self
     {
         $this->autoIncrement = $value;
+
         return $this;
     }
 
     public function primary(bool $value = true): self
     {
         $this->primary = $value;
+
         return $this;
     }
 
@@ -240,51 +250,57 @@ class Column
                 'algorithm' => null,
             ];
         }
+
         return $this;
     }
 
     public function comment(string $comment): self
     {
         $this->comment = $comment;
+
         return $this;
     }
 
     public function after(string $column): self
     {
         $this->after = $column;
+
         return $this;
     }
 
     public function useCurrent(bool $value = true): self
     {
         $this->useCurrent = $value;
+
         return $this;
     }
 
     public function onUpdate(string $value): self
     {
         $this->onUpdate = $value;
+
         return $this;
     }
 
     public function setEnumValues(array $values): self
     {
         $this->enumValues = $values;
+
         return $this;
     }
 
     public function setBlueprint(Blueprint $blueprint): self
     {
         $this->blueprint = $blueprint;
+
         return $this;
     }
 
     /**
      * Add a regular index to this column
-     * 
-     * @param string|null $name Optional index name
-     * @param string|null $algorithm Optional algorithm (BTREE, HASH, NGRAM, etc.)
-     * @return self
+     *
+     * @param  string|null  $name  Optional index name
+     * @param  string|null  $algorithm  Optional algorithm (BTREE, HASH, NGRAM, etc.)
      */
     public function index(?string $name = null, ?string $algorithm = null): self
     {
@@ -293,15 +309,15 @@ class Column
             'name' => $name,
             'algorithm' => $algorithm,
         ];
+
         return $this;
     }
 
     /**
      * Add a fulltext index to this column
-     * 
-     * @param string|null $name Optional index name
-     * @param string|null $algorithm Optional parser (NGRAM, etc.)
-     * @return self
+     *
+     * @param  string|null  $name  Optional index name
+     * @param  string|null  $algorithm  Optional parser (NGRAM, etc.)
      */
     public function fullText(?string $name = null, ?string $algorithm = null): self
     {
@@ -310,16 +326,16 @@ class Column
             'name' => $name,
             'algorithm' => $algorithm,
         ];
+
         return $this;
     }
 
     /**
      * Add a spatial index to this column
      * Note: MySQL requires spatial indexed columns to be NOT NULL
-     * 
-     * @param string|null $name Optional index name
-     * @param string|null $operatorClass Optional operator class (for PostgreSQL: gist, gin, spgist, brin)
-     * @return self
+     *
+     * @param  string|null  $name  Optional index name
+     * @param  string|null  $operatorClass  Optional operator class (for PostgreSQL: gist, gin, spgist, brin)
      */
     public function spatialIndex(?string $name = null, ?string $operatorClass = null): self
     {
@@ -328,13 +344,13 @@ class Column
             'name' => $name,
             'operatorClass' => $operatorClass,
         ];
-        
+
         return $this;
     }
 
     public function constrained(?string $table = null, string $column = 'id'): self
     {
-        if (!$this->blueprint) {
+        if (! $this->blueprint) {
             throw new \RuntimeException('Blueprint reference not set on column');
         }
 
@@ -366,6 +382,7 @@ class Column
         if ($this->foreignKey) {
             $this->foreignKey->cascadeOnDelete();
         }
+
         return $this;
     }
 
@@ -374,6 +391,7 @@ class Column
         if ($this->foreignKey) {
             $this->foreignKey->cascadeOnUpdate();
         }
+
         return $this;
     }
 
@@ -382,6 +400,7 @@ class Column
         if ($this->foreignKey) {
             $this->foreignKey->nullOnDelete();
         }
+
         return $this;
     }
 
@@ -390,6 +409,7 @@ class Column
         if ($this->foreignKey) {
             $this->foreignKey->onDelete('RESTRICT');
         }
+
         return $this;
     }
 
@@ -398,6 +418,7 @@ class Column
         if ($this->foreignKey) {
             $this->foreignKey->onUpdate('RESTRICT');
         }
+
         return $this;
     }
 
@@ -406,6 +427,7 @@ class Column
         if ($this->foreignKey) {
             $this->foreignKey->onDelete('NO ACTION');
         }
+
         return $this;
     }
 
@@ -414,6 +436,7 @@ class Column
         if ($this->foreignKey) {
             $this->foreignKey->onUpdate('NO ACTION');
         }
+
         return $this;
     }
 
@@ -425,6 +448,7 @@ class Column
     {
         $column = clone $this;
         $column->setName($newName);
+
         return $column;
     }
 
@@ -536,11 +560,11 @@ class Column
             $column->onUpdate($data['onUpdate']);
         }
 
-        if (!empty($data['enumValues'])) {
+        if (! empty($data['enumValues'])) {
             $column->setEnumValues($data['enumValues']);
         }
 
-        if (!empty($data['columnIndexes'])) {
+        if (! empty($data['columnIndexes'])) {
             $column->columnIndexes = $data['columnIndexes'];
         }
 

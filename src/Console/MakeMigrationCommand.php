@@ -30,7 +30,8 @@ class MakeMigrationCommand extends Command
             ->setDescription('Create a new migration file')
             ->addArgument('name', InputArgument::REQUIRED, 'Migration name')
             ->addOption('table', null, InputOption::VALUE_OPTIONAL, 'Table to create')
-            ->addOption('alter', null, InputOption::VALUE_OPTIONAL, 'Table to alter');
+            ->addOption('alter', null, InputOption::VALUE_OPTIONAL, 'Table to alter')
+        ;
     }
 
     protected function execute(InputInterface $input, OutputInterface $output): int
@@ -42,15 +43,15 @@ class MakeMigrationCommand extends Command
         $this->table = $input->getOption('table');
         $this->alter = $input->getOption('alter');
 
-        if (!$this->initializeProjectRoot()) {
+        if (! $this->initializeProjectRoot()) {
             return Command::FAILURE;
         }
 
-        if (!$this->ensureMigrationsDirectory()) {
+        if (! $this->ensureMigrationsDirectory()) {
             return Command::FAILURE;
         }
 
-        if (!$this->createMigrationFile()) {
+        if (! $this->createMigrationFile()) {
             return Command::FAILURE;
         }
 
@@ -60,63 +61,70 @@ class MakeMigrationCommand extends Command
     private function initializeProjectRoot(): bool
     {
         $this->projectRoot = $this->findProjectRoot();
-        if (!$this->projectRoot) {
+        if (! $this->projectRoot) {
             $this->io->error('Could not find project root');
+
             return false;
         }
+
         return true;
     }
 
     private function ensureMigrationsDirectory(): bool
     {
         $this->migrationsPath = $this->getMigrationsPath();
-        
-        if (!is_dir($this->migrationsPath) && !mkdir($this->migrationsPath, 0755, true)) {
+
+        if (! is_dir($this->migrationsPath) && ! mkdir($this->migrationsPath, 0755, true)) {
             $this->io->error("Failed to create migrations directory: {$this->migrationsPath}");
+
             return false;
         }
-        
+
         return true;
     }
 
     private function createMigrationFile(): bool
     {
         $fileName = $this->generateFileName();
-        $filePath = $this->migrationsPath . '/' . $fileName;
+        $filePath = $this->migrationsPath.'/'.$fileName;
         $stub = $this->generateMigrationStub();
 
         if (file_put_contents($filePath, $stub) === false) {
-            $this->io->error("Failed to create migration file");
+            $this->io->error('Failed to create migration file');
+
             return false;
         }
 
-        $relativePath = str_replace($this->projectRoot . '/', '', $this->migrationsPath);
+        $relativePath = str_replace($this->projectRoot.'/', '', $this->migrationsPath);
         $this->io->success("Migration created: {$relativePath}/{$fileName}");
+
         return true;
     }
 
     private function generateFileName(): string
     {
         $convention = $this->getNamingConvention();
-        
+
         return match ($convention) {
             'sequential' => $this->generateSequentialFileName(),
             'timestamp' => $this->generateTimestampFileName(),
             default => $this->generateTimestampFileName(),
         };
     }
-    
+
     private function generateTimestampFileName(): string
     {
         $timestamp = date('Y_m_d_His');
+
         return "{$timestamp}_{$this->migrationName}.php";
     }
-    
+
     private function generateSequentialFileName(): string
     {
-        $files = glob($this->migrationsPath . '/*.php');
+        $files = glob($this->migrationsPath.'/*.php');
         $nextNumber = count($files) + 1;
-        $paddedNumber = str_pad((string)$nextNumber, 4, '0', STR_PAD_LEFT);
+        $paddedNumber = str_pad((string) $nextNumber, 4, '0', STR_PAD_LEFT);
+
         return "{$paddedNumber}_{$this->migrationName}.php";
     }
 
@@ -214,11 +222,16 @@ return new class
     {
         $dir = getcwd() ?: __DIR__;
         for ($i = 0; $i < 10; $i++) {
-            if (file_exists($dir . '/composer.json')) return $dir;
+            if (file_exists($dir.'/composer.json')) {
+                return $dir;
+            }
             $parent = dirname($dir);
-            if ($parent === $dir) break;
+            if ($parent === $dir) {
+                break;
+            }
             $dir = $parent;
         }
+
         return null;
     }
 }

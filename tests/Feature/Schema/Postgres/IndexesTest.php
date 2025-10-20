@@ -2,7 +2,6 @@
 
 use Hibla\PdoQueryBuilder\DB;
 use Hibla\PdoQueryBuilder\Schema\Blueprint;
-use Tests\Helpers\SchemaTestHelper;
 
 beforeEach(function () {
     initializeSchemaForPostgres();
@@ -11,7 +10,6 @@ beforeEach(function () {
 afterEach(function () {
     cleanupSchema('pgsql');
 });
-
 
 describe('Indexes', function () {
     it('creates a table with primary key', function () {
@@ -75,7 +73,7 @@ describe('Indexes', function () {
     it('creates table with various spatial types', function () {
         try {
             DB::rawExecute('CREATE EXTENSION IF NOT EXISTS postgis', [])->await();
-        } catch (\Exception $e) {
+        } catch (Exception $e) {
             $this->markTestSkipped('PostGIS extension not available');
         }
 
@@ -96,7 +94,7 @@ describe('Indexes', function () {
     it('creates table with SRID specification', function () {
         try {
             DB::rawExecute('CREATE EXTENSION IF NOT EXISTS postgis', [])->await();
-        } catch (\Exception $e) {
+        } catch (Exception $e) {
             $this->markTestSkipped('PostGIS extension not available');
         }
 

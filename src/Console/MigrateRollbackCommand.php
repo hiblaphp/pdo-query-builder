@@ -30,7 +30,8 @@ class MigrateRollbackCommand extends Command
         $this
             ->setName('migrate:rollback')
             ->setDescription('Rollback the last database migration')
-            ->addOption('step', null, InputOption::VALUE_OPTIONAL, 'Number of migrations to rollback', 1);
+            ->addOption('step', null, InputOption::VALUE_OPTIONAL, 'Number of migrations to rollback', 1)
+        ;
     }
 
     protected function execute(InputInterface $input, OutputInterface $output): int
@@ -39,11 +40,11 @@ class MigrateRollbackCommand extends Command
         $this->output = $output;
         $this->io->title('Rollback Migrations');
 
-        if (!$this->initializeProjectRoot()) {
+        if (! $this->initializeProjectRoot()) {
             return Command::FAILURE;
         }
 
-        if (!$this->validateMigrationsDirectory()) {
+        if (! $this->validateMigrationsDirectory()) {
             return Command::FAILURE;
         }
 
@@ -53,15 +54,17 @@ class MigrateRollbackCommand extends Command
             $this->schema = new SchemaBuilder();
 
             $step = (int) $input->getOption('step');
-            
-            if (!$this->performRollback($step)) {
+
+            if (! $this->performRollback($step)) {
                 return Command::FAILURE;
             }
 
             $this->io->success('Rollback completed successfully!');
+
             return Command::SUCCESS;
         } catch (\Throwable $e) {
             $this->handleCriticalError($e);
+
             return Command::FAILURE;
         }
     }
@@ -69,20 +72,24 @@ class MigrateRollbackCommand extends Command
     private function initializeProjectRoot(): bool
     {
         $this->projectRoot = $this->findProjectRoot();
-        if (!$this->projectRoot) {
+        if (! $this->projectRoot) {
             $this->io->error('Could not find project root');
+
             return false;
         }
+
         return true;
     }
 
     private function validateMigrationsDirectory(): bool
     {
         $this->migrationsPath = $this->getMigrationsPath();
-        if (!is_dir($this->migrationsPath)) {
+        if (! is_dir($this->migrationsPath)) {
             $this->io->error('Migrations directory not found');
+
             return false;
         }
+
         return true;
     }
 
@@ -92,6 +99,7 @@ class MigrateRollbackCommand extends Command
 
         if (empty($lastBatchMigrations)) {
             $this->io->warning('Nothing to rollback');
+
             return true;
         }
 
@@ -104,7 +112,7 @@ class MigrateRollbackCommand extends Command
         $lastBatchMigrations = array_reverse($lastBatchMigrations);
 
         foreach ($lastBatchMigrations as $migrationData) {
-            if (!$this->rollbackMigration($migrationData)) {
+            if (! $this->rollbackMigration($migrationData)) {
                 return false;
             }
         }
@@ -115,51 +123,57 @@ class MigrateRollbackCommand extends Command
     private function rollbackMigration(array $migrationData): bool
     {
         $migrationName = $migrationData['migration'];
-        $file = $this->migrationsPath . '/' . $migrationName;
+        $file = $this->migrationsPath.'/'.$migrationName;
 
-        if (!$this->validateMigrationFile($file, $migrationName)) {
+        if (! $this->validateMigrationFile($file, $migrationName)) {
             return false;
         }
 
         try {
             $migration = require $file;
-            
-            if (!$this->validateMigrationClass($migration, $migrationName)) {
+
+            if (! $this->validateMigrationClass($migration, $migrationName)) {
                 return false;
             }
 
             $this->io->write("Rolling back: {$migrationName}...");
-            
+
             await($migration->down($this->schema));
             await($this->repository->delete($migrationName));
-            
+
             $this->io->writeln(' <info>✓</info>');
+
             return true;
         } catch (\Throwable $e) {
             $this->io->newLine();
-            $this->io->error("Failed to rollback migration {$migrationName}: " . $e->getMessage());
+            $this->io->error("Failed to rollback migration {$migrationName}: ".$e->getMessage());
             if ($this->output->isVerbose()) {
                 $this->io->writeln($e->getTraceAsString());
             }
+
             return false;
         }
     }
 
     private function validateMigrationFile(string $file, string $migrationName): bool
     {
-        if (!file_exists($file)) {
+        if (! file_exists($file)) {
             $this->io->warning("Migration file not found: {$migrationName}");
+
             return false;
         }
+
         return true;
     }
 
     private function validateMigrationClass(object $migration, string $migrationName): bool
     {
-        if (!method_exists($migration, 'down')) {
+        if (! method_exists($migration, 'down')) {
             $this->io->error("Migration {$migrationName} does not have a down() method");
+
             return false;
         }
+
         return true;
     }
 
@@ -168,7 +182,7 @@ class MigrateRollbackCommand extends Command
         try {
             DB::table('_test_init');
         } catch (\Throwable $e) {
-            if (!str_contains($e->getMessage(), 'not found')) {
+            if (! str_contains($e->getMessage(), 'not found')) {
                 throw $e;
             }
         }
@@ -176,7 +190,7 @@ class MigrateRollbackCommand extends Command
 
     private function handleCriticalError(\Throwable $e): void
     {
-        $this->io->error('Rollback failed: ' . $e->getMessage());
+        $this->io->error('Rollback failed: '.$e->getMessage());
         if ($this->output->isVerbose()) {
             $this->io->writeln($e->getTraceAsString());
         }
@@ -186,11 +200,16 @@ class MigrateRollbackCommand extends Command
     {
         $dir = getcwd() ?: __DIR__;
         for ($i = 0; $i < 10; $i++) {
-            if (file_exists($dir . '/composer.json')) return $dir;
+            if (file_exists($dir.'/composer.json')) {
+                return $dir;
+            }
             $parent = dirname($dir);
-            if ($parent === $dir) break;
+            if ($parent === $dir) {
+                break;
+            }
             $dir = $parent;
         }
+
         return null;
     }
 }

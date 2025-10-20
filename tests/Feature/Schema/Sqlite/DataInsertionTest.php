@@ -1,7 +1,7 @@
 <?php
 
-use Hibla\PdoQueryBuilder\Schema\Blueprint;
 use Hibla\AsyncPDO\AsyncPDO;
+use Hibla\PdoQueryBuilder\Schema\Blueprint;
 
 beforeEach(function () {
     initializeSchemaForSqlite();
@@ -10,7 +10,6 @@ beforeEach(function () {
 afterEach(function () {
     cleanupSchema();
 });
-
 
 describe('Data Insertion and Verification', function () {
     it('creates table and inserts data', function () {
@@ -31,7 +30,7 @@ describe('Data Insertion and Verification', function () {
         expect($user)->not->toBeNull();
         expect($user['name'])->toBe('John Doe');
         expect($user['email'])->toBe('john@example.com');
-        expect((int)$user['age'])->toBe(30);
+        expect((int) $user['age'])->toBe(30);
     });
 
     it('respects default values', function () {
@@ -51,9 +50,9 @@ describe('Data Insertion and Verification', function () {
         $product = AsyncPDO::fetchOne('SELECT * FROM products WHERE name = ?', ['Test Product'])->await();
 
         expect($product)->not->toBeNull();
-        expect((float)$product['price'])->toBe(0.00);
-        expect((int)$product['stock'])->toBe(0);
-        expect((int)$product['active'])->toBe(1);
+        expect((float) $product['price'])->toBe(0.00);
+        expect((int) $product['stock'])->toBe(0);
+        expect((int) $product['active'])->toBe(1);
 
         schema('sqlite')->dropIfExists('products')->await();
     });
@@ -124,7 +123,7 @@ describe('Data Insertion and Verification', function () {
 
         $post = AsyncPDO::fetchOne('SELECT * FROM posts WHERE title = ?', ['Test Post'])->await();
         expect($post)->not->toBeNull();
-        expect((int)$post['user_id'])->toBe((int)$userId);
+        expect((int) $post['user_id'])->toBe((int) $userId);
 
         expect(function () {
             AsyncPDO::execute(
@@ -164,11 +163,11 @@ describe('Data Insertion and Verification', function () {
         )->await();
 
         $postCount = AsyncPDO::fetchValue('SELECT COUNT(*) FROM posts WHERE user_id = ?', [$userId])->await();
-        expect((int)$postCount)->toBe(2);
+        expect((int) $postCount)->toBe(2);
 
         AsyncPDO::execute('DELETE FROM users WHERE id = ?', [$userId])->await();
 
         $postCount = AsyncPDO::fetchValue('SELECT COUNT(*) FROM posts WHERE user_id = ?', [$userId])->await();
-        expect((int)$postCount)->toBe(0);
+        expect((int) $postCount)->toBe(0);
     });
 });

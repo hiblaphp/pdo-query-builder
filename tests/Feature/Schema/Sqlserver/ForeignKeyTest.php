@@ -1,7 +1,6 @@
 <?php
 
 use Hibla\PdoQueryBuilder\Schema\Blueprint;
-use Tests\Helpers\SchemaTestHelper;
 
 beforeEach(function () {
     skipIfPhp84OrHigher();
@@ -11,7 +10,6 @@ beforeEach(function () {
 afterEach(function () {
     cleanupSchema('sqlsrv');
 });
-
 
 describe('Foreign Keys', function () {
     it('creates tables with foreign key constraint', function () {
@@ -26,7 +24,7 @@ describe('Foreign Keys', function () {
             $table->string('title');
         })->await();
 
-        $exists =    schema('sqlsrv')->hasTable('posts')->await();
+        $exists = schema('sqlsrv')->hasTable('posts')->await();
         expect($exists)->toBeTruthy();
     });
 
@@ -42,7 +40,7 @@ describe('Foreign Keys', function () {
             $table->string('title');
         })->await();
 
-        $exists =    schema('sqlsrv')->hasTable('posts')->await();
+        $exists = schema('sqlsrv')->hasTable('posts')->await();
         expect($exists)->toBeTruthy();
     });
 
@@ -58,7 +56,7 @@ describe('Foreign Keys', function () {
             $table->string('title');
         })->await();
 
-        $exists =    schema('sqlsrv')->hasTable('posts')->await();
+        $exists = schema('sqlsrv')->hasTable('posts')->await();
         expect($exists)->toBeTruthy();
     });
 
@@ -75,7 +73,7 @@ describe('Foreign Keys', function () {
             $table->foreign('category_id')->references('id')->on('categories');
         })->await();
 
-        $exists =    schema('sqlsrv')->hasTable('posts')->await();
+        $exists = schema('sqlsrv')->hasTable('posts')->await();
         expect($exists)->toBeTruthy();
     });
 
@@ -90,10 +88,11 @@ describe('Foreign Keys', function () {
             $table->foreignId('user_id')
                 ->constrained()
                 ->cascadeOnDelete()
-                ->cascadeOnUpdate();
+                ->cascadeOnUpdate()
+            ;
         })->await();
 
-        $exists =    schema('sqlsrv')->hasTable('profiles')->await();
+        $exists = schema('sqlsrv')->hasTable('profiles')->await();
         expect($exists)->toBeTruthy();
     });
 
@@ -109,7 +108,7 @@ describe('Foreign Keys', function () {
             $table->string('title');
         })->await();
 
-        $exists =    schema('sqlsrv')->hasTable('posts')->await();
+        $exists = schema('sqlsrv')->hasTable('posts')->await();
         expect($exists)->toBeTruthy();
     });
 
@@ -125,7 +124,7 @@ describe('Foreign Keys', function () {
             $table->string('title');
         })->await();
 
-        $exists =    schema('sqlsrv')->hasTable('posts')->await();
+        $exists = schema('sqlsrv')->hasTable('posts')->await();
         expect($exists)->toBeTruthy();
     });
 
@@ -141,7 +140,7 @@ describe('Foreign Keys', function () {
             $table->string('title');
         })->await();
 
-        $exists =    schema('sqlsrv')->hasTable('posts')->await();
+        $exists = schema('sqlsrv')->hasTable('posts')->await();
         expect($exists)->toBeTruthy();
     });
 });

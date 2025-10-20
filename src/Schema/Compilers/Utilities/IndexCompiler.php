@@ -35,12 +35,13 @@ class IndexCompiler
 
     protected function quoteName(string $name): string
     {
-        return $this->openQuote . $name . $this->closeQuote;
+        return $this->openQuote.$name.$this->closeQuote;
     }
 
     protected function compilePrimaryIndex(IndexDefinition $indexDef): string
     {
         $cols = $this->getColumnsList($indexDef);
+
         return "PRIMARY KEY ({$this->openQuote}{$cols}{$this->closeQuote})";
     }
 
@@ -48,6 +49,7 @@ class IndexCompiler
     {
         $cols = $this->getColumnsList($indexDef);
         $name = $indexDef->getName();
+
         return "UNIQUE KEY {$this->quoteName($name)} ({$this->openQuote}{$cols}{$this->closeQuote})";
     }
 
@@ -55,6 +57,7 @@ class IndexCompiler
     {
         $cols = $this->getColumnsList($indexDef);
         $name = $indexDef->getName();
+
         return "KEY {$this->quoteName($name)} ({$this->openQuote}{$cols}{$this->closeQuote})";
     }
 
@@ -62,6 +65,7 @@ class IndexCompiler
     {
         $cols = $this->getColumnsList($indexDef);
         $name = $indexDef->getName();
+
         return "FULLTEXT KEY {$this->quoteName($name)} ({$this->openQuote}{$cols}{$this->closeQuote})";
     }
 
@@ -69,6 +73,7 @@ class IndexCompiler
     {
         $cols = $this->getColumnsList($indexDef);
         $name = $indexDef->getName();
+
         return "SPATIAL KEY {$this->quoteName($name)} ({$this->openQuote}{$cols}{$this->closeQuote})";
     }
 

@@ -2,8 +2,8 @@
 
 namespace Tests\Helpers;
 
-use Hibla\PdoQueryBuilder\Schema\SchemaBuilder;
 use Hibla\PdoQueryBuilder\DB;
+use Hibla\PdoQueryBuilder\Schema\SchemaBuilder;
 
 class SchemaTestHelper
 {
@@ -31,15 +31,14 @@ class SchemaTestHelper
         'empty_table',
         'wide_table',
         'user_roles',
-        'user_profiles'
+        'user_profiles',
     ];
 
     /**
      * Initialize database with specific driver configuration from environment variables
-     * 
-     * @param string $driver The database driver (mysql, pgsql, sqlite, sqlsrv)
-     * @param int $poolSize Connection pool size (default: 10)
-     * @return void
+     *
+     * @param  string  $driver  The database driver (mysql, pgsql, sqlite, sqlsrv)
+     * @param  int  $poolSize  Connection pool size (default: 10)
      */
     public static function initializeDatabaseForDriver(string $driver, int $poolSize = 10): void
     {
@@ -47,13 +46,13 @@ class SchemaTestHelper
         $config = self::getDriverConfig($driver);
         DB::init($config, $poolSize);
 
-        DB::rawExecute("SELECT 1")->await();
+        DB::rawExecute('SELECT 1')->await();
     }
 
     /**
      * Get configuration array for specific driver from environment variables
-     * 
-     * @param string $driver The database driver
+     *
+     * @param  string  $driver  The database driver
      * @return array<string, mixed>
      */
     private static function getDriverConfig(string $driver): array
@@ -113,7 +112,7 @@ class SchemaTestHelper
 
     public static function initializeDatabase(): void
     {
-        DB::rawExecute("SELECT 1")->await();
+        DB::rawExecute('SELECT 1')->await();
     }
 
     public static function createSchemaBuilder(?string $driver = null): SchemaBuilder

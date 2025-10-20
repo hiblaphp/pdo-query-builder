@@ -1,7 +1,6 @@
 <?php
 
 use Hibla\PdoQueryBuilder\Schema\Blueprint;
-use Tests\Helpers\SchemaTestHelper;
 
 beforeEach(function () {
     initializeSchemaForPostgres();
@@ -10,7 +9,6 @@ beforeEach(function () {
 afterEach(function () {
     cleanupSchema('pgsql');
 });
-
 
 describe('Foreign Keys', function () {
     it('creates tables with foreign key constraint', function () {
@@ -89,7 +87,8 @@ describe('Foreign Keys', function () {
             $table->foreignId('user_id')
                 ->constrained()
                 ->cascadeOnDelete()
-                ->cascadeOnUpdate();
+                ->cascadeOnUpdate()
+            ;
         })->await();
 
         $exists = schema('pgsql')->hasTable('profiles')->await();

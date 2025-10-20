@@ -18,7 +18,7 @@ class ForeignKeyCompiler
         $cols = implode($this->columnDelimiter, $foreignKey->getColumns());
         $refCols = implode($this->columnDelimiter, $foreignKey->getReferenceColumns());
 
-        $sql = "CONSTRAINT {$this->quoteName($foreignKey->getName())} FOREIGN KEY ({$this->openQuote}{$cols}{$this->closeQuote}) " .
+        $sql = "CONSTRAINT {$this->quoteName($foreignKey->getName())} FOREIGN KEY ({$this->openQuote}{$cols}{$this->closeQuote}) ".
             "REFERENCES {$this->quoteName($foreignKey->getReferenceTable())} ({$this->openQuote}{$refCols}{$this->closeQuote})";
 
         $sql = $this->appendOnDelete($sql, $foreignKey->getOnDelete());
@@ -29,24 +29,24 @@ class ForeignKeyCompiler
 
     protected function quoteName(string $name): string
     {
-        return $this->openQuote . $name . $this->closeQuote;
+        return $this->openQuote.$name.$this->closeQuote;
     }
 
     protected function appendOnDelete(string $sql, ?string $action): string
     {
-        if (!$action || $action === 'RESTRICT') {
+        if (! $action || $action === 'RESTRICT') {
             return $sql;
         }
 
-        return $sql . " ON DELETE {$action}";
+        return $sql." ON DELETE {$action}";
     }
 
     protected function appendOnUpdate(string $sql, ?string $action): string
     {
-        if (!$action || $action === 'RESTRICT') {
+        if (! $action || $action === 'RESTRICT') {
             return $sql;
         }
 
-        return $sql . " ON UPDATE {$action}";
+        return $sql." ON UPDATE {$action}";
     }
 }

@@ -62,6 +62,7 @@ class IndexDefinition
     public function algorithm(string $algorithm): self
     {
         $this->algorithm = strtoupper($algorithm);
+
         return $this;
     }
 
@@ -71,6 +72,7 @@ class IndexDefinition
     public function operatorClass(string $operatorClass): self
     {
         $this->operatorClass = $operatorClass;
+
         return $this;
     }
 
@@ -80,6 +82,7 @@ class IndexDefinition
     public function with(string $with): self
     {
         $this->with = $with;
+
         return $this;
     }
 
@@ -89,6 +92,7 @@ class IndexDefinition
     public function using(array $params): self
     {
         $this->using = array_merge($this->using, $params);
+
         return $this;
     }
 

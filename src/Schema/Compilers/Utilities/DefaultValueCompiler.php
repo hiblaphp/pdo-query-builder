@@ -4,8 +4,6 @@ declare(strict_types=1);
 
 namespace Hibla\PdoQueryBuilder\Schema\Compilers\Utilities;
 
-use Hibla\PdoQueryBuilder\Schema\Column;
-
 /**
  * Handles default value compilation for different database systems
  */
@@ -51,7 +49,7 @@ class DefaultValueCompiler
 
     protected function formatNumeric(mixed $value): string
     {
-        return (string)$value;
+        return (string) $value;
     }
 
     protected function formatExpression(string $value): string

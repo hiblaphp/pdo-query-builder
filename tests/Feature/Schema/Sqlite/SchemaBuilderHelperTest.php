@@ -10,7 +10,6 @@ afterEach(function () {
     cleanupSchema('sqlite');
 });
 
-
 describe('SchemaBuilder Helper Methods', function () {
     it('uses dropColumn helper method', function () {
         schema('sqlite')->create('users', function (Blueprint $table) {

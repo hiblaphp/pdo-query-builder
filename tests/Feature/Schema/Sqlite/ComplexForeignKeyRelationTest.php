@@ -10,7 +10,6 @@ afterEach(function () {
     cleanupSchema('sqlite');
 });
 
-
 describe('Complex Foreign Key Relationships', function () {
     it('creates multiple foreign keys on single table', function () {
         schema('sqlite')->create('users', function (Blueprint $table) {

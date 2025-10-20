@@ -1,7 +1,6 @@
 <?php
 
 use Hibla\PdoQueryBuilder\Schema\Blueprint;
-use Tests\Helpers\SchemaTestHelper;
 
 beforeEach(function () {
     initializeSchemaForPostgres();
@@ -10,7 +9,6 @@ beforeEach(function () {
 afterEach(function () {
     cleanupSchema('mysql');
 });
-
 
 describe('Table Operations', function () {
     it('drops a table', function () {

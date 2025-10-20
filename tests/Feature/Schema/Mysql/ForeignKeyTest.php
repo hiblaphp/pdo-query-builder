@@ -1,7 +1,6 @@
 <?php
 
 use Hibla\PdoQueryBuilder\Schema\Blueprint;
-use Tests\Helpers\SchemaTestHelper;
 
 beforeEach(function () {
     initializeSchemaForMysql();
@@ -88,7 +87,8 @@ describe('Foreign Keys', function () {
             $table->foreignId('user_id')
                 ->constrained()
                 ->cascadeOnDelete()
-                ->cascadeOnUpdate();
+                ->cascadeOnUpdate()
+            ;
         })->await();
 
         $exists = schema()->hasTable('profiles')->await();

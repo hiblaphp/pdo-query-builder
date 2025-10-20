@@ -1,7 +1,6 @@
 <?php
 
 use Hibla\PdoQueryBuilder\Schema\Blueprint;
-use Tests\Helpers\SchemaTestHelper;
 
 beforeEach(function () {
     skipIfPhp84OrHigher();
@@ -9,7 +8,7 @@ beforeEach(function () {
 });
 
 afterEach(function () {
-   cleanupSchema('sqlsrv');
+    cleanupSchema('sqlsrv');
 });
 
 describe('Advanced Index Scenarios', function () {
@@ -35,7 +34,7 @@ describe('Advanced Index Scenarios', function () {
 
         $exists = schema('sqlsrv')->hasTable('user_roles')->await();
         expect($exists)->toBeTruthy();
-        
+
         schema('sqlsrv')->dropIfExists('user_roles')->await();
     });
 
@@ -48,7 +47,7 @@ describe('Advanced Index Scenarios', function () {
 
         $exists = schema('sqlsrv')->hasTable('products')->await();
         expect($exists)->toBeTruthy();
-        
+
         schema('sqlsrv')->dropIfExists('products')->await();
     });
 });

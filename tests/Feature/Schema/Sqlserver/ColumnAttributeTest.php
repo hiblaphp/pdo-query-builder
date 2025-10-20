@@ -1,7 +1,6 @@
 <?php
 
 use Hibla\PdoQueryBuilder\Schema\Blueprint;
-use Tests\Helpers\SchemaTestHelper;
 
 beforeEach(function () {
     skipIfPhp84OrHigher();
@@ -12,7 +11,6 @@ afterEach(function () {
     cleanupSchema('sqlsrv');
 });
 
-
 describe('Column Attributes', function () {
     it('creates columns with nullable attribute', function () {
         schema('sqlsrv')->create('users', function (Blueprint $table) {
@@ -21,7 +19,7 @@ describe('Column Attributes', function () {
             $table->string('phone')->nullable(false);
         })->await();
 
-        $exists =   schema('sqlsrv')->hasTable('users')->await();
+        $exists = schema('sqlsrv')->hasTable('users')->await();
         expect($exists)->toBeTruthy();
     });
 
@@ -35,7 +33,7 @@ describe('Column Attributes', function () {
             $table->decimal('amount', 10, 2)->default(0.00);
         })->await();
 
-        $exists =   schema('sqlsrv')->hasTable('settings')->await();
+        $exists = schema('sqlsrv')->hasTable('settings')->await();
         expect($exists)->toBeTruthy();
     });
 
@@ -46,7 +44,7 @@ describe('Column Attributes', function () {
             $table->bigInteger('big_count')->unsigned();
         })->await();
 
-        $exists =   schema('sqlsrv')->hasTable('counters')->await();
+        $exists = schema('sqlsrv')->hasTable('counters')->await();
         expect($exists)->toBeTruthy();
     });
 
@@ -58,7 +56,7 @@ describe('Column Attributes', function () {
             $table->timestamp('updated_at')->useCurrent()->onUpdate('CURRENT_TIMESTAMP');
         })->await();
 
-        $exists =   schema('sqlsrv')->hasTable('logs')->await();
+        $exists = schema('sqlsrv')->hasTable('logs')->await();
         expect($exists)->toBeTruthy();
     });
 });

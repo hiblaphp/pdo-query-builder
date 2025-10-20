@@ -10,8 +10,6 @@ afterEach(function () {
     cleanupSchema('sqlite');
 });
 
-
-
 describe('Column Attributes', function () {
     it('creates columns with nullable attribute', function () {
         schema('sqlite')->create('users', function (Blueprint $table) {

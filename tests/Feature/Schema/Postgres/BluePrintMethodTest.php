@@ -1,7 +1,6 @@
 <?php
 
 use Hibla\PdoQueryBuilder\Schema\Blueprint;
-use Tests\Helpers\SchemaTestHelper;
 
 beforeEach(function () {
     initializeSchemaForPostgres();
@@ -10,7 +9,6 @@ beforeEach(function () {
 afterEach(function () {
     cleanupSchema('pgsql');
 });
-
 
 describe('Blueprint Methods', function () {
     it('gets blueprint properties correctly', function () {

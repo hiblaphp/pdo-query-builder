@@ -66,7 +66,7 @@ class PostgreSQLIndexCompiler extends IndexCompiler
      */
     protected function compileFulltextIndexStatements(string $table, IndexDefinition $indexDef): array
     {
-        $cols = implode(" || ' ' || ", array_map(fn($c) => "\"{$c}\"", $indexDef->getColumns()));
+        $cols = implode(" || ' ' || ", array_map(fn ($c) => "\"{$c}\"", $indexDef->getColumns()));
         $name = $indexDef->getName();
 
         return ["CREATE INDEX IF NOT EXISTS \"{$name}\" ON \"{$table}\" USING gin(to_tsvector('english', {$cols}))"];
@@ -89,8 +89,8 @@ class PostgreSQLIndexCompiler extends IndexCompiler
         $statements = [];
         $typeMapper = new PostgreSQLTypeMapper();
 
-        $colDef = "\"{$column->getName()}\" " . $typeMapper->mapType($column->getType(), $column);
-        if (!$column->isNullable()) {
+        $colDef = "\"{$column->getName()}\" ".$typeMapper->mapType($column->getType(), $column);
+        if (! $column->isNullable()) {
             $colDef .= ' NOT NULL';
         }
 
@@ -124,7 +124,7 @@ class PostgreSQLIndexCompiler extends IndexCompiler
         $using = "\"{$columnName}\"::{$newType}";
         $statements[] = "ALTER TABLE \"{$table}\" ALTER COLUMN \"{$columnName}\" TYPE {$newType} USING {$using}";
 
-        if (!$column->isNullable()) {
+        if (! $column->isNullable()) {
             $statements[] = "ALTER TABLE \"{$table}\" ALTER COLUMN \"{$columnName}\" SET NOT NULL";
         } else {
             $statements[] = "ALTER TABLE \"{$table}\" ALTER COLUMN \"{$columnName}\" DROP NOT NULL";

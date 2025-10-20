@@ -6,9 +6,9 @@ namespace Hibla\PdoQueryBuilder\Schema\Compilers;
 
 use Hibla\PdoQueryBuilder\Schema\Blueprint;
 use Hibla\PdoQueryBuilder\Schema\Column;
-use Hibla\PdoQueryBuilder\Schema\SchemaCompiler;
-use Hibla\PdoQueryBuilder\Schema\Compilers\Utilities\SQLiteTypeMapper;
 use Hibla\PdoQueryBuilder\Schema\Compilers\Utilities\SQLiteIndexCompiler;
+use Hibla\PdoQueryBuilder\Schema\Compilers\Utilities\SQLiteTypeMapper;
+use Hibla\PdoQueryBuilder\Schema\SchemaCompiler;
 
 class SQLiteSchemaCompiler implements SchemaCompiler
 {
@@ -38,7 +38,7 @@ class SQLiteSchemaCompiler implements SchemaCompiler
 
         $columnDefinitions = [];
         foreach ($columns as $column) {
-            $columnDefinitions[] = '  ' . $this->compileColumn($column);
+            $columnDefinitions[] = '  '.$this->compileColumn($column);
         }
 
         foreach ($indexDefinitions as $indexDef) {
@@ -49,7 +49,7 @@ class SQLiteSchemaCompiler implements SchemaCompiler
         }
 
         foreach ($foreignKeys as $foreignKey) {
-            $columnDefinitions[] = '  ' . $this->compileForeignKey($foreignKey);
+            $columnDefinitions[] = '  '.$this->compileForeignKey($foreignKey);
         }
 
         $sql .= implode(",\n", $columnDefinitions);
@@ -77,7 +77,7 @@ class SQLiteSchemaCompiler implements SchemaCompiler
         if ($column->hasDefault()) {
             $sql .= $this->compileDefaultValue($column->getDefault());
         } elseif ($column->shouldUseCurrent() && in_array($column->getType(), ['DATETIME', 'TIMESTAMP'])) {
-            $sql .= " DEFAULT CURRENT_TIMESTAMP";
+            $sql .= ' DEFAULT CURRENT_TIMESTAMP';
         }
 
         if ($column->isUnique()) {
@@ -94,7 +94,7 @@ class SQLiteSchemaCompiler implements SchemaCompiler
         }
 
         if (is_bool($default)) {
-            return ' DEFAULT ' . ($default ? '1' : '0');
+            return ' DEFAULT '.($default ? '1' : '0');
         }
 
         if (is_numeric($default)) {
@@ -102,6 +102,7 @@ class SQLiteSchemaCompiler implements SchemaCompiler
         }
 
         $escaped = str_replace("'", "''", $default);
+
         return " DEFAULT '{$escaped}'";
     }
 
@@ -128,10 +129,10 @@ class SQLiteSchemaCompiler implements SchemaCompiler
         $table = $blueprint->getTable();
         $statements = [];
 
-        $needsRecreation = !empty($blueprint->getDropColumns()) ||
-            !empty($blueprint->getModifyColumns()) ||
-            !empty($blueprint->getDropForeignKeys()) ||
-            !empty($blueprint->getDropIndexes());
+        $needsRecreation = ! empty($blueprint->getDropColumns()) ||
+            ! empty($blueprint->getModifyColumns()) ||
+            ! empty($blueprint->getDropForeignKeys()) ||
+            ! empty($blueprint->getDropIndexes());
 
         if ($needsRecreation) {
             return $this->indexCompiler->compileTableRecreation($blueprint, $this->existingTableColumns, $this);
@@ -148,7 +149,7 @@ class SQLiteSchemaCompiler implements SchemaCompiler
     private function compileAddColumns(string $table, array $columns): array
     {
         return array_map(
-            fn($col) => "ALTER TABLE `{$table}` ADD COLUMN " . $this->compileColumn($col),
+            fn ($col) => "ALTER TABLE `{$table}` ADD COLUMN ".$this->compileColumn($col),
             $columns
         );
     }
@@ -156,7 +157,7 @@ class SQLiteSchemaCompiler implements SchemaCompiler
     private function compileRenameColumns(string $table, array $renames): array
     {
         return array_map(
-            fn($rename) => "ALTER TABLE `{$table}` RENAME COLUMN `{$rename['from']}` TO `{$rename['to']}`",
+            fn ($rename) => "ALTER TABLE `{$table}` RENAME COLUMN `{$rename['from']}` TO `{$rename['to']}`",
             $renames
         );
     }
@@ -169,6 +170,7 @@ class SQLiteSchemaCompiler implements SchemaCompiler
                 $statements[] = $this->compileRename($table, $command['to']);
             }
         }
+
         return $statements;
     }
 
@@ -205,6 +207,7 @@ class SQLiteSchemaCompiler implements SchemaCompiler
     public function compileRenameColumn(Blueprint $blueprint, string $from, string $to): string
     {
         $table = $blueprint->getTable();
+
         return "ALTER TABLE `{$table}` RENAME COLUMN `{$from}` TO `{$to}`";
     }
 }

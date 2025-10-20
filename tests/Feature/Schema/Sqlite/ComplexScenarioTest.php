@@ -10,7 +10,6 @@ afterEach(function () {
     cleanupSchema('sqlite');
 });
 
-
 describe('Complex Scenarios', function () {
     it('creates a complete blog schema', function () {
         schema('sqlite')->create('users', function (Blueprint $table) {

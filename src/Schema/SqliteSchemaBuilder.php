@@ -4,11 +4,13 @@ declare(strict_types=1);
 
 namespace Hibla\PdoQueryBuilder\Schema;
 
-use Hibla\AsyncPDO\AsyncPDO;
-use Hibla\Promise\Interfaces\PromiseInterface;
-
 use function Hibla\async;
+
+use Hibla\AsyncPDO\AsyncPDO;
+
 use function Hibla\await;
+
+use Hibla\Promise\Interfaces\PromiseInterface;
 
 class SQLiteSchemaBuilder
 {
@@ -23,18 +25,19 @@ class SQLiteSchemaBuilder
     {
         return async(function () use ($sql) {
             await(AsyncPDO::execute('PRAGMA foreign_keys = ON', []));
+
             return await(AsyncPDO::execute($sql, []));
         });
     }
 
     public function handleTable(string $table, Blueprint $blueprint): PromiseInterface
     {
-        $needsRecreation = !empty($blueprint->getDropColumns()) ||
-            !empty($blueprint->getModifyColumns()) ||
-            !empty($blueprint->getDropForeignKeys()) ||
-            !empty($blueprint->getDropIndexes());
+        $needsRecreation = ! empty($blueprint->getDropColumns()) ||
+            ! empty($blueprint->getModifyColumns()) ||
+            ! empty($blueprint->getDropForeignKeys()) ||
+            ! empty($blueprint->getDropIndexes());
 
-        if (!$needsRecreation) {
+        if (! $needsRecreation) {
             return $this->executeAlter($blueprint);
         }
 
@@ -118,12 +121,14 @@ class SQLiteSchemaBuilder
                 foreach ($statements as $statement) {
                     await(AsyncPDO::execute($statement, []));
                 }
+
                 return true;
             } catch (\Throwable $e) {
                 try {
                     await(AsyncPDO::execute('ROLLBACK', []));
                 } catch (\Throwable $rollbackError) {
                 }
+
                 throw $e;
             }
         });
@@ -136,6 +141,7 @@ class SQLiteSchemaBuilder
             foreach ($statements as $sql) {
                 $results[] = await(AsyncPDO::execute($sql, []));
             }
+
             return $results;
         });
     }

@@ -33,7 +33,7 @@ describe('Advanced Index Scenarios', function () {
 
         $exists = schema('sqlite')->hasTable('user_roles')->await();
         expect($exists)->toBeTruthy();
-        
+
         schema('sqlite')->dropIfExists('user_roles')->await();
     });
 
@@ -46,7 +46,7 @@ describe('Advanced Index Scenarios', function () {
 
         $exists = schema('sqlite')->hasTable('products')->await();
         expect($exists)->toBeTruthy();
-        
+
         schema('sqlite')->dropIfExists('products')->await();
     });
 });

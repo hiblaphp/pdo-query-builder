@@ -1,7 +1,6 @@
 <?php
 
 use Hibla\PdoQueryBuilder\Schema\Blueprint;
-use Tests\Helpers\SchemaTestHelper;
 
 beforeEach(function () {
     skipIfPhp84OrHigher();
@@ -12,7 +11,6 @@ afterEach(function () {
     cleanupSchema('sqlsrv');
 });
 
-
 describe('Indexes', function () {
     it('creates a table with primary key', function () {
         schema('sqlsrv')->create('users', function (Blueprint $table) {
@@ -20,7 +18,7 @@ describe('Indexes', function () {
             $table->string('name');
         })->await();
 
-        $exists =    schema('sqlsrv')->hasTable('users')->await();
+        $exists = schema('sqlsrv')->hasTable('users')->await();
         expect($exists)->toBeTruthy();
     });
 
@@ -32,7 +30,7 @@ describe('Indexes', function () {
             $table->unique('username');
         })->await();
 
-        $exists =    schema('sqlsrv')->hasTable('users')->await();
+        $exists = schema('sqlsrv')->hasTable('users')->await();
         expect($exists)->toBeTruthy();
     });
 
@@ -44,7 +42,7 @@ describe('Indexes', function () {
             $table->index('slug');
         })->await();
 
-        $exists =    schema('sqlsrv')->hasTable('posts')->await();
+        $exists = schema('sqlsrv')->hasTable('posts')->await();
         expect($exists)->toBeTruthy();
     });
 
@@ -56,7 +54,7 @@ describe('Indexes', function () {
             $table->index(['user_id', 'slug']);
         })->await();
 
-        $exists =    schema('sqlsrv')->hasTable('posts')->await();
+        $exists = schema('sqlsrv')->hasTable('posts')->await();
         expect($exists)->toBeTruthy();
     });
 
@@ -68,7 +66,7 @@ describe('Indexes', function () {
             $table->fullText(['title', 'content']);
         })->await();
 
-        $exists =    schema('sqlsrv')->hasTable('articles')->await();
+        $exists = schema('sqlsrv')->hasTable('articles')->await();
         expect($exists)->toBeTruthy();
     });
 
@@ -81,7 +79,7 @@ describe('Indexes', function () {
             $table->geometry('shape')->nullable();
         })->await();
 
-        $exists =    schema('sqlsrv')->hasTable('geo_test')->await();
+        $exists = schema('sqlsrv')->hasTable('geo_test')->await();
         expect($exists)->toBeTruthy();
 
         schema('sqlsrv')->dropIfExists('geo_test')->await();
@@ -95,9 +93,7 @@ describe('Indexes', function () {
             $table->spatialIndex('location');
         })->await();
 
-
-
-        $exists =    schema('sqlsrv')->hasTable('stores')->await();
+        $exists = schema('sqlsrv')->hasTable('stores')->await();
         expect($exists)->toBeTruthy();
 
         schema('sqlsrv')->dropIfExists('stores')->await();
@@ -111,7 +107,7 @@ describe('Indexes', function () {
             $table->unique('slug', 'custom_slug_unique');
         })->await();
 
-        $exists =    schema('sqlsrv')->hasTable('posts')->await();
+        $exists = schema('sqlsrv')->hasTable('posts')->await();
         expect($exists)->toBeTruthy();
     });
 
@@ -122,7 +118,7 @@ describe('Indexes', function () {
             $table->index('slug', null, 'BTREE');
         })->await();
 
-        $exists =    schema('sqlsrv')->hasTable('posts')->await();
+        $exists = schema('sqlsrv')->hasTable('posts')->await();
         expect($exists)->toBeTruthy();
     });
 });

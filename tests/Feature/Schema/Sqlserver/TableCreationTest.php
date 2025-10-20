@@ -1,7 +1,6 @@
 <?php
 
 use Hibla\PdoQueryBuilder\Schema\Blueprint;
-use Tests\Helpers\SchemaTestHelper;
 
 beforeEach(function () {
     skipIfPhp84OrHigher();
@@ -12,7 +11,6 @@ afterEach(function () {
     cleanupSchema('sqlsrv');
 });
 
-
 describe('Table Creation', function () {
     it('creates a basic table', function () {
         schema('sqlsrv')->create('users', function (Blueprint $table) {
@@ -22,7 +20,7 @@ describe('Table Creation', function () {
             $table->timestamps();
         })->await();
 
-        $exists =    schema('sqlsrv')->hasTable('users')->await();
+        $exists = schema('sqlsrv')->hasTable('users')->await();
         expect($exists)->toBeTruthy();
     });
 
@@ -39,7 +37,7 @@ describe('Table Creation', function () {
             $table->timestamps();
         })->await();
 
-        $exists =    schema('sqlsrv')->hasTable('posts')->await();
+        $exists = schema('sqlsrv')->hasTable('posts')->await();
         expect($exists)->toBeTruthy();
     });
 
@@ -52,7 +50,7 @@ describe('Table Creation', function () {
             $table->string('name');
         })->await();
 
-        $exists =    schema('sqlsrv')->hasTable('categories')->await();
+        $exists = schema('sqlsrv')->hasTable('categories')->await();
         expect($exists)->toBeTruthy();
     });
 
@@ -68,7 +66,7 @@ describe('Table Creation', function () {
             $table->unsignedBigInteger('unsigned_big');
         })->await();
 
-        $exists =    schema('sqlsrv')->hasTable('stats')->await();
+        $exists = schema('sqlsrv')->hasTable('stats')->await();
         expect($exists)->toBeTruthy();
     });
 
@@ -81,7 +79,7 @@ describe('Table Creation', function () {
             $table->string('title', 100);
         })->await();
 
-        $exists =    schema('sqlsrv')->hasTable('documents')->await();
+        $exists = schema('sqlsrv')->hasTable('documents')->await();
         expect($exists)->toBeTruthy();
     });
 
@@ -94,7 +92,7 @@ describe('Table Creation', function () {
             $table->unsignedDecimal('positive_amount', 8, 2);
         })->await();
 
-        $exists =    schema('sqlsrv')->hasTable('financials')->await();
+        $exists = schema('sqlsrv')->hasTable('financials')->await();
         expect($exists)->toBeTruthy();
     });
 
@@ -107,7 +105,7 @@ describe('Table Creation', function () {
             $table->timestamps();
         })->await();
 
-        $exists =    schema('sqlsrv')->hasTable('events')->await();
+        $exists = schema('sqlsrv')->hasTable('events')->await();
         expect($exists)->toBeTruthy();
     });
 
@@ -118,7 +116,7 @@ describe('Table Creation', function () {
             $table->timestamps();
         })->await();
 
-        $exists =    schema('sqlsrv')->hasTable('orders')->await();
+        $exists = schema('sqlsrv')->hasTable('orders')->await();
         expect($exists)->toBeTruthy();
     });
 
@@ -130,7 +128,7 @@ describe('Table Creation', function () {
             $table->softDeletes();
         })->await();
 
-        $exists =    schema('sqlsrv')->hasTable('users')->await();
+        $exists = schema('sqlsrv')->hasTable('users')->await();
         expect($exists)->toBeTruthy();
     });
 
@@ -141,7 +139,7 @@ describe('Table Creation', function () {
             $table->string('email')->comment('User email address')->unique();
         })->await();
 
-        $exists =    schema('sqlsrv')->hasTable('users')->await();
+        $exists = schema('sqlsrv')->hasTable('users')->await();
         expect($exists)->toBeTruthy();
     });
 
@@ -153,7 +151,7 @@ describe('Table Creation', function () {
             $table->timestamps();
         })->await();
 
-        $exists =    schema('sqlsrv')->hasTable('users')->await();
+        $exists = schema('sqlsrv')->hasTable('users')->await();
         expect($exists)->toBeTruthy();
     });
 });

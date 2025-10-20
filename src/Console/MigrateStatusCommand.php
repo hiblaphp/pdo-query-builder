@@ -24,7 +24,8 @@ class MigrateStatusCommand extends Command
     {
         $this
             ->setName('migrate:status')
-            ->setDescription('Show the status of each migration');
+            ->setDescription('Show the status of each migration')
+        ;
     }
 
     protected function execute(InputInterface $input, OutputInterface $output): int
@@ -32,20 +33,22 @@ class MigrateStatusCommand extends Command
         $this->io = new SymfonyStyle($input, $output);
         $this->io->title('Migration Status');
 
-        if (!$this->initializeProjectRoot()) {
+        if (! $this->initializeProjectRoot()) {
             return Command::FAILURE;
         }
 
-        if (!$this->validateMigrationsDirectory()) {
+        if (! $this->validateMigrationsDirectory()) {
             return Command::SUCCESS;
         }
 
         try {
             $this->initializeDatabase();
             $this->displayMigrationStatus();
+
             return Command::SUCCESS;
         } catch (\Throwable $e) {
             $this->handleError($e);
+
             return Command::FAILURE;
         }
     }
@@ -53,20 +56,24 @@ class MigrateStatusCommand extends Command
     private function initializeProjectRoot(): bool
     {
         $this->projectRoot = $this->findProjectRoot();
-        if (!$this->projectRoot) {
+        if (! $this->projectRoot) {
             $this->io->error('Could not find project root');
+
             return false;
         }
+
         return true;
     }
 
     private function validateMigrationsDirectory(): bool
     {
         $this->migrationsPath = $this->getMigrationsPath();
-        if (!is_dir($this->migrationsPath)) {
+        if (! is_dir($this->migrationsPath)) {
             $this->io->warning('Migrations directory not found');
+
             return false;
         }
+
         return true;
     }
 
@@ -78,6 +85,7 @@ class MigrateStatusCommand extends Command
         $migrationFiles = $this->getMigrationFiles();
         if (empty($migrationFiles)) {
             $this->io->warning('No migration files found');
+
             return;
         }
 
@@ -89,12 +97,13 @@ class MigrateStatusCommand extends Command
 
     private function getMigrationFiles(): array
     {
-        $files = glob($this->migrationsPath . '/*.php');
+        $files = glob($this->migrationsPath.'/*.php');
         if ($files === false) {
             return [];
         }
 
         sort($files);
+
         return array_map('basename', $files);
     }
 
@@ -123,7 +132,7 @@ class MigrateStatusCommand extends Command
         try {
             DB::table('_test_init');
         } catch (\Throwable $e) {
-            if (!str_contains($e->getMessage(), 'not found')) {
+            if (! str_contains($e->getMessage(), 'not found')) {
                 throw $e;
             }
         }
@@ -131,7 +140,7 @@ class MigrateStatusCommand extends Command
 
     private function handleError(\Throwable $e): void
     {
-        $this->io->error('Failed to get migration status: ' . $e->getMessage());
+        $this->io->error('Failed to get migration status: '.$e->getMessage());
         if ($this->io->isVerbose()) {
             $this->io->writeln($e->getTraceAsString());
         }
@@ -141,11 +150,16 @@ class MigrateStatusCommand extends Command
     {
         $dir = getcwd() ?: __DIR__;
         for ($i = 0; $i < 10; $i++) {
-            if (file_exists($dir . '/composer.json')) return $dir;
+            if (file_exists($dir.'/composer.json')) {
+                return $dir;
+            }
             $parent = dirname($dir);
-            if ($parent === $dir) break;
+            if ($parent === $dir) {
+                break;
+            }
             $dir = $parent;
         }
+
         return null;
     }
 }

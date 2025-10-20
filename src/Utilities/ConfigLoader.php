@@ -44,7 +44,7 @@ final class ConfigLoader
     public static function getInstance(): self
     {
         if (self::$instance === null) {
-            self::$instance = new self;
+            self::$instance = new self();
         }
 
         return self::$instance;
@@ -79,7 +79,7 @@ final class ConfigLoader
     {
         $dir = __DIR__;
         for ($i = 0; $i < 10; $i++) {
-            if (is_dir($dir . '/vendor')) {
+            if (is_dir($dir.'/vendor')) {
                 return $dir;
             }
 
@@ -99,9 +99,9 @@ final class ConfigLoader
             throw new ProjectRootNotFoundException();
         }
 
-        $envFile = $this->rootPath . '/.env';
+        $envFile = $this->rootPath.'/.env';
 
-        if (!file_exists($envFile)) {
+        if (! file_exists($envFile)) {
             throw new EnvFileNotFoundException($envFile);
         }
 
@@ -122,8 +122,8 @@ final class ConfigLoader
             throw new ProjectRootNotFoundException();
         }
 
-        $configDir = $this->rootPath . '/config';
-        $files = is_dir($configDir) ? glob($configDir . '/*.php') : false;
+        $configDir = $this->rootPath.'/config';
+        $files = is_dir($configDir) ? glob($configDir.'/*.php') : false;
 
         if ($files === false || $files === []) {
             return;

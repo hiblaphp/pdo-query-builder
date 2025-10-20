@@ -1,7 +1,6 @@
 <?php
 
 use Hibla\PdoQueryBuilder\Schema\Blueprint;
-use Tests\Helpers\SchemaTestHelper;
 
 beforeEach(function () {
     skipIfPhp84OrHigher();
@@ -11,7 +10,6 @@ beforeEach(function () {
 afterEach(function () {
     cleanupSchema('sqlsrv');
 });
-
 
 describe('Complex Foreign Key Relationships', function () {
     it('creates multiple foreign keys on single table', function () {
@@ -32,7 +30,7 @@ describe('Complex Foreign Key Relationships', function () {
             $table->string('title');
         })->await();
 
-        $exists =    schema('sqlsrv')->hasTable('posts')->await();
+        $exists = schema('sqlsrv')->hasTable('posts')->await();
         expect($exists)->toBeTruthy();
     });
 
@@ -45,7 +43,7 @@ describe('Complex Foreign Key Relationships', function () {
             $table->foreign('parent_id')->references('id')->on('categories')->noActionOnDelete()->noActionOnUpdate();
         })->await();
 
-        $exists =    schema('sqlsrv')->hasTable('categories')->await();
+        $exists = schema('sqlsrv')->hasTable('categories')->await();
         expect($exists)->toBeTruthy();
     });
 
@@ -63,7 +61,7 @@ describe('Complex Foreign Key Relationships', function () {
             $table->foreign('user_id')->references('id')->on('users')->cascadeOnDelete();
         })->await();
 
-        $exists =    schema('sqlsrv')->hasTable('user_profiles')->await();
+        $exists = schema('sqlsrv')->hasTable('user_profiles')->await();
         expect($exists)->toBeTruthy();
     });
 });

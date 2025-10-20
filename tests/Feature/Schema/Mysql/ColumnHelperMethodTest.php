@@ -1,8 +1,7 @@
 <?php
 
-use Hibla\PdoQueryBuilder\Schema\Blueprint;
 use Hibla\AsyncPDO\AsyncPDO;
-use Tests\Helpers\SchemaTestHelper;
+use Hibla\PdoQueryBuilder\Schema\Blueprint;
 
 beforeEach(function () {
     initializeSchemaForMysql();
@@ -41,7 +40,7 @@ describe('Column Helper Methods', function () {
         )->await();
 
         $user = AsyncPDO::fetchOne('SELECT * FROM users WHERE name = ?', ['Test User'])->await();
-        
+
         expect($user['created_at'])->not->toBeNull();
         expect($user['updated_at'])->not->toBeNull();
     });

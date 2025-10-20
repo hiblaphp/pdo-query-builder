@@ -1,8 +1,7 @@
 <?php
 
-use Hibla\PdoQueryBuilder\Schema\Blueprint;
 use Hibla\AsyncPDO\AsyncPDO;
-use Tests\Helpers\SchemaTestHelper;
+use Hibla\PdoQueryBuilder\Schema\Blueprint;
 
 beforeEach(function () {
     initializeSchemaForPostgres();
@@ -11,7 +10,6 @@ beforeEach(function () {
 afterEach(function () {
     cleanupSchema('pgsql');
 });
-
 
 describe('Column Helper Methods', function () {
     it('uses foreignId helper correctly', function () {

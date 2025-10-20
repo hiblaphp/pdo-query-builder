@@ -17,7 +17,8 @@ class MigrateRefreshCommand extends Command
     {
         $this
             ->setName('migrate:refresh')
-            ->setDescription('Reset and re-run all migrations');
+            ->setDescription('Reset and re-run all migrations')
+        ;
     }
 
     protected function execute(InputInterface $input, OutputInterface $output): int
@@ -26,17 +27,20 @@ class MigrateRefreshCommand extends Command
         $this->output = $output;
         $this->io->title('Refresh Migrations');
 
-        if (!$this->resetMigrations()) {
+        if (! $this->resetMigrations()) {
             $this->io->error('Reset failed');
+
             return Command::FAILURE;
         }
 
-        if (!$this->runMigrations()) {
+        if (! $this->runMigrations()) {
             $this->io->error('Migration failed');
+
             return Command::FAILURE;
         }
 
         $this->io->success('Database refreshed successfully!');
+
         return Command::SUCCESS;
     }
 

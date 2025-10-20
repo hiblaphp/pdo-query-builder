@@ -1,7 +1,6 @@
 <?php
 
 use Hibla\PdoQueryBuilder\Schema\Blueprint;
-use Tests\Helpers\SchemaTestHelper;
 
 beforeEach(function () {
     initializeSchemaForMysql();
@@ -73,9 +72,9 @@ describe('Indexes', function () {
     it('creates table with various spatial types', function () {
         schema()->create('geo_test', function (Blueprint $table) {
             $table->id();
-            $table->point('location')->spatialIndex(); 
+            $table->point('location')->spatialIndex();
             $table->lineString('route')->nullable();
-            $table->polygon('area')->spatialIndex();   
+            $table->polygon('area')->spatialIndex();
             $table->geometry('shape')->nullable();
         })->await();
 
@@ -92,8 +91,6 @@ describe('Indexes', function () {
             $table->point('location');
             $table->spatialIndex('location');
         })->await();
-
-
 
         $exists = schema()->hasTable('stores')->await();
         expect($exists)->toBeTruthy();

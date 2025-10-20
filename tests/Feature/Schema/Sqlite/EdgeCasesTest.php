@@ -10,7 +10,6 @@ afterEach(function () {
     cleanupSchema('sqlite');
 });
 
-
 describe('Edge Cases', function () {
     it('handles empty table creation', function () {
         schema('sqlite')->create('empty_table', function (Blueprint $table) {

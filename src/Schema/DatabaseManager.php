@@ -17,7 +17,7 @@ class DatabaseManager
         $configLoader = ConfigLoader::getInstance();
         $dbConfig = $configLoader->get('pdo-query-builder');
 
-        if (!is_array($dbConfig)) {
+        if (! is_array($dbConfig)) {
             throw new \RuntimeException('Invalid database configuration');
         }
 
@@ -30,8 +30,8 @@ class DatabaseManager
     public function createDatabaseIfNotExists(): bool
     {
         $database = $this->config['database'] ?? null;
-        
-        if (!$database) {
+
+        if (! $database) {
             throw new \RuntimeException('Database name not specified in configuration');
         }
 
@@ -45,7 +45,7 @@ class DatabaseManager
             };
         } catch (\Throwable $e) {
             throw new \RuntimeException(
-                "Failed to create database '{$database}': " . $e->getMessage(),
+                "Failed to create database '{$database}': ".$e->getMessage(),
                 0,
                 $e
             );
@@ -96,7 +96,7 @@ class DatabaseManager
         $stmt = $pdo->query("SELECT 1 FROM pg_database WHERE datname = '{$database}'");
         $exists = $stmt->fetchColumn();
 
-        if (!$exists) {
+        if (! $exists) {
             $pdo->exec("CREATE DATABASE \"{$database}\"");
         }
 
@@ -106,18 +106,18 @@ class DatabaseManager
     private function createSQLiteDatabase(): bool
     {
         $database = $this->config['database'] ?? '';
-        
+
         if ($database === ':memory:') {
-            return true; 
+            return true;
         }
 
         $directory = dirname($database);
-        
-        if (!is_dir($directory) && !mkdir($directory, 0755, true)) {
+
+        if (! is_dir($directory) && ! mkdir($directory, 0755, true)) {
             throw new \RuntimeException("Failed to create directory: {$directory}");
         }
 
-        if (!file_exists($database)) {
+        if (! file_exists($database)) {
             touch($database);
         }
 
@@ -142,7 +142,7 @@ class DatabaseManager
         $stmt = $pdo->query("SELECT database_id FROM sys.databases WHERE name = '{$database}'");
         $exists = $stmt->fetchColumn();
 
-        if (!$exists) {
+        if (! $exists) {
             $pdo->exec("CREATE DATABASE [{$database}]");
         }
 
@@ -152,8 +152,8 @@ class DatabaseManager
     public function databaseExists(): bool
     {
         $database = $this->config['database'] ?? null;
-        
-        if (!$database) {
+
+        if (! $database) {
             return false;
         }
 
@@ -186,6 +186,7 @@ class DatabaseManager
         );
 
         $stmt = $pdo->query("SELECT SCHEMA_NAME FROM INFORMATION_SCHEMA.SCHEMATA WHERE SCHEMA_NAME = '{$database}'");
+
         return (bool) $stmt->fetchColumn();
     }
 
@@ -205,12 +206,14 @@ class DatabaseManager
         );
 
         $stmt = $pdo->query("SELECT 1 FROM pg_database WHERE datname = '{$database}'");
+
         return (bool) $stmt->fetchColumn();
     }
 
     private function checkSQLiteDatabase(): bool
     {
         $database = $this->config['database'] ?? '';
+
         return $database === ':memory:' || file_exists($database);
     }
 
@@ -230,6 +233,7 @@ class DatabaseManager
         );
 
         $stmt = $pdo->query("SELECT database_id FROM sys.databases WHERE name = '{$database}'");
+
         return (bool) $stmt->fetchColumn();
     }
 }

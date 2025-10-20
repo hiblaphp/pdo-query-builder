@@ -28,7 +28,8 @@ class MigrateResetCommand extends Command
     {
         $this
             ->setName('migrate:reset')
-            ->setDescription('Rollback all database migrations');
+            ->setDescription('Rollback all database migrations')
+        ;
     }
 
     protected function execute(InputInterface $input, OutputInterface $output): int
@@ -37,12 +38,13 @@ class MigrateResetCommand extends Command
         $this->output = $output;
         $this->io->title('Reset All Migrations');
 
-        if (!$this->confirmReset()) {
+        if (! $this->confirmReset()) {
             $this->io->warning('Reset cancelled');
+
             return Command::SUCCESS;
         }
 
-        if (!$this->initializeProjectRoot()) {
+        if (! $this->initializeProjectRoot()) {
             return Command::FAILURE;
         }
 
@@ -53,14 +55,16 @@ class MigrateResetCommand extends Command
             $this->repository = new MigrationRepository($this->getMigrationsTable());
             $this->schema = new SchemaBuilder();
 
-            if (!$this->performReset()) {
+            if (! $this->performReset()) {
                 return Command::FAILURE;
             }
 
             $this->io->success('All migrations have been reset!');
+
             return Command::SUCCESS;
         } catch (\Throwable $e) {
             $this->handleCriticalError($e);
+
             return Command::FAILURE;
         }
     }
@@ -73,10 +77,12 @@ class MigrateResetCommand extends Command
     private function initializeProjectRoot(): bool
     {
         $this->projectRoot = $this->findProjectRoot();
-        if (!$this->projectRoot) {
+        if (! $this->projectRoot) {
             $this->io->error('Could not find project root');
+
             return false;
         }
+
         return true;
     }
 
@@ -86,6 +92,7 @@ class MigrateResetCommand extends Command
 
         if (empty($allMigrations)) {
             $this->io->warning('Nothing to reset');
+
             return true;
         }
 
@@ -103,10 +110,11 @@ class MigrateResetCommand extends Command
     private function resetMigration(array $migrationData): void
     {
         $migrationName = $migrationData['migration'];
-        $file = $this->migrationsPath . '/' . $migrationName;
+        $file = $this->migrationsPath.'/'.$migrationName;
 
-        if (!$this->validateMigrationFile($file, $migrationName)) {
+        if (! $this->validateMigrationFile($file, $migrationName)) {
             await($this->repository->delete($migrationName));
+
             return;
         }
 
@@ -131,17 +139,19 @@ class MigrateResetCommand extends Command
 
     private function validateMigrationFile(string $file, string $migrationName): bool
     {
-        if (!file_exists($file)) {
+        if (! file_exists($file)) {
             $this->io->warning("Migration file not found: {$migrationName}");
+
             return false;
         }
+
         return true;
     }
 
     private function handleMigrationError(string $migrationName, \Throwable $e): void
     {
         $this->io->newLine();
-        $this->io->error("Failed to rollback {$migrationName}: " . $e->getMessage());
+        $this->io->error("Failed to rollback {$migrationName}: ".$e->getMessage());
         if ($this->output->isVerbose()) {
             $this->io->writeln($e->getTraceAsString());
         }
@@ -149,7 +159,7 @@ class MigrateResetCommand extends Command
 
     private function handleCriticalError(\Throwable $e): void
     {
-        $this->io->error('Reset failed: ' . $e->getMessage());
+        $this->io->error('Reset failed: '.$e->getMessage());
         if ($this->output->isVerbose()) {
             $this->io->writeln($e->getTraceAsString());
         }
@@ -160,7 +170,7 @@ class MigrateResetCommand extends Command
         try {
             DB::table('_test_init');
         } catch (\Throwable $e) {
-            if (!str_contains($e->getMessage(), 'not found')) {
+            if (! str_contains($e->getMessage(), 'not found')) {
                 throw $e;
             }
         }
@@ -170,11 +180,16 @@ class MigrateResetCommand extends Command
     {
         $dir = getcwd() ?: __DIR__;
         for ($i = 0; $i < 10; $i++) {
-            if (file_exists($dir . '/composer.json')) return $dir;
+            if (file_exists($dir.'/composer.json')) {
+                return $dir;
+            }
             $parent = dirname($dir);
-            if ($parent === $dir) break;
+            if ($parent === $dir) {
+                break;
+            }
             $dir = $parent;
         }
+
         return null;
     }
 }

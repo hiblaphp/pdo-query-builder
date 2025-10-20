@@ -33,7 +33,8 @@ class MigrateCommand extends Command
             ->setName('migrate')
             ->setDescription('Run pending database migrations')
             ->addOption('step', null, InputOption::VALUE_OPTIONAL, 'Number of migrations to run', 0)
-            ->addOption('force', 'f', InputOption::VALUE_NONE, 'Force the operation to run without prompts');
+            ->addOption('force', 'f', InputOption::VALUE_NONE, 'Force the operation to run without prompts')
+        ;
     }
 
     protected function execute(InputInterface $input, OutputInterface $output): int
@@ -42,25 +43,26 @@ class MigrateCommand extends Command
         $this->output = $output;
         $this->io->title('Database Migrations');
 
-        if (!$this->initializeProjectRoot()) {
+        if (! $this->initializeProjectRoot()) {
             return Command::FAILURE;
         }
 
-        if (!$this->validateMigrationsDirectory()) {
+        if (! $this->validateMigrationsDirectory()) {
             return Command::FAILURE;
         }
 
         try {
             $force = $input->getOption('force');
-            
+
             $dbCheckResult = $this->ensureDatabaseExists($force);
-            
+
             if ($dbCheckResult === false) {
                 return Command::FAILURE;
             }
-            
+
             if ($dbCheckResult === null) {
                 $this->io->warning('Migration cancelled by user');
+
                 return Command::SUCCESS;
             }
 
@@ -72,90 +74,94 @@ class MigrateCommand extends Command
             await($this->repository->createRepository());
 
             $step = (int) $input->getOption('step');
-            
-            if (!$this->performMigration($step)) {
+
+            if (! $this->performMigration($step)) {
                 return Command::FAILURE;
             }
 
             $this->io->success('Migrations completed successfully!');
+
             return Command::SUCCESS;
         } catch (\Throwable $e) {
             $this->handleCriticalError($e);
+
             return Command::FAILURE;
         }
     }
 
     /**
      * Ensure database exists with user confirmation
-     * 
+     *
      * @return bool|null true = success, false = error, null = user declined
      */
     private function ensureDatabaseExists(bool $force): ?bool
     {
         try {
             $dbManager = new DatabaseManager();
-            
-            if (!$dbManager->databaseExists()) {
+
+            if (! $dbManager->databaseExists()) {
                 $dbName = $this->getDatabaseName();
-                
+
                 $this->io->warning("Database '{$dbName}' does not exist!");
-            
-                if (!$force) {
+
+                if (! $force) {
                     $confirmed = $this->io->confirm(
                         "Do you want to create the database '{$dbName}'?",
                         false
                     );
-                    
-                    if (!$confirmed) {
-                        return null; 
+
+                    if (! $confirmed) {
+                        return null;
                     }
                 }
-                
+
                 $this->io->writeln('<comment>Creating database...</comment>');
                 $dbManager->createDatabaseIfNotExists();
                 $this->io->writeln('<info>✓ Database created successfully!</info>');
                 $this->io->newLine();
             }
-            
+
             return true;
         } catch (\Throwable $e) {
             if ($this->isDatabaseNotExistError($e)) {
                 try {
                     $dbName = $this->getDatabaseName();
-                    
+
                     $this->io->warning("Database '{$dbName}' does not exist!");
-                    
-                    if (!$force) {
+
+                    if (! $force) {
                         $confirmed = $this->io->confirm(
                             "Do you want to create the database '{$dbName}'?",
                             false
                         );
-                        
-                        if (!$confirmed) {
-                            return null; 
+
+                        if (! $confirmed) {
+                            return null;
                         }
                     }
-                    
+
                     $this->io->writeln('<comment>Creating database...</comment>');
                     $dbManager = new DatabaseManager();
                     $dbManager->createDatabaseIfNotExists();
                     $this->io->writeln('<info>✓ Database created successfully!</info>');
                     $this->io->newLine();
-                    
+
                     return true;
                 } catch (\Throwable $createError) {
-                    $this->io->error('Failed to create database: ' . $createError->getMessage());
+                    $this->io->error('Failed to create database: '.$createError->getMessage());
                     if ($this->output->isVerbose()) {
                         $this->io->writeln($createError->getTraceAsString());
                     }
+
                     return false;
                 }
             }
-            
-            $this->io->error('Database connection failed: ' . $e->getMessage());
+
+            $this->io->error('Database connection failed: '.$e->getMessage());
             if ($this->output->isVerbose()) {
                 $this->io->writeln($e->getTraceAsString());
             }
+
             return false;
         }
     }
@@ -165,15 +171,15 @@ class MigrateCommand extends Command
         try {
             $configLoader = ConfigLoader::getInstance();
             $dbConfig = $configLoader->get('pdo-query-builder');
-            
-            if (!is_array($dbConfig)) {
+
+            if (! is_array($dbConfig)) {
                 return 'unknown';
             }
-            
+
             $defaultConnection = $dbConfig['default'] ?? 'mysql';
             $connections = $dbConfig['connections'] ?? [];
             $config = $connections[$defaultConnection] ?? [];
-            
+
             return $config['database'] ?? 'unknown';
         } catch (\Throwable $e) {
             return 'unknown';
@@ -183,7 +189,7 @@ class MigrateCommand extends Command
     private function isDatabaseNotExistError(\Throwable $e): bool
     {
         $message = strtolower($e->getMessage());
-        
+
         return str_contains($message, 'does not exist') ||
                str_contains($message, 'unknown database') ||
                str_contains($message, 'database') && str_contains($message, 'not found') ||
@@ -193,20 +199,24 @@ class MigrateCommand extends Command
     private function initializeProjectRoot(): bool
     {
         $this->projectRoot = $this->findProjectRoot();
-        if (!$this->projectRoot) {
+        if (! $this->projectRoot) {
             $this->io->error('Could not find project root');
+
             return false;
         }
+
         return true;
     }
 
     private function validateMigrationsDirectory(): bool
     {
         $this->migrationsPath = $this->getMigrationsPath();
-        if (!is_dir($this->migrationsPath)) {
+        if (! is_dir($this->migrationsPath)) {
             $this->io->error('Migrations directory not found. Run make:migration first.');
+
             return false;
         }
+
         return true;
     }
 
@@ -217,6 +227,7 @@ class MigrateCommand extends Command
 
         if (empty($pendingMigrations)) {
             $this->io->success('Nothing to migrate');
+
             return true;
         }
 
@@ -229,7 +240,7 @@ class MigrateCommand extends Command
         $this->io->section('Running migrations');
 
         foreach ($pendingMigrations as $file) {
-            if (!$this->runMigration($file, $batchNumber)) {
+            if (! $this->runMigration($file, $batchNumber)) {
                 return false;
             }
         }
@@ -239,7 +250,7 @@ class MigrateCommand extends Command
 
     private function getPendingMigrations(array $ranMigrations): array
     {
-        $files = glob($this->migrationsPath . '/*.php');
+        $files = glob($this->migrationsPath.'/*.php');
         if ($files === false) {
             return [];
         }
@@ -249,13 +260,14 @@ class MigrateCommand extends Command
         $ranMigrationNames = array_column($ranMigrations, 'migration');
 
         return array_filter($files, function ($file) use ($ranMigrationNames) {
-            return !in_array(basename($file), $ranMigrationNames);
+            return ! in_array(basename($file), $ranMigrationNames);
         });
     }
 
     private function getNextBatchNumber(): int
     {
         $batchNumber = await($this->repository->getNextBatchNumber());
+
         return ($batchNumber ?? 0) + 1;
     }
 
@@ -266,7 +278,7 @@ class MigrateCommand extends Command
         try {
             $migration = require $file;
 
-            if (!$this->validateMigrationClass($migration, $migrationName)) {
+            if (! $this->validateMigrationClass($migration, $migrationName)) {
                 return false;
             }
 
@@ -276,29 +288,33 @@ class MigrateCommand extends Command
             await($this->repository->log($migrationName, $batchNumber));
 
             $this->io->writeln(' <info>✓</info>');
+
             return true;
         } catch (\Throwable $e) {
             $this->io->newLine();
-            $this->io->error("Failed to run migration {$migrationName}: " . $e->getMessage());
+            $this->io->error("Failed to run migration {$migrationName}: ".$e->getMessage());
             if ($this->output->isVerbose()) {
                 $this->io->writeln($e->getTraceAsString());
             }
+
             return false;
         }
     }
 
     private function validateMigrationClass(object $migration, string $migrationName): bool
     {
-        if (!method_exists($migration, 'up')) {
+        if (! method_exists($migration, 'up')) {
             $this->io->error("Migration {$migrationName} does not have an up() method");
+
             return false;
         }
+
         return true;
     }
 
     private function handleCriticalError(\Throwable $e): void
     {
-        $this->io->error('Migration failed: ' . $e->getMessage());
+        $this->io->error('Migration failed: '.$e->getMessage());
         if ($this->output->isVerbose()) {
             $this->io->writeln($e->getTraceAsString());
         }
@@ -309,7 +325,7 @@ class MigrateCommand extends Command
         try {
             DB::table('_test_init');
         } catch (\Throwable $e) {
-            if (!str_contains($e->getMessage(), 'not found')) {
+            if (! str_contains($e->getMessage(), 'not found')) {
                 throw $e;
             }
         }
@@ -319,11 +335,16 @@ class MigrateCommand extends Command
     {
         $dir = getcwd() ?: __DIR__;
         for ($i = 0; $i < 10; $i++) {
-            if (file_exists($dir . '/composer.json')) return $dir;
+            if (file_exists($dir.'/composer.json')) {
+                return $dir;
+            }
             $parent = dirname($dir);
-            if ($parent === $dir) break;
+            if ($parent === $dir) {
+                break;
+            }
             $dir = $parent;
         }
+
         return null;
     }
 }

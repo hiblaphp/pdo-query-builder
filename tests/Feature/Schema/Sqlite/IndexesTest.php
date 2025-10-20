@@ -92,8 +92,6 @@ describe('Indexes', function () {
             $table->spatialIndex('location');
         })->await();
 
-
-
         $exists = schema('sqlite')->hasTable('stores')->await();
         expect($exists)->toBeTruthy();
 

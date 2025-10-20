@@ -25,7 +25,7 @@ class MigrationRepository
             $configLoader = ConfigLoader::getInstance();
             $dbConfig = $configLoader->get('pdo-query-builder');
 
-            if (!is_array($dbConfig)) {
+            if (! is_array($dbConfig)) {
                 return 'mysql';
             }
 
@@ -151,12 +151,12 @@ class MigrationRepository
         $sql = match ($this->driver) {
             'pgsql' => "SELECT COUNT(*) FROM information_schema.tables 
                        WHERE table_schema = 'public' AND table_name = ?",
-            'sqlsrv' => "SELECT COUNT(*) FROM INFORMATION_SCHEMA.TABLES 
-                        WHERE TABLE_NAME = ?",
+            'sqlsrv' => 'SELECT COUNT(*) FROM INFORMATION_SCHEMA.TABLES 
+                        WHERE TABLE_NAME = ?',
             'sqlite' => "SELECT COUNT(*) FROM sqlite_master 
                         WHERE type='table' AND name=?",
-            default => "SELECT COUNT(*) FROM information_schema.tables 
-                       WHERE table_schema = DATABASE() AND table_name = ?",
+            default => 'SELECT COUNT(*) FROM information_schema.tables 
+                       WHERE table_schema = DATABASE() AND table_name = ?',
         };
 
         return AsyncPDO::fetchValue($sql, [$this->table]);

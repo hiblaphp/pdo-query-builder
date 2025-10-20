@@ -6,12 +6,11 @@ namespace Hibla\PdoQueryBuilder\Schema\Compilers;
 
 use Hibla\PdoQueryBuilder\Schema\Blueprint;
 use Hibla\PdoQueryBuilder\Schema\Column;
-use Hibla\PdoQueryBuilder\Schema\IndexDefinition;
-use Hibla\PdoQueryBuilder\Schema\SchemaCompiler;
-use Hibla\PdoQueryBuilder\Schema\Compilers\Utilities\SQLServerTypeMapper;
-use Hibla\PdoQueryBuilder\Schema\Compilers\Utilities\SQLServerIndexCompiler;
 use Hibla\PdoQueryBuilder\Schema\Compilers\Utilities\SQLServerForeignKeyCompiler;
+use Hibla\PdoQueryBuilder\Schema\Compilers\Utilities\SQLServerIndexCompiler;
+use Hibla\PdoQueryBuilder\Schema\Compilers\Utilities\SQLServerTypeMapper;
 use Hibla\PdoQueryBuilder\Schema\Compilers\Utilities\ValueQuoter;
+use Hibla\PdoQueryBuilder\Schema\SchemaCompiler;
 use PDO;
 
 class SQLServerSchemaCompiler implements SchemaCompiler
@@ -46,20 +45,21 @@ class SQLServerSchemaCompiler implements SchemaCompiler
         $hasPrimaryKey = false;
 
         foreach ($columns as $column) {
-            $columnDefinitions[] = '  ' . $this->compileColumn($column);
+            $columnDefinitions[] = '  '.$this->compileColumn($column);
         }
 
         $primaryKeyColumn = $this->getPrimaryKeyColumn($columns, $indexDefinitions);
         if ($primaryKeyColumn) {
             foreach ($indexDefinitions as $indexDef) {
                 if ($indexDef->getType() === 'PRIMARY') {
-                    $columnDefinitions[] = '  ' . $this->indexCompiler->compilePrimaryIndex($indexDef);
+                    $columnDefinitions[] = '  '.$this->indexCompiler->compilePrimaryIndex($indexDef);
                     $hasPrimaryKey = true;
+
                     break;
                 }
             }
 
-            if (!$hasPrimaryKey) {
+            if (! $hasPrimaryKey) {
                 $columnDefinitions[] = "  CONSTRAINT [PK_{$table}] PRIMARY KEY CLUSTERED ([{$primaryKeyColumn}])";
                 $hasPrimaryKey = true;
             }
@@ -71,7 +71,7 @@ class SQLServerSchemaCompiler implements SchemaCompiler
         $sql .= $this->compileCreateIndexes($table, $indexDefinitions);
         $sql .= $this->compileCreateForeignKeys($table, $foreignKeys);
 
-        $sql .= "END";
+        $sql .= 'END';
 
         return $sql;
     }
@@ -83,6 +83,7 @@ class SQLServerSchemaCompiler implements SchemaCompiler
                 return 'id';
             }
         }
+
         return null;
     }
 
@@ -92,11 +93,12 @@ class SQLServerSchemaCompiler implements SchemaCompiler
         foreach ($indexDefinitions as $indexDef) {
             if ($indexDef->getType() !== 'PRIMARY') {
                 $indexSql = $this->indexCompiler->compileIndexDefinitionStatement($table, $indexDef);
-                if (!empty($indexSql) && !str_starts_with($indexSql, '--')) {
-                    $sql .= $indexSql . ";\n";
+                if (! empty($indexSql) && ! str_starts_with($indexSql, '--')) {
+                    $sql .= $indexSql.";\n";
                 }
             }
         }
+
         return $sql;
     }
 
@@ -104,8 +106,9 @@ class SQLServerSchemaCompiler implements SchemaCompiler
     {
         $sql = '';
         foreach ($foreignKeys as $foreignKey) {
-            $sql .= "ALTER TABLE [{$table}] ADD " . $this->foreignKeyCompiler->compile($foreignKey) . ";\n";
+            $sql .= "ALTER TABLE [{$table}] ADD ".$this->foreignKeyCompiler->compile($foreignKey).";\n";
         }
+
         return $sql;
     }
 
@@ -121,7 +124,7 @@ class SQLServerSchemaCompiler implements SchemaCompiler
 
         $sql .= $column->isNullable() ? ' NULL' : ' NOT NULL';
 
-        if ($column->hasDefault() && !$column->isAutoIncrement()) {
+        if ($column->hasDefault() && ! $column->isAutoIncrement()) {
             $sql .= $this->compileDefaultValue($column->getDefault());
         } elseif ($column->shouldUseCurrent()) {
             $sql .= ' DEFAULT GETDATE()';
@@ -137,7 +140,7 @@ class SQLServerSchemaCompiler implements SchemaCompiler
         }
 
         if (is_bool($default)) {
-            return ' DEFAULT ' . ($default ? '1' : '0');
+            return ' DEFAULT '.($default ? '1' : '0');
         }
 
         if (is_numeric($default)) {
@@ -148,12 +151,13 @@ class SQLServerSchemaCompiler implements SchemaCompiler
             return " DEFAULT {$default}";
         }
 
-        return " DEFAULT " . $this->quoter->quote($default);
+        return ' DEFAULT '.$this->quoter->quote($default);
     }
 
     private function isDefaultExpression(string $value): bool
     {
         $expressions = ['GETDATE()', 'GETUTCDATE()', 'CURRENT_TIMESTAMP', 'NEWID()', 'SYSDATETIME()'];
+
         return in_array(strtoupper($value), $expressions);
     }
 
@@ -179,16 +183,17 @@ class SQLServerSchemaCompiler implements SchemaCompiler
         $statements = [];
         foreach ($columns as $column) {
             $statements[] = $this->indexCompiler->compileDropDefaultConstraint($table, $column);
-            $statements[] = "IF EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('[{$table}]') AND name = '{$column}')\n" .
+            $statements[] = "IF EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('[{$table}]') AND name = '{$column}')\n".
                 "ALTER TABLE [{$table}] DROP COLUMN [{$column}]";
         }
+
         return $statements;
     }
 
     private function compileDropForeignKeys(string $table, array $foreignKeys): array
     {
         return array_map(
-            fn($fk) => $this->indexCompiler->compileDropForeignKey($table, $fk),
+            fn ($fk) => $this->indexCompiler->compileDropForeignKey($table, $fk),
             $foreignKeys
         );
     }
@@ -204,6 +209,7 @@ class SQLServerSchemaCompiler implements SchemaCompiler
         foreach ($renames as $rename) {
             $statements[] = $this->compileRenameColumn(new Blueprint($table), $rename['from'], $rename['to']);
         }
+
         return $statements;
     }
 
@@ -212,15 +218,16 @@ class SQLServerSchemaCompiler implements SchemaCompiler
         $statements = [];
         foreach ($columns as $column) {
             $statements[] = $this->indexCompiler->compileDropDefaultConstraint($table, $column->getName());
-            $statements[] = "ALTER TABLE [{$table}] ALTER COLUMN " . $this->compileColumn($column);
+            $statements[] = "ALTER TABLE [{$table}] ALTER COLUMN ".$this->compileColumn($column);
         }
+
         return $statements;
     }
 
     private function compileAddColumns(string $table, array $columns): array
     {
         return array_map(
-            fn($col) => "ALTER TABLE [{$table}] ADD " . $this->compileColumn($col),
+            fn ($col) => "ALTER TABLE [{$table}] ADD ".$this->compileColumn($col),
             $columns
         );
     }
@@ -232,14 +239,15 @@ class SQLServerSchemaCompiler implements SchemaCompiler
             $indexStatements = $this->indexCompiler->compileAddIndexDefinition($table, $indexDef);
             $statements = array_merge($statements, array_filter($indexStatements));
         }
+
         return $statements;
     }
 
     private function compileAddForeignKeys(string $table, array $foreignKeys): array
     {
         return array_map(
-            fn($fk) => "IF NOT EXISTS (SELECT * FROM sys.foreign_keys WHERE name = '{$fk->getName()}' AND parent_object_id = OBJECT_ID('[{$table}]'))\n" .
-                "ALTER TABLE [{$table}] ADD " . $this->foreignKeyCompiler->compile($fk),
+            fn ($fk) => "IF NOT EXISTS (SELECT * FROM sys.foreign_keys WHERE name = '{$fk->getName()}' AND parent_object_id = OBJECT_ID('[{$table}]'))\n".
+                "ALTER TABLE [{$table}] ADD ".$this->foreignKeyCompiler->compile($fk),
             $foreignKeys
         );
     }
@@ -271,7 +279,7 @@ class SQLServerSchemaCompiler implements SchemaCompiler
 
         foreach ($columns as $column) {
             $statements[] = $this->indexCompiler->compileDropDefaultConstraint($table, $column);
-            $statements[] = "IF EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('[{$table}]') AND name = '{$column}')\n" .
+            $statements[] = "IF EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('[{$table}]') AND name = '{$column}')\n".
                 "ALTER TABLE [{$table}] DROP COLUMN [{$column}]";
         }
 
@@ -281,7 +289,8 @@ class SQLServerSchemaCompiler implements SchemaCompiler
     public function compileRenameColumn(Blueprint $blueprint, string $from, string $to): string
     {
         $table = $blueprint->getTable();
-        return "IF EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('[{$table}]') AND name = '{$from}')\n" .
+
+        return "IF EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('[{$table}]') AND name = '{$from}')\n".
             "EXEC sp_rename '[{$table}].[{$from}]', '{$to}', 'COLUMN'";
     }
 }

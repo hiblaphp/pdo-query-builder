@@ -10,7 +10,6 @@ afterEach(function () {
     cleanupSchema('sqlite');
 });
 
-
 describe('Stress Tests', function () {
     it('handles rapid table creation and deletion', function () {
         for ($i = 1; $i <= 5; $i++) {

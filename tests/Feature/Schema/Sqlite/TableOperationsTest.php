@@ -10,7 +10,6 @@ afterEach(function () {
     cleanupSchema('sqlite');
 });
 
-
 describe('Table Operations', function () {
     it('drops a table', function () {
         schema('sqlite')->create('temp_table', function (Blueprint $table) {

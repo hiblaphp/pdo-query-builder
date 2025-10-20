@@ -1,7 +1,6 @@
 <?php
 
 use Hibla\PdoQueryBuilder\Schema\Blueprint;
-use Tests\Helpers\SchemaTestHelper;
 
 beforeEach(function () {
     initializeSchemaForMysql();
@@ -19,7 +18,7 @@ describe('Edge Cases', function () {
 
         $exists = schema()->hasTable('empty_table')->await();
         expect($exists)->toBeTruthy();
-        
+
         schema()->dropIfExists('empty_table')->await();
     });
 
@@ -33,7 +32,7 @@ describe('Edge Cases', function () {
 
         $exists = schema()->hasTable('wide_table')->await();
         expect($exists)->toBeTruthy();
-        
+
         schema()->dropIfExists('wide_table')->await();
     });
 

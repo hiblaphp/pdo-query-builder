@@ -18,7 +18,7 @@ class PostgreSQLForeignKeyCompiler extends ForeignKeyCompiler
         $sql = parent::compile($foreignKey);
 
         if ($notValid) {
-            $sql .= " NOT VALID";
+            $sql .= ' NOT VALID';
         }
 
         return $sql;

@@ -6,12 +6,12 @@ namespace Hibla\PdoQueryBuilder\Schema\Compilers;
 
 use Hibla\PdoQueryBuilder\Schema\Blueprint;
 use Hibla\PdoQueryBuilder\Schema\Column;
-use Hibla\PdoQueryBuilder\Schema\SchemaCompiler;
-use Hibla\PdoQueryBuilder\Schema\Compilers\Utilities\MySQLTypeMapper;
 use Hibla\PdoQueryBuilder\Schema\Compilers\Utilities\MySQLDefaultValueCompiler;
 use Hibla\PdoQueryBuilder\Schema\Compilers\Utilities\MySQLForeignKeyCompiler;
 use Hibla\PdoQueryBuilder\Schema\Compilers\Utilities\MySQLIndexCompiler;
+use Hibla\PdoQueryBuilder\Schema\Compilers\Utilities\MySQLTypeMapper;
 use Hibla\PdoQueryBuilder\Schema\Compilers\Utilities\ValueQuoter;
+use Hibla\PdoQueryBuilder\Schema\SchemaCompiler;
 use PDO;
 
 class MySQLSchemaCompiler implements SchemaCompiler
@@ -42,22 +42,22 @@ class MySQLSchemaCompiler implements SchemaCompiler
 
     private function validateMySQLVersion(): void
     {
-        if (!$this->connection) {
+        if (! $this->connection) {
             return;
         }
 
         try {
-            $stmt = $this->connection->query("SELECT VERSION()");
+            $stmt = $this->connection->query('SELECT VERSION()');
             $version = $stmt->fetchColumn();
 
             if (preg_match('/^(\d+)\.(\d+)/', $version, $matches)) {
-                $major = (int)$matches[1];
+                $major = (int) $matches[1];
 
                 if ($major < 8) {
                     throw new \RuntimeException(
-                        "MySQL version {$version} is not supported. " .
-                            "This library requires MySQL " . self::MINIMUM_VERSION . " or higher. " .
-                            "Please upgrade your MySQL server."
+                        "MySQL version {$version} is not supported. ".
+                            'This library requires MySQL '.self::MINIMUM_VERSION.' or higher. '.
+                            'Please upgrade your MySQL server.'
                     );
                 }
             }
@@ -78,15 +78,15 @@ class MySQLSchemaCompiler implements SchemaCompiler
         $columnDefinitions = [];
 
         foreach ($columns as $column) {
-            $columnDefinitions[] = '  ' . $this->compileColumn($column);
+            $columnDefinitions[] = '  '.$this->compileColumn($column);
         }
 
         foreach ($indexDefinitions as $indexDef) {
-            $columnDefinitions[] = '  ' . $this->indexCompiler->compileIndexDefinition($indexDef);
+            $columnDefinitions[] = '  '.$this->indexCompiler->compileIndexDefinition($indexDef);
         }
 
         foreach ($foreignKeys as $foreignKey) {
-            $columnDefinitions[] = '  ' . $this->foreignKeyCompiler->compile($foreignKey);
+            $columnDefinitions[] = '  '.$this->foreignKeyCompiler->compile($foreignKey);
         }
 
         $sql .= implode(",\n", $columnDefinitions);
@@ -124,12 +124,12 @@ class MySQLSchemaCompiler implements SchemaCompiler
             $sql .= ' AUTO_INCREMENT';
         }
 
-        if ($column->isUnique() && !$column->isPrimary()) {
+        if ($column->isUnique() && ! $column->isPrimary()) {
             $sql .= ' UNIQUE';
         }
 
         if ($column->getComment()) {
-            $sql .= " COMMENT " . $this->quoter->quote($column->getComment());
+            $sql .= ' COMMENT '.$this->quoter->quote($column->getComment());
         }
 
         if ($column->getAfter()) {
@@ -159,7 +159,7 @@ class MySQLSchemaCompiler implements SchemaCompiler
     private function compileRenameColumns(string $table, array $renames): array
     {
         return array_map(
-            fn($rename) => "ALTER TABLE `{$table}` RENAME COLUMN `{$rename['from']}` TO `{$rename['to']}`",
+            fn ($rename) => "ALTER TABLE `{$table}` RENAME COLUMN `{$rename['from']}` TO `{$rename['to']}`",
             $renames
         );
     }
@@ -167,7 +167,7 @@ class MySQLSchemaCompiler implements SchemaCompiler
     private function compileDropForeignKeys(string $table, array $foreignKeys): array
     {
         return array_map(
-            fn($fk) => "ALTER TABLE `{$table}` DROP FOREIGN KEY `{$fk}`",
+            fn ($fk) => "ALTER TABLE `{$table}` DROP FOREIGN KEY `{$fk}`",
             $foreignKeys
         );
     }
@@ -182,13 +182,14 @@ class MySQLSchemaCompiler implements SchemaCompiler
                 $statements[] = "ALTER TABLE `{$table}` DROP INDEX `{$index[0]}`";
             }
         }
+
         return $statements;
     }
 
     private function compileDropColumns(string $table, array $columns): array
     {
         return array_map(
-            fn($col) => "ALTER TABLE `{$table}` DROP COLUMN `{$col}`",
+            fn ($col) => "ALTER TABLE `{$table}` DROP COLUMN `{$col}`",
             $columns
         );
     }
@@ -200,10 +201,11 @@ class MySQLSchemaCompiler implements SchemaCompiler
         }
 
         $modifications = array_map(
-            fn($col) => "MODIFY COLUMN " . $this->compileColumn($col),
+            fn ($col) => 'MODIFY COLUMN '.$this->compileColumn($col),
             $columns
         );
-        return ["ALTER TABLE `{$table}` " . implode(', ', $modifications)];
+
+        return ["ALTER TABLE `{$table}` ".implode(', ', $modifications)];
     }
 
     private function compileAddColumns(string $table, array $columns): array
@@ -213,10 +215,11 @@ class MySQLSchemaCompiler implements SchemaCompiler
         }
 
         $additions = array_map(
-            fn($col) => "ADD COLUMN " . $this->compileColumn($col),
+            fn ($col) => 'ADD COLUMN '.$this->compileColumn($col),
             $columns
         );
-        return ["ALTER TABLE `{$table}` " . implode(', ', $additions)];
+
+        return ["ALTER TABLE `{$table}` ".implode(', ', $additions)];
     }
 
     private function compileAddIndexes(string $table, array $indexes): array
@@ -225,13 +228,14 @@ class MySQLSchemaCompiler implements SchemaCompiler
         foreach ($indexes as $indexDef) {
             $statements = array_merge($statements, $this->indexCompiler->compileAddIndexDefinition($table, $indexDef));
         }
+
         return $statements;
     }
 
     private function compileAddForeignKeys(string $table, array $foreignKeys): array
     {
         return array_map(
-            fn($fk) => "ALTER TABLE `{$table}` ADD " . $this->foreignKeyCompiler->compile($fk),
+            fn ($fk) => "ALTER TABLE `{$table}` ADD ".$this->foreignKeyCompiler->compile($fk),
             $foreignKeys
         );
     }
@@ -248,8 +252,8 @@ class MySQLSchemaCompiler implements SchemaCompiler
 
     public function compileTableExists(string $table): string
     {
-        return "SELECT COUNT(*) FROM information_schema.tables " .
-            "WHERE table_schema = DATABASE() AND table_name = " . $this->quoter->quote($table);
+        return 'SELECT COUNT(*) FROM information_schema.tables '.
+            'WHERE table_schema = DATABASE() AND table_name = '.$this->quoter->quote($table);
     }
 
     public function compileRename(string $from, string $to): string
@@ -260,13 +264,15 @@ class MySQLSchemaCompiler implements SchemaCompiler
     public function compileDropColumn(Blueprint $blueprint, array $columns): string
     {
         $table = $blueprint->getTable();
-        $drops = array_map(fn($col) => "DROP COLUMN `{$col}`", $columns);
-        return "ALTER TABLE `{$table}` " . implode(', ', $drops);
+        $drops = array_map(fn ($col) => "DROP COLUMN `{$col}`", $columns);
+
+        return "ALTER TABLE `{$table}` ".implode(', ', $drops);
     }
 
     public function compileRenameColumn(Blueprint $blueprint, string $from, string $to): string
     {
         $table = $blueprint->getTable();
+
         return "ALTER TABLE `{$table}` RENAME COLUMN `{$from}` TO `{$to}`";
     }
 }

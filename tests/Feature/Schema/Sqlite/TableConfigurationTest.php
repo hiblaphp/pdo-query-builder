@@ -10,7 +10,6 @@ afterEach(function () {
     cleanupSchema('sqlite');
 });
 
-
 describe('Table Configuration', function () {
     it('creates table with custom engine', function () {
         schema('sqlite')->create('users', function (Blueprint $table) {

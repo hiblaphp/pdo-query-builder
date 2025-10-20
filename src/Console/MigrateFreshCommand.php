@@ -30,7 +30,8 @@ class MigrateFreshCommand extends Command
         $this
             ->setName('migrate:fresh')
             ->setDescription('Drop all tables and re-run all migrations')
-            ->addOption('force', 'f', InputOption::VALUE_NONE, 'Force the operation without confirmation');
+            ->addOption('force', 'f', InputOption::VALUE_NONE, 'Force the operation without confirmation')
+        ;
     }
 
     protected function execute(InputInterface $input, OutputInterface $output): int
@@ -41,12 +42,13 @@ class MigrateFreshCommand extends Command
 
         $force = $input->getOption('force');
 
-        if (!$force && !$this->confirmFresh()) {
+        if (! $force && ! $this->confirmFresh()) {
             $this->io->warning('Fresh migration cancelled');
+
             return Command::SUCCESS;
         }
 
-        if (!$this->initializeProjectRoot()) {
+        if (! $this->initializeProjectRoot()) {
             return Command::FAILURE;
         }
 
@@ -56,22 +58,25 @@ class MigrateFreshCommand extends Command
             $this->driver = $this->detectDriver();
 
             $this->io->section('Dropping all tables...');
-            if (!$this->dropAllTables()) {
+            if (! $this->dropAllTables()) {
                 return Command::FAILURE;
             }
 
             $this->io->success('All tables dropped successfully!');
 
             $this->io->section('Running migrations...');
-            if (!$this->runMigrations()) {
+            if (! $this->runMigrations()) {
                 $this->io->error('Migration failed');
+
                 return Command::FAILURE;
             }
 
             $this->io->success('Database refreshed successfully!');
+
             return Command::SUCCESS;
         } catch (\Throwable $e) {
             $this->handleCriticalError($e);
+
             return Command::FAILURE;
         }
     }
@@ -89,10 +94,12 @@ class MigrateFreshCommand extends Command
     private function initializeProjectRoot(): bool
     {
         $this->projectRoot = $this->findProjectRoot();
-        if (!$this->projectRoot) {
+        if (! $this->projectRoot) {
             $this->io->error('Could not find project root');
+
             return false;
         }
+
         return true;
     }
 
@@ -103,6 +110,7 @@ class MigrateFreshCommand extends Command
 
             if (empty($tables)) {
                 $this->io->note('No tables to drop');
+
                 return true;
             }
 
@@ -120,10 +128,11 @@ class MigrateFreshCommand extends Command
 
             return true;
         } catch (\Throwable $e) {
-            $this->io->error('Failed to drop tables: ' . $e->getMessage());
+            $this->io->error('Failed to drop tables: '.$e->getMessage());
             if ($this->output->isVerbose()) {
                 $this->io->writeln($e->getTraceAsString());
             }
+
             return false;
         }
     }
@@ -155,12 +164,12 @@ class MigrateFreshCommand extends Command
                         WHERE type='table' AND name NOT LIKE 'sqlite_%'",
             'sqlsrv' => "SELECT TABLE_NAME FROM INFORMATION_SCHEMA.TABLES 
                         WHERE TABLE_TYPE = 'BASE TABLE'",
-            default => "SELECT table_name FROM information_schema.tables 
-                       WHERE table_schema = DATABASE()",
+            default => 'SELECT table_name FROM information_schema.tables 
+                       WHERE table_schema = DATABASE()',
         };
 
         $result = await(DB::raw($sql));
-        
+
         return match ($this->driver) {
             'mysql', 'sqlsrv' => array_column($result, 'table_name'),
             'pgsql' => array_column($result, 'tablename'),
@@ -228,7 +237,7 @@ class MigrateFreshCommand extends Command
             $configLoader = ConfigLoader::getInstance();
             $dbConfig = $configLoader->get('pdo-query-builder');
 
-            if (!is_array($dbConfig)) {
+            if (! is_array($dbConfig)) {
                 return 'mysql';
             }
 
@@ -247,7 +256,7 @@ class MigrateFreshCommand extends Command
         try {
             DB::table('_test_init');
         } catch (\Throwable $e) {
-            if (!str_contains($e->getMessage(), 'not found')) {
+            if (! str_contains($e->getMessage(), 'not found')) {
                 throw $e;
             }
         }
@@ -255,7 +264,7 @@ class MigrateFreshCommand extends Command
 
     private function handleCriticalError(\Throwable $e): void
     {
-        $this->io->error('Fresh migration failed: ' . $e->getMessage());
+        $this->io->error('Fresh migration failed: '.$e->getMessage());
         if ($this->output->isVerbose()) {
             $this->io->writeln($e->getTraceAsString());
         }
@@ -265,11 +274,16 @@ class MigrateFreshCommand extends Command
     {
         $dir = getcwd() ?: __DIR__;
         for ($i = 0; $i < 10; $i++) {
-            if (file_exists($dir . '/composer.json')) return $dir;
+            if (file_exists($dir.'/composer.json')) {
+                return $dir;
+            }
             $parent = dirname($dir);
-            if ($parent === $dir) break;
+            if ($parent === $dir) {
+                break;
+            }
             $dir = $parent;
         }
+
         return null;
     }
 }

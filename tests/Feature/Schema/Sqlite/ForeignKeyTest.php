@@ -10,7 +10,6 @@ afterEach(function () {
     cleanupSchema('sqlite');
 });
 
-
 describe('Foreign Keys', function () {
     it('creates tables with foreign key constraint', function () {
         schema('sqlite')->create('users', function (Blueprint $table) {
@@ -88,7 +87,8 @@ describe('Foreign Keys', function () {
             $table->foreignId('user_id')
                 ->constrained()
                 ->cascadeOnDelete()
-                ->cascadeOnUpdate();
+                ->cascadeOnUpdate()
+            ;
         })->await();
 
         $exists = schema('sqlite')->hasTable('profiles')->await();

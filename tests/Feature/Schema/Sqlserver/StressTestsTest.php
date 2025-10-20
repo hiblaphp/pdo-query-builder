@@ -1,7 +1,6 @@
 <?php
 
 use Hibla\PdoQueryBuilder\Schema\Blueprint;
-use Tests\Helpers\SchemaTestHelper;
 
 beforeEach(function () {
     skipIfPhp84OrHigher();
@@ -11,7 +10,6 @@ beforeEach(function () {
 afterEach(function () {
     cleanupSchema('sqlsrv');
 });
-
 
 describe('Stress Tests', function () {
     it('handles rapid table creation and deletion', function () {
@@ -23,12 +21,12 @@ describe('Stress Tests', function () {
                 $table->string('name');
             })->await();
 
-            $exists =   schema('sqlsrv')->hasTable($tableName)->await();
+            $exists = schema('sqlsrv')->hasTable($tableName)->await();
             expect($exists)->toBeTruthy();
 
             schema('sqlsrv')->drop($tableName)->await();
 
-            $exists =   schema('sqlsrv')->hasTable($tableName)->await();
+            $exists = schema('sqlsrv')->hasTable($tableName)->await();
             expect($exists)->toBeFalsy();
         }
     });
@@ -55,7 +53,7 @@ describe('Stress Tests', function () {
             $table->integer('age')->default(0);
         })->await();
 
-        $exists =   schema('sqlsrv')->hasTable('users')->await();
+        $exists = schema('sqlsrv')->hasTable('users')->await();
         expect($exists)->toBeTruthy();
     });
 });

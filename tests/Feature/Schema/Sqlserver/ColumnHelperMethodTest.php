@@ -1,8 +1,7 @@
 <?php
 
-use Hibla\PdoQueryBuilder\Schema\Blueprint;
 use Hibla\AsyncPDO\AsyncPDO;
-use Tests\Helpers\SchemaTestHelper;
+use Hibla\PdoQueryBuilder\Schema\Blueprint;
 
 beforeEach(function () {
     skipIfPhp84OrHigher();
@@ -12,7 +11,6 @@ beforeEach(function () {
 afterEach(function () {
     cleanupSchema('sqlsrv');
 });
-
 
 describe('Column Helper Methods', function () {
     it('uses foreignId helper correctly', function () {
@@ -26,7 +24,7 @@ describe('Column Helper Methods', function () {
             $table->foreignId('user_id')->constrained();
         })->await();
 
-        $exists =    schema('sqlsrv')->hasTable('posts')->await();
+        $exists = schema('sqlsrv')->hasTable('posts')->await();
         expect($exists)->toBeTruthy();
     });
 
@@ -56,7 +54,7 @@ describe('Column Helper Methods', function () {
             $table->softDeletes();
         })->await();
 
-        $exists =    schema('sqlsrv')->hasTable('users')->await();
+        $exists = schema('sqlsrv')->hasTable('users')->await();
         expect($exists)->toBeTruthy();
     });
 });

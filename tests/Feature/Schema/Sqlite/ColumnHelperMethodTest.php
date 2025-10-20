@@ -1,7 +1,7 @@
 <?php
 
-use Hibla\PdoQueryBuilder\Schema\Blueprint;
 use Hibla\AsyncPDO\AsyncPDO;
+use Hibla\PdoQueryBuilder\Schema\Blueprint;
 
 beforeEach(function () {
     initializeSchemaForSqlite();
@@ -10,7 +10,6 @@ beforeEach(function () {
 afterEach(function () {
     cleanupSchema('sqlite');
 });
-
 
 describe('Column Helper Methods', function () {
     it('uses foreignId helper correctly', function () {

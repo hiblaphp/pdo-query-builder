@@ -59,24 +59,28 @@ class ForeignKey
     public function references(string|array $columns): self
     {
         $this->referenceColumns = is_array($columns) ? $columns : [$columns];
+
         return $this;
     }
 
     public function on(string $table): self
     {
         $this->referenceTable = $table;
+
         return $this;
     }
 
     public function onDelete(string $action): self
     {
         $this->onDelete = strtoupper($action);
+
         return $this;
     }
 
     public function onUpdate(string $action): self
     {
         $this->onUpdate = strtoupper($action);
+
         return $this;
     }
 

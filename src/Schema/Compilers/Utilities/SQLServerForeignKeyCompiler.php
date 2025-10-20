@@ -18,7 +18,7 @@ class SQLServerForeignKeyCompiler extends ForeignKeyCompiler
         $cols = implode($this->columnDelimiter, $foreignKey->getColumns());
         $refCols = implode($this->columnDelimiter, $foreignKey->getReferenceColumns());
 
-        $sql = "CONSTRAINT [{$foreignKey->getName()}] FOREIGN KEY ([{$cols}]) " .
+        $sql = "CONSTRAINT [{$foreignKey->getName()}] FOREIGN KEY ([{$cols}]) ".
             "REFERENCES [{$foreignKey->getReferenceTable()}] ([{$refCols}])";
 
         if ($foreignKey->getOnDelete()) {

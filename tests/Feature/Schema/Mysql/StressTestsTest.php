@@ -1,7 +1,6 @@
 <?php
 
 use Hibla\PdoQueryBuilder\Schema\Blueprint;
-use Tests\Helpers\SchemaTestHelper;
 
 beforeEach(function () {
     initializeSchemaForMysql();
@@ -15,7 +14,7 @@ describe('Stress Tests', function () {
     it('handles rapid table creation and deletion', function () {
         for ($i = 1; $i <= 5; $i++) {
             $tableName = "test_table_{$i}";
-            
+
             schema()->create($tableName, function (Blueprint $table) {
                 $table->id();
                 $table->string('name');
