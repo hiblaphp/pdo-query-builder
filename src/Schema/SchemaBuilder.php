@@ -308,7 +308,7 @@ class SchemaBuilder
     private function nullPromise(): PromiseInterface
     {
         /** @phpstan-ignore-next-line */
-        return async(static fn () => null);
+        return async(static fn() => null);
     }
 
     /**
@@ -381,17 +381,7 @@ class SchemaBuilder
                     $indexDef->operatorClass($indexInfo['operatorClass']);
                 }
 
-                $reflection = new \ReflectionClass($blueprint);
-                $property = $reflection->getProperty('indexDefinitions');
-                $property->setAccessible(true);
-                $indexDefinitions = $property->getValue($blueprint);
-
-                if (! is_array($indexDefinitions)) {
-                    continue;
-                }
-                /** @var list<IndexDefinition> $indexDefinitions */
-                $indexDefinitions[] = $indexDef;
-                $property->setValue($blueprint, $indexDefinitions);
+                $blueprint->addIndexDefinition($indexDef);
             }
         }
     }

@@ -37,6 +37,30 @@ class Blueprint
     }
 
     /**
+     * Add an index definition to the blueprint.
+     */
+    public function addIndexDefinition(IndexDefinition $indexDefinition): void
+    {
+        $this->indexDefinitions[] = $indexDefinition;
+    }
+
+    /**
+     * Add a column to the blueprint.
+     */
+    public function addColumn(Column $column): void
+    {
+        $this->columns[] = $column;
+    }
+
+    /**
+     * Add a foreign key to the blueprint.
+     */
+    public function addForeignKey(ForeignKey $foreignKey): void
+    {
+        $this->foreignKeys[] = $foreignKey;
+    }
+
+    /**
      * Get the table name.
      */
     public function getTable(): string
@@ -572,7 +596,7 @@ class Blueprint
     public function primary(string|array $columns, ?string $name = null, ?string $algorithm = null): IndexDefinition
     {
         $columns = is_array($columns) ? $columns : [$columns];
-        $name ??= $this->table.'_'.implode('_', $columns).'_primary';
+        $name ??= $this->table . '_' . implode('_', $columns) . '_primary';
 
         $indexDef = new IndexDefinition('PRIMARY', $columns, $name);
         if ($algorithm !== null) {
@@ -592,7 +616,7 @@ class Blueprint
     public function unique(string|array $columns, ?string $name = null, ?string $algorithm = null): IndexDefinition
     {
         $columns = is_array($columns) ? $columns : [$columns];
-        $name ??= $this->table.'_'.implode('_', $columns).'_unique';
+        $name ??= $this->table . '_' . implode('_', $columns) . '_unique';
 
         $indexDef = new IndexDefinition('UNIQUE', $columns, $name);
         if ($algorithm !== null) {
@@ -612,7 +636,7 @@ class Blueprint
     public function index(string|array $columns, ?string $name = null, ?string $algorithm = null): IndexDefinition
     {
         $columns = is_array($columns) ? $columns : [$columns];
-        $name ??= $this->table.'_'.implode('_', $columns).'_index';
+        $name ??= $this->table . '_' . implode('_', $columns) . '_index';
 
         $indexDef = new IndexDefinition('INDEX', $columns, $name);
         if ($algorithm !== null) {
@@ -632,7 +656,7 @@ class Blueprint
     public function fullText(string|array $columns, ?string $name = null, ?string $algorithm = null): IndexDefinition
     {
         $columns = is_array($columns) ? $columns : [$columns];
-        $name ??= $this->table.'_'.implode('_', $columns).'_fulltext';
+        $name ??= $this->table . '_' . implode('_', $columns) . '_fulltext';
 
         $indexDef = new IndexDefinition('FULLTEXT', $columns, $name);
         if ($algorithm !== null) {
@@ -652,7 +676,7 @@ class Blueprint
     public function spatialIndex(string|array $columns, ?string $name = null, ?string $operatorClass = null): IndexDefinition
     {
         $columns = is_array($columns) ? $columns : [$columns];
-        $name ??= $this->table.'_'.implode('_', $columns).'_spatial';
+        $name ??= $this->table . '_' . implode('_', $columns) . '_spatial';
 
         $indexDef = new IndexDefinition('SPATIAL', $columns, $name);
         if ($operatorClass !== null) {
@@ -683,7 +707,7 @@ class Blueprint
     public function foreign(string|array $columns, ?string $name = null): ForeignKey
     {
         $columns = is_array($columns) ? $columns : [$columns];
-        $name ??= $this->table.'_'.implode('_', $columns).'_foreign';
+        $name ??= $this->table . '_' . implode('_', $columns) . '_foreign';
         $foreignKey = new ForeignKey($name, $columns, $this->table);
         $this->foreignKeys[] = $foreignKey;
 

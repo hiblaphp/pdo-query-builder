@@ -69,7 +69,7 @@ class SQLiteIndexCompiler extends IndexCompiler
         $statements[] = "DROP TABLE `{$table}`";
         $statements[] = "ALTER TABLE `{$tempTable}` RENAME TO `{$table}`";
 
-        $dropIndexNames = array_map(fn ($idx) => $idx[0], $blueprint->getDropIndexes());
+        $dropIndexNames = array_map(fn($idx) => $idx[0], $blueprint->getDropIndexes());
         foreach ($blueprint->getIndexDefinitions() as $indexDef) {
             $indexName = $indexDef->getName();
             if ($indexDef->getType() !== 'PRIMARY' && ! in_array($indexName, $dropIndexNames, true)) {
@@ -134,7 +134,7 @@ class SQLiteIndexCompiler extends IndexCompiler
             $this->addColumnToBlueprint($newBlueprint, $clonedColumn);
         }
 
-        $dropIndexNames = array_map(fn ($idx) => $idx[0], $originalBlueprint->getDropIndexes());
+        $dropIndexNames = array_map(fn($idx) => $idx[0], $originalBlueprint->getDropIndexes());
         foreach ($originalBlueprint->getIndexDefinitions() as $indexDef) {
             $indexName = $indexDef->getName() ?? 'PRIMARY';
             if (! in_array($indexName, $dropIndexNames, true)) {
@@ -281,34 +281,16 @@ class SQLiteIndexCompiler extends IndexCompiler
 
     private function addColumnToBlueprint(Blueprint $blueprint, Column $column): void
     {
-        $reflection = new \ReflectionClass($blueprint);
-        $property = $reflection->getProperty('columns');
-        $property->setAccessible(true);
-        /** @var array<int, Column> $columns */
-        $columns = $property->getValue($blueprint);
-        $columns[] = $column;
-        $property->setValue($blueprint, $columns);
+        $blueprint->addColumn($column);
     }
 
     private function addIndexDefinitionToBlueprint(Blueprint $blueprint, IndexDefinition $indexDef): void
     {
-        $reflection = new \ReflectionClass($blueprint);
-        $property = $reflection->getProperty('indexDefinitions');
-        $property->setAccessible(true);
-        /** @var array<int, IndexDefinition> $indexDefinitions */
-        $indexDefinitions = $property->getValue($blueprint);
-        $indexDefinitions[] = $indexDef;
-        $property->setValue($blueprint, $indexDefinitions);
+        $blueprint->addIndexDefinition($indexDef);
     }
 
     private function addForeignKeyToBlueprint(Blueprint $blueprint, ForeignKey $foreignKey): void
     {
-        $reflection = new \ReflectionClass($blueprint);
-        $property = $reflection->getProperty('foreignKeys');
-        $property->setAccessible(true);
-        /** @var array<int, ForeignKey> $foreignKeys */
-        $foreignKeys = $property->getValue($blueprint);
-        $foreignKeys[] = $foreignKey;
-        $property->setValue($blueprint, $foreignKeys);
+        $blueprint->addForeignKey($foreignKey);
     }
 }
