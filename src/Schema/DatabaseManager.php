@@ -7,9 +7,22 @@ namespace Hibla\PdoQueryBuilder\Schema;
 use Hibla\PdoQueryBuilder\Utilities\ConfigLoader;
 use PDO;
 
+/**
+ * @phpstan-type TConnectionConfig array{
+ *   driver: string,
+ *   host?: string,
+ *   port?: int|string,
+ *   database?: string,
+ *   username?: string,
+ *   password?: string,
+ *   charset?: string,
+ *   collation?: string
+ * }
+ */
 class DatabaseManager
 {
     private string $driver;
+    /** @var TConnectionConfig */
     private array $config;
 
     public function __construct()
@@ -18,28 +31,47 @@ class DatabaseManager
         $dbConfig = $configLoader->get('pdo-query-builder');
 
         if (! is_array($dbConfig)) {
-            throw new \RuntimeException('Invalid database configuration');
+            throw new \RuntimeException('Invalid database configuration format');
         }
 
         $defaultConnection = $dbConfig['default'] ?? 'mysql';
+        if (! is_string($defaultConnection)) {
+            throw new \RuntimeException('Default connection name must be a string');
+        }
+
         $connections = $dbConfig['connections'] ?? [];
-        $this->config = $connections[$defaultConnection] ?? [];
+        if (! is_array($connections)) {
+            throw new \RuntimeException('Connections configuration must be an array');
+        }
+
+        $config = $connections[$defaultConnection] ?? [];
+        if (! is_array($config)) {
+            throw new \RuntimeException("Configuration for '{$defaultConnection}' connection is invalid");
+        }
+
+        /** @var TConnectionConfig $config */
+        $this->config = $config;
         $this->driver = strtolower($this->config['driver'] ?? 'mysql');
     }
 
+    /**
+     * Create the configured database if it does not already exist.
+     *
+     * @throws \RuntimeException If the driver is unsupported or database creation fails.
+     */
     public function createDatabaseIfNotExists(): bool
     {
         $database = $this->config['database'] ?? null;
 
-        if (! $database) {
-            throw new \RuntimeException('Database name not specified in configuration');
+        if (! is_string($database) || $database === '') {
+            throw new \RuntimeException('Database name not specified or invalid in configuration');
         }
 
         try {
             return match ($this->driver) {
                 'mysql' => $this->createMySQLDatabase($database),
                 'pgsql' => $this->createPostgreSQLDatabase($database),
-                'sqlite' => $this->createSQLiteDatabase(),
+                'sqlite' => $this->createSQLiteDatabase($database),
                 'sqlsrv' => $this->createSQLServerDatabase($database),
                 default => throw new \RuntimeException("Unsupported driver: {$this->driver}"),
             };
@@ -71,9 +103,7 @@ class DatabaseManager
         $charset = $this->config['charset'] ?? 'utf8mb4';
         $collation = $this->config['collation'] ?? 'utf8mb4_unicode_ci';
 
-        $pdo->exec("CREATE DATABASE IF NOT EXISTS `{$database}` 
-                    CHARACTER SET {$charset} 
-                    COLLATE {$collation}");
+        $pdo->exec("CREATE DATABASE IF NOT EXISTS `{$database}` CHARACTER SET {$charset} COLLATE {$collation}");
 
         return true;
     }
@@ -93,20 +123,19 @@ class DatabaseManager
             [PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION]
         );
 
-        $stmt = $pdo->query("SELECT 1 FROM pg_database WHERE datname = '{$database}'");
+        $stmt = $pdo->prepare('SELECT 1 FROM pg_database WHERE datname = ?');
+        $stmt->execute([$database]);
         $exists = $stmt->fetchColumn();
 
-        if (! $exists) {
+        if ($exists === false) {
             $pdo->exec("CREATE DATABASE \"{$database}\"");
         }
 
         return true;
     }
 
-    private function createSQLiteDatabase(): bool
+    private function createSQLiteDatabase(string $database): bool
     {
-        $database = $this->config['database'] ?? '';
-
         if ($database === ':memory:') {
             return true;
         }
@@ -129,7 +158,7 @@ class DatabaseManager
         $dsn = sprintf(
             'sqlsrv:Server=%s,%s',
             $this->config['host'] ?? '127.0.0.1',
-            $this->config['port'] ?? 1433
+            (string) ($this->config['port'] ?? 1433)
         );
 
         $pdo = new PDO(
@@ -139,21 +168,25 @@ class DatabaseManager
             [PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION]
         );
 
-        $stmt = $pdo->query("SELECT database_id FROM sys.databases WHERE name = '{$database}'");
+        $stmt = $pdo->prepare('SELECT database_id FROM sys.databases WHERE name = ?');
+        $stmt->execute([$database]);
         $exists = $stmt->fetchColumn();
 
-        if (! $exists) {
+        if ($exists === false) {
             $pdo->exec("CREATE DATABASE [{$database}]");
         }
 
         return true;
     }
 
+    /**
+     * Check if the configured database exists.
+     */
     public function databaseExists(): bool
     {
         $database = $this->config['database'] ?? null;
 
-        if (! $database) {
+        if (! is_string($database) || $database === '') {
             return false;
         }
 
@@ -161,11 +194,11 @@ class DatabaseManager
             return match ($this->driver) {
                 'mysql' => $this->checkMySQLDatabase($database),
                 'pgsql' => $this->checkPostgreSQLDatabase($database),
-                'sqlite' => $this->checkSQLiteDatabase(),
+                'sqlite' => $this->checkSQLiteDatabase($database),
                 'sqlsrv' => $this->checkSQLServerDatabase($database),
                 default => false,
             };
-        } catch (\Throwable $e) {
+        } catch (\Throwable) {
             return false;
         }
     }
@@ -185,7 +218,8 @@ class DatabaseManager
             [PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION]
         );
 
-        $stmt = $pdo->query("SELECT SCHEMA_NAME FROM INFORMATION_SCHEMA.SCHEMATA WHERE SCHEMA_NAME = '{$database}'");
+        $stmt = $pdo->prepare('SELECT SCHEMA_NAME FROM INFORMATION_SCHEMA.SCHEMATA WHERE SCHEMA_NAME = ?');
+        $stmt->execute([$database]);
 
         return (bool) $stmt->fetchColumn();
     }
@@ -205,15 +239,16 @@ class DatabaseManager
             [PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION]
         );
 
-        $stmt = $pdo->query("SELECT 1 FROM pg_database WHERE datname = '{$database}'");
+        $stmt = $pdo->prepare('SELECT 1 FROM pg_database WHERE datname = ?');
+        $stmt->execute([$database]);
 
         return (bool) $stmt->fetchColumn();
     }
 
-    private function checkSQLiteDatabase(): bool
-    {
-        $database = $this->config['database'] ?? '';
 
+
+    private function checkSQLiteDatabase(string $database): bool
+    {
         return $database === ':memory:' || file_exists($database);
     }
 
@@ -222,7 +257,7 @@ class DatabaseManager
         $dsn = sprintf(
             'sqlsrv:Server=%s,%s',
             $this->config['host'] ?? '127.0.0.1',
-            $this->config['port'] ?? 1433
+            (string) ($this->config['port'] ?? 1433)
         );
 
         $pdo = new PDO(
@@ -232,7 +267,8 @@ class DatabaseManager
             [PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION]
         );
 
-        $stmt = $pdo->query("SELECT database_id FROM sys.databases WHERE name = '{$database}'");
+        $stmt = $pdo->prepare('SELECT database_id FROM sys.databases WHERE name = ?');
+        $stmt->execute([$database]);
 
         return (bool) $stmt->fetchColumn();
     }

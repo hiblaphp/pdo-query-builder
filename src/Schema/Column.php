@@ -7,6 +7,30 @@ namespace Hibla\PdoQueryBuilder\Schema;
 use Doctrine\Inflector\Inflector as DoctrineInflector;
 use Doctrine\Inflector\InflectorFactory;
 
+/**
+ * @phpstan-type TColumnIndex array{type: 'UNIQUE'|'INDEX'|'FULLTEXT'|'SPATIAL', name: string|null, algorithm: string|null, operatorClass?: string|null}
+ * @phpstan-type TColumnArray array{
+ *     name: string,
+ *     type: string,
+ *     length: int|null,
+ *     precision: int|null,
+ *     scale: int|null,
+ *     nullable: bool,
+ *     default: mixed,
+ *     hasDefault: bool,
+ *     unsigned: bool,
+ *     autoIncrement: bool,
+ *     primary: bool,
+ *     unique: bool,
+ *     comment: string|null,
+ *     after: string|null,
+ *     useCurrent: bool,
+ *     onUpdate: string|null,
+ *     enumValues: list<string>,
+ *     hasForeignKey: bool,
+ *     columnIndexes: list<TColumnIndex>
+ * }
+ */
 class Column
 {
     private string $name;
@@ -25,10 +49,12 @@ class Column
     private ?string $after = null;
     private bool $useCurrent = false;
     private ?string $onUpdate = null;
+    /** @var list<string> */
     private array $enumValues = [];
     private ?ForeignKey $foreignKey = null;
     private ?Blueprint $blueprint = null;
     private static ?DoctrineInflector $inflector = null;
+    /** @var list<TColumnIndex> */
     private array $columnIndexes = [];
 
     public function __construct(
@@ -45,6 +71,9 @@ class Column
         $this->scale = $scale;
     }
 
+    /**
+     * Get the singleton inflector instance.
+     */
     private static function getInflector(): DoctrineInflector
     {
         if (self::$inflector === null) {
@@ -55,7 +84,7 @@ class Column
     }
 
     /**
-     * Clone method to support column duplication during table recreation
+     * Clone the column instance.
      */
     public function __clone()
     {
@@ -66,11 +95,17 @@ class Column
         $this->blueprint = null;
     }
 
+    /**
+     * Get the column name.
+     */
     public function getName(): string
     {
         return $this->name;
     }
 
+    /**
+     * Set the column name.
+     */
     public function setName(string $name): self
     {
         $this->name = $name;
@@ -78,11 +113,17 @@ class Column
         return $this;
     }
 
+    /**
+     * Get the column type.
+     */
     public function getType(): string
     {
         return $this->type;
     }
 
+    /**
+     * Set the column type.
+     */
     public function setType(string $type): self
     {
         $this->type = $type;
@@ -90,11 +131,17 @@ class Column
         return $this;
     }
 
+    /**
+     * Get the column length.
+     */
     public function getLength(): ?int
     {
         return $this->length;
     }
 
+    /**
+     * Set the column length.
+     */
     public function setLength(?int $length): self
     {
         $this->length = $length;
@@ -102,11 +149,17 @@ class Column
         return $this;
     }
 
+    /**
+     * Get the column precision.
+     */
     public function getPrecision(): ?int
     {
         return $this->precision;
     }
 
+    /**
+     * Set the column precision.
+     */
     public function setPrecision(?int $precision): self
     {
         $this->precision = $precision;
@@ -114,11 +167,17 @@ class Column
         return $this;
     }
 
+    /**
+     * Get the column scale.
+     */
     public function getScale(): ?int
     {
         return $this->scale;
     }
 
+    /**
+     * Set the column scale.
+     */
     public function setScale(?int $scale): self
     {
         $this->scale = $scale;
@@ -126,84 +185,131 @@ class Column
         return $this;
     }
 
+    /**
+     * Check if the column is nullable.
+     */
     public function isNullable(): bool
     {
         return $this->nullable;
     }
 
+    /**
+     * Get the default value of the column.
+     */
     public function getDefault(): mixed
     {
         return $this->default;
     }
 
+    /**
+     * Check if the column has a default value.
+     */
     public function hasDefault(): bool
     {
         return $this->hasDefault;
     }
 
+    /**
+     * Check if the column is unsigned.
+     */
     public function isUnsigned(): bool
     {
         return $this->unsigned;
     }
 
+    /**
+     * Check if the column has auto-increment enabled.
+     */
     public function isAutoIncrement(): bool
     {
         return $this->autoIncrement;
     }
 
+    /**
+     * Check if the column is a primary key.
+     */
     public function isPrimary(): bool
     {
         return $this->primary;
     }
 
+    /**
+     * Check if the column has a unique constraint.
+     */
     public function isUnique(): bool
     {
         return $this->unique;
     }
 
+    /**
+     * Get the column comment.
+     */
     public function getComment(): ?string
     {
         return $this->comment;
     }
 
+    /**
+     * Get the column that this column should be placed "after".
+     */
     public function getAfter(): ?string
     {
         return $this->after;
     }
 
+    /**
+     * Check if the column should use the "current" timestamp.
+     */
     public function shouldUseCurrent(): bool
     {
         return $this->useCurrent;
     }
 
+    /**
+     * Get the "on update" action for the column.
+     */
     public function getOnUpdate(): ?string
     {
         return $this->onUpdate;
     }
 
+    /**
+     * Get the enum values for the column.
+     * @return list<string>
+     */
     public function getEnumValues(): array
     {
         return $this->enumValues;
     }
 
+    /**
+     * Get the foreign key constraint for the column.
+     */
     public function getForeignKey(): ?ForeignKey
     {
         return $this->foreignKey;
     }
 
+    /**
+     * Get the blueprint instance for the column.
+     */
     public function getBlueprint(): ?Blueprint
     {
         return $this->blueprint;
     }
 
     /**
-     * NEW: Get column indexes
+     * Get the indexes for the column.
+     * @return list<TColumnIndex>
      */
     public function getColumnIndexes(): array
     {
         return $this->columnIndexes;
     }
 
+    /**
+     * Allow the column to be nullable.
+     */
     public function nullable(bool $value = true): self
     {
         $this->nullable = $value;
@@ -211,6 +317,9 @@ class Column
         return $this;
     }
 
+    /**
+     * Set the default value for the column.
+     */
     public function default(mixed $value): self
     {
         $this->default = $value;
@@ -219,6 +328,9 @@ class Column
         return $this;
     }
 
+    /**
+     * Set the column as unsigned.
+     */
     public function unsigned(bool $value = true): self
     {
         $this->unsigned = $value;
@@ -226,6 +338,9 @@ class Column
         return $this;
     }
 
+    /**
+     * Set the column to auto-increment.
+     */
     public function autoIncrement(bool $value = true): self
     {
         $this->autoIncrement = $value;
@@ -233,6 +348,9 @@ class Column
         return $this;
     }
 
+    /**
+     * Set the column as a primary key.
+     */
     public function primary(bool $value = true): self
     {
         $this->primary = $value;
@@ -240,6 +358,9 @@ class Column
         return $this;
     }
 
+    /**
+     * Add a unique constraint to the column.
+     */
     public function unique(bool $value = true): self
     {
         $this->unique = $value;
@@ -254,6 +375,9 @@ class Column
         return $this;
     }
 
+    /**
+     * Add a comment to the column.
+     */
     public function comment(string $comment): self
     {
         $this->comment = $comment;
@@ -261,6 +385,9 @@ class Column
         return $this;
     }
 
+    /**
+     * Specify the column that this column should be placed "after".
+     */
     public function after(string $column): self
     {
         $this->after = $column;
@@ -268,6 +395,9 @@ class Column
         return $this;
     }
 
+    /**
+     * Set the column to use the current timestamp.
+     */
     public function useCurrent(bool $value = true): self
     {
         $this->useCurrent = $value;
@@ -275,6 +405,9 @@ class Column
         return $this;
     }
 
+    /**
+     * Specify an "on update" action for the column.
+     */
     public function onUpdate(string $value): self
     {
         $this->onUpdate = $value;
@@ -282,6 +415,10 @@ class Column
         return $this;
     }
 
+    /**
+     * Set the enum values for the column.
+     * @param list<string> $values
+     */
     public function setEnumValues(array $values): self
     {
         $this->enumValues = $values;
@@ -289,6 +426,9 @@ class Column
         return $this;
     }
 
+    /**
+     * Set the blueprint instance for the column.
+     */
     public function setBlueprint(Blueprint $blueprint): self
     {
         $this->blueprint = $blueprint;
@@ -297,10 +437,7 @@ class Column
     }
 
     /**
-     * Add a regular index to this column
-     *
-     * @param  string|null  $name  Optional index name
-     * @param  string|null  $algorithm  Optional algorithm (BTREE, HASH, NGRAM, etc.)
+     * Add a regular index to the column.
      */
     public function index(?string $name = null, ?string $algorithm = null): self
     {
@@ -314,10 +451,7 @@ class Column
     }
 
     /**
-     * Add a fulltext index to this column
-     *
-     * @param  string|null  $name  Optional index name
-     * @param  string|null  $algorithm  Optional parser (NGRAM, etc.)
+     * Add a full-text index to the column.
      */
     public function fullText(?string $name = null, ?string $algorithm = null): self
     {
@@ -331,26 +465,26 @@ class Column
     }
 
     /**
-     * Add a spatial index to this column
-     * Note: MySQL requires spatial indexed columns to be NOT NULL
-     *
-     * @param  string|null  $name  Optional index name
-     * @param  string|null  $operatorClass  Optional operator class (for PostgreSQL: gist, gin, spgist, brin)
+     * Add a spatial index to the column.
      */
     public function spatialIndex(?string $name = null, ?string $operatorClass = null): self
     {
         $this->columnIndexes[] = [
             'type' => 'SPATIAL',
             'name' => $name,
+            'algorithm' => null,
             'operatorClass' => $operatorClass,
         ];
 
         return $this;
     }
 
+    /**
+     * Add a foreign key constraint to the column.
+     */
     public function constrained(?string $table = null, string $column = 'id'): self
     {
-        if (! $this->blueprint) {
+        if ($this->blueprint === null) {
             throw new \RuntimeException('Blueprint reference not set on column');
         }
 
@@ -366,6 +500,9 @@ class Column
         return $this;
     }
 
+    /**
+     * Guess the table name for a foreign key constraint.
+     */
     private function guessTableName(): string
     {
         $name = $this->name;
@@ -377,63 +514,84 @@ class Column
         return self::getInflector()->pluralize($name);
     }
 
+    /**
+     * Add a "cascade on delete" action to the foreign key.
+     */
     public function cascadeOnDelete(): self
     {
-        if ($this->foreignKey) {
+        if ($this->foreignKey !== null) {
             $this->foreignKey->cascadeOnDelete();
         }
 
         return $this;
     }
 
+    /**
+     * Add a "cascade on update" action to the foreign key.
+     */
     public function cascadeOnUpdate(): self
     {
-        if ($this->foreignKey) {
+        if ($this->foreignKey !== null) {
             $this->foreignKey->cascadeOnUpdate();
         }
 
         return $this;
     }
 
+    /**
+     * Add a "set null on delete" action to the foreign key.
+     */
     public function nullOnDelete(): self
     {
-        if ($this->foreignKey) {
+        if ($this->foreignKey !== null) {
             $this->foreignKey->nullOnDelete();
         }
 
         return $this;
     }
 
+    /**
+     * Add a "restrict on delete" action to the foreign key.
+     */
     public function restrictOnDelete(): self
     {
-        if ($this->foreignKey) {
+        if ($this->foreignKey !== null) {
             $this->foreignKey->onDelete('RESTRICT');
         }
 
         return $this;
     }
 
+    /**
+     * Add a "restrict on update" action to the foreign key.
+     */
     public function restrictOnUpdate(): self
     {
-        if ($this->foreignKey) {
+        if ($this->foreignKey !== null) {
             $this->foreignKey->onUpdate('RESTRICT');
         }
 
         return $this;
     }
 
+    /**
+     * Add a "no action on delete" action to the foreign key.
+     */
     public function noActionOnDelete(): self
     {
-        if ($this->foreignKey) {
+        if ($this->foreignKey !== null) {
             $this->foreignKey->onDelete('NO ACTION');
         }
 
         return $this;
     }
 
+    /**
+     * Add a "no action on update" action to the foreign key.
+     */
     public function noActionOnUpdate(): self
     {
-        if ($this->foreignKey) {
+        if ($this->foreignKey !== null) {
             $this->foreignKey->onUpdate('NO ACTION');
         }
 
@@ -441,8 +599,7 @@ class Column
     }
 
     /**
-     * Create a new column instance from this column with a different name
-     * Useful for column renaming operations
+     * Create a new column instance from this column with a different name.
      */
     public function copyWithName(string $newName): self
     {
@@ -453,8 +610,8 @@ class Column
     }
 
     /**
-     * Create a new column instance with modified attributes
-     * Useful for column modification operations
+     * Create a new column instance with modified attributes.
+     * @param array<string, mixed> $modifications
      */
     public function copyWithModifications(array $modifications): self
     {
@@ -462,15 +619,15 @@ class Column
 
         foreach ($modifications as $attribute => $value) {
             match ($attribute) {
-                'type' => $column->setType($value),
-                'length' => $column->setLength($value),
-                'precision' => $column->setPrecision($value),
-                'scale' => $column->setScale($value),
-                'nullable' => $column->nullable($value),
+                'type' => is_string($value) ? $column->setType($value) : null,
+                'length' => (is_int($value) || $value === null) ? $column->setLength($value) : null,
+                'precision' => (is_int($value) || $value === null) ? $column->setPrecision($value) : null,
+                'scale' => (is_int($value) || $value === null) ? $column->setScale($value) : null,
+                'nullable' => is_bool($value) ? $column->nullable($value) : null,
                 'default' => $column->default($value),
-                'unsigned' => $column->unsigned($value),
-                'unique' => $column->unique($value),
-                'comment' => $column->comment($value),
+                'unsigned' => is_bool($value) ? $column->unsigned($value) : null,
+                'unique' => is_bool($value) ? $column->unique($value) : null,
+                'comment' => is_string($value) ? $column->comment($value) : null,
                 default => null,
             };
         }
@@ -479,8 +636,8 @@ class Column
     }
 
     /**
-     * Convert column to array representation
-     * Useful for debugging and serialization
+     * Convert the column to an array representation.
+     * @return TColumnArray
      */
     public function toArray(): array
     {
@@ -508,7 +665,8 @@ class Column
     }
 
     /**
-     * Create a column from array representation
+     * Create a column from an array representation.
+     * @param TColumnArray $data
      */
     public static function fromArray(array $data): self
     {
@@ -560,11 +718,11 @@ class Column
             $column->onUpdate($data['onUpdate']);
         }
 
-        if (! empty($data['enumValues'])) {
+        if (isset($data['enumValues']) && $data['enumValues'] !== []) {
             $column->setEnumValues($data['enumValues']);
         }
 
-        if (! empty($data['columnIndexes'])) {
+        if (isset($data['columnIndexes']) && $data['columnIndexes'] !== []) {
             $column->columnIndexes = $data['columnIndexes'];
         }
 

@@ -13,6 +13,11 @@ class MigrationRepository
     private string $table;
     private string $driver;
 
+    /**
+     * Create a new migration repository instance.
+     *
+     * @param string $table The name of the migrations table.
+     */
     public function __construct(string $table = 'migrations')
     {
         $this->table = $table;
@@ -30,10 +35,23 @@ class MigrationRepository
             }
 
             $defaultConnection = $dbConfig['default'] ?? 'mysql';
-            $connections = $dbConfig['connections'] ?? [];
-            $connectionConfig = $connections[$defaultConnection] ?? [];
+            if (! is_string($defaultConnection)) {
+                return 'mysql';
+            }
 
-            return strtolower($connectionConfig['driver'] ?? 'mysql');
+            $connections = $dbConfig['connections'] ?? [];
+            if (! is_array($connections)) {
+                return 'mysql';
+            }
+
+            $connectionConfig = $connections[$defaultConnection] ?? [];
+            if (! is_array($connectionConfig)) {
+                return 'mysql';
+            }
+
+            $driver = $connectionConfig['driver'] ?? 'mysql';
+
+            return is_string($driver) ? strtolower($driver) : 'mysql';
         } catch (\Throwable $e) {
             return 'mysql';
         }
@@ -49,6 +67,11 @@ class MigrationRepository
         };
     }
 
+    /**
+     * Create the migration repository data store.
+     *
+     * @return PromiseInterface<int> Resolves with the number of affected rows.
+     */
     public function createRepository(): PromiseInterface
     {
         $table = $this->quoteIdentifier($this->table);
@@ -84,6 +107,11 @@ class MigrationRepository
         return AsyncPDO::execute($sql, []);
     }
 
+    /**
+     * Get the list of completed migrations.
+     *
+     * @return PromiseInterface<array<int, array<string, mixed>>> Resolves with a list of migration records.
+     */
     public function getRan(): PromiseInterface
     {
         $table = $this->quoteIdentifier($this->table);
@@ -94,6 +122,12 @@ class MigrationRepository
         );
     }
 
+    /**
+     * Get the list of migrations that were part of the last batch.
+     *
+     * @param int $steps The number of batches to roll back.
+     * @return PromiseInterface<array<int, array<string, mixed>>> Resolves with a list of migration records.
+     */
     public function getMigrations(int $steps): PromiseInterface
     {
         $table = $this->quoteIdentifier($this->table);
@@ -106,6 +140,11 @@ class MigrationRepository
         return AsyncPDO::query($sql, [$steps]);
     }
 
+    /**
+     * Get the last migration batch.
+     *
+     * @return PromiseInterface<array<int, array<string, mixed>>> Resolves with a list of migration records.
+     */
     public function getLast(): PromiseInterface
     {
         $table = $this->quoteIdentifier($this->table);
@@ -116,6 +155,13 @@ class MigrationRepository
         );
     }
 
+    /**
+     * Log that a migration was run.
+     *
+     * @param string $file The migration file name.
+     * @param int $batch The batch number.
+     * @return PromiseInterface<int> Resolves with the number of affected rows.
+     */
     public function log(string $file, int $batch): PromiseInterface
     {
         $table = $this->quoteIdentifier($this->table);
@@ -126,6 +172,12 @@ class MigrationRepository
         );
     }
 
+    /**
+     * Remove a migration from the log.
+     *
+     * @param string $migration The migration file name.
+     * @return PromiseInterface<int> Resolves with the number of affected rows.
+     */
     public function delete(string $migration): PromiseInterface
     {
         $table = $this->quoteIdentifier($this->table);
@@ -136,6 +188,11 @@ class MigrationRepository
         );
     }
 
+    /**
+     * Get the next migration batch number.
+     *
+     * @return PromiseInterface<mixed> Resolves with the next batch number (int) or null.
+     */
     public function getNextBatchNumber(): PromiseInterface
     {
         $table = $this->quoteIdentifier($this->table);
@@ -146,6 +203,11 @@ class MigrationRepository
         );
     }
 
+    /**
+     * Determine if the migration repository exists.
+     *
+     * @return PromiseInterface<mixed> Resolves with the count (int) of matching tables.
+     */
     public function repositoryExists(): PromiseInterface
     {
         $sql = match ($this->driver) {

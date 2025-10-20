@@ -5,11 +5,8 @@ declare(strict_types=1);
 namespace Hibla\PdoQueryBuilder\Schema;
 
 use function Hibla\async;
-
 use Hibla\AsyncPDO\AsyncPDO;
-
 use function Hibla\await;
-
 use Hibla\PdoQueryBuilder\Utilities\ConfigLoader;
 use Hibla\Promise\Interfaces\PromiseInterface;
 
@@ -33,10 +30,22 @@ class SchemaBuilder
         }
 
         $defaultConnection = $dbConfig['default'] ?? 'mysql';
-        $connections = $dbConfig['connections'] ?? [];
-        $connectionConfig = $connections[$defaultConnection] ?? [];
+        if (! is_string($defaultConnection)) {
+            return 'mysql';
+        }
 
-        return strtolower($connectionConfig['driver'] ?? 'mysql');
+        $connections = $dbConfig['connections'] ?? [];
+        if (! is_array($connections)) {
+            return 'mysql';
+        }
+
+        $connectionConfig = $connections[$defaultConnection] ?? [];
+        if (! is_array($connectionConfig)) {
+            return 'mysql';
+        }
+        $driver = $connectionConfig['driver'] ?? 'mysql';
+
+        return is_string($driver) ? strtolower($driver) : 'mysql';
     }
 
     private function getSQLiteBuilder(): SQLiteSchemaBuilder
@@ -48,6 +57,11 @@ class SchemaBuilder
         return $this->sqliteBuilder;
     }
 
+    /**
+     * Create a new table on the schema.
+     *
+     * @return PromiseInterface<int|null>
+     */
     public function create(string $table, callable $callback): PromiseInterface
     {
         $blueprint = new Blueprint($table);
@@ -62,9 +76,15 @@ class SchemaBuilder
             return $this->getSQLiteBuilder()->handleCreate($sql);
         }
 
+        /** @phpstan-ignore-next-line */
         return AsyncPDO::execute($sql, []);
     }
 
+    /**
+     * Drop a table from the schema if it exists.
+     *
+     * @return PromiseInterface<int>
+     */
     public function dropIfExists(string $table): PromiseInterface
     {
         $compiler = $this->getCompiler();
@@ -73,6 +93,11 @@ class SchemaBuilder
         return AsyncPDO::execute($sql, []);
     }
 
+    /**
+     * Drop a table from the schema.
+     *
+     * @return PromiseInterface<int>
+     */
     public function drop(string $table): PromiseInterface
     {
         $compiler = $this->getCompiler();
@@ -81,6 +106,11 @@ class SchemaBuilder
         return AsyncPDO::execute($sql, []);
     }
 
+    /**
+     * Determine if the given table exists.
+     *
+     * @return PromiseInterface<mixed>
+     */
     public function hasTable(string $table): PromiseInterface
     {
         $compiler = $this->getCompiler();
@@ -89,6 +119,11 @@ class SchemaBuilder
         return AsyncPDO::fetchValue($sql, []);
     }
 
+    /**
+     * Modify a table on the schema.
+     *
+     * @return PromiseInterface<int|list<int>|null>
+     */
     public function table(string $table, callable $callback): PromiseInterface
     {
         $blueprint = new Blueprint($table);
@@ -99,18 +134,26 @@ class SchemaBuilder
         $compiler = $this->getCompiler();
 
         if ($this->driver === 'sqlite') {
+            /** @phpstan-ignore-next-line */
             return $this->getSQLiteBuilder()->handleTable($table, $blueprint);
         }
 
         $sql = $compiler->compileAlter($blueprint);
 
         if (is_array($sql)) {
-            return $this->executeMultiple($sql);
+            $statements = $this->toList($sql);
+            return $this->executeMultipleOrNull($statements);
         }
 
+        /** @phpstan-ignore-next-line */
         return AsyncPDO::execute($sql, []);
     }
 
+    /**
+     * Rename a table on the schema.
+     *
+     * @return PromiseInterface<int>
+     */
     public function rename(string $from, string $to): PromiseInterface
     {
         $compiler = $this->getCompiler();
@@ -119,6 +162,12 @@ class SchemaBuilder
         return AsyncPDO::execute($sql, []);
     }
 
+    /**
+     * Drop a column from a table.
+     *
+     * @param string|list<string> $columns
+     * @return PromiseInterface<int|list<int>|null>
+     */
     public function dropColumn(string $table, string|array $columns): PromiseInterface
     {
         $blueprint = new Blueprint($table);
@@ -127,18 +176,29 @@ class SchemaBuilder
         $compiler = $this->getCompiler();
 
         if ($this->driver === 'sqlite') {
+            /** @phpstan-ignore-next-line */
             return $this->getSQLiteBuilder()->handleDropColumn($table, $blueprint);
         }
 
         $sql = $compiler->compileAlter($blueprint);
 
         if (is_array($sql)) {
-            return empty($sql) ? async(function () {}) : $this->executeMultiple($sql);
+            if (count($sql) === 0) {
+                return $this->nullPromise();
+            }
+            $statements = $this->toList($sql);
+            return $this->executeMultipleOrNull($statements);
         }
 
+        /** @phpstan-ignore-next-line */
         return AsyncPDO::execute($sql, []);
     }
 
+    /**
+     * Rename a column on a table.
+     *
+     * @return PromiseInterface<int|list<int>>
+     */
     public function renameColumn(string $table, string $from, string $to): PromiseInterface
     {
         $blueprint = new Blueprint($table);
@@ -148,12 +208,20 @@ class SchemaBuilder
         $sql = $compiler->compileAlter($blueprint);
 
         if (is_array($sql)) {
-            return $this->executeMultiple($sql);
+            $statements = $this->toList($sql);
+            return $this->executeMultipleNoNull($statements);
         }
 
+        /** @phpstan-ignore-next-line */
         return AsyncPDO::execute($sql, []);
     }
 
+    /**
+     * Drop an index from a table.
+     *
+     * @param string|list<string> $index
+     * @return PromiseInterface<int|list<int>|null>
+     */
     public function dropIndex(string $table, string|array $index): PromiseInterface
     {
         $blueprint = new Blueprint($table);
@@ -162,18 +230,30 @@ class SchemaBuilder
         $compiler = $this->getCompiler();
 
         if ($this->driver === 'sqlite') {
+            /** @phpstan-ignore-next-line */
             return $this->getSQLiteBuilder()->handleDropIndex($table, $blueprint);
         }
 
         $sql = $compiler->compileAlter($blueprint);
 
         if (is_array($sql)) {
-            return empty($sql) ? async(function () {}) : $this->executeMultiple($sql);
+            if (count($sql) === 0) {
+                return $this->nullPromise();
+            }
+            $statements = $this->toList($sql);
+            return $this->executeMultipleOrNull($statements);
         }
 
+        /** @phpstan-ignore-next-line */
         return AsyncPDO::execute($sql, []);
     }
 
+    /**
+     * Drop a foreign key from a table.
+     *
+     * @param string|list<string> $foreignKey
+     * @return PromiseInterface<int|list<int>|null>
+     */
     public function dropForeign(string $table, string|array $foreignKey): PromiseInterface
     {
         $blueprint = new Blueprint($table);
@@ -182,24 +262,81 @@ class SchemaBuilder
         $compiler = $this->getCompiler();
 
         if ($this->driver === 'sqlite') {
+            /** @phpstan-ignore-next-line */
             return $this->getSQLiteBuilder()->handleDropForeign($table, $blueprint);
         }
 
         $sql = $compiler->compileAlter($blueprint);
 
         if (is_array($sql)) {
-            return empty($sql) ? async(function () {}) : $this->executeMultiple($sql);
+            if (count($sql) === 0) {
+                return $this->nullPromise();
+            }
+            $statements = $this->toList($sql);
+            return $this->executeMultipleOrNull($statements);
         }
 
+        /** @phpstan-ignore-next-line */
         return AsyncPDO::execute($sql, []);
     }
 
-    private function executeMultiple(array $statements): PromiseInterface
+    /**
+     * Convert array to a list type for PHPStan.
+     *
+     * @param array<mixed> $items
+     * @return list<string>
+     */
+    private function toList(array $items): array
     {
+        /** @var list<string> */
+        return array_values($items);
+    }
+
+    /**
+     * Create a null promise for empty operations.
+     *
+     * @return PromiseInterface<int|list<int>|null>
+     */
+    private function nullPromise(): PromiseInterface
+    {
+        /** @phpstan-ignore-next-line */
+        return async(static fn() => null);
+    }
+
+    /**
+     * Execute multiple SQL statements, returning list of results or null if empty.
+     *
+     * @param list<string> $statements
+     * @return PromiseInterface<int|list<int>|null>
+     */
+    private function executeMultipleOrNull(array $statements): PromiseInterface
+    {
+        /** @phpstan-ignore-next-line */
         return async(function () use ($statements) {
             $results = [];
             foreach ($statements as $sql) {
-                $results[] = await(AsyncPDO::execute($sql, []));
+                $result = await(AsyncPDO::execute($sql, []));
+                $results[] = $result;
+            }
+
+            return count($results) === 0 ? null : $results;
+        });
+    }
+
+    /**
+     * Execute multiple SQL statements, returning list of results.
+     *
+     * @param list<string> $statements
+     * @return PromiseInterface<int|list<int>>
+     */
+    private function executeMultipleNoNull(array $statements): PromiseInterface
+    {
+        /** @phpstan-ignore-next-line */
+        return async(function () use ($statements) {
+            $results = [];
+            foreach ($statements as $sql) {
+                $result = await(AsyncPDO::execute($sql, []));
+                $results[] = $result;
             }
 
             return $results;
@@ -218,21 +355,21 @@ class SchemaBuilder
     }
 
     /**
-     * Process column-level indexes and add them to blueprint
+     * Process column-level indexes and add them to the blueprint.
      */
     private function processColumnIndexes(Blueprint $blueprint): void
     {
         foreach ($blueprint->getColumns() as $column) {
             foreach ($column->getColumnIndexes() as $indexInfo) {
-                $indexName = $indexInfo['name'] ?? $blueprint->getTable().'_'.$column->getName().'_'.strtolower($indexInfo['type']);
+                $indexName = $indexInfo['name'] ?? $blueprint->getTable() . '_' . $column->getName() . '_' . strtolower($indexInfo['type']);
 
                 $indexDef = new IndexDefinition($indexInfo['type'], [$column->getName()], $indexName);
 
-                if ($indexInfo['algorithm'] ?? null) {
+                if (isset($indexInfo['algorithm'])) {
                     $indexDef->algorithm($indexInfo['algorithm']);
                 }
 
-                if ($indexInfo['operatorClass'] ?? null) {
+                if (isset($indexInfo['operatorClass'])) {
                     $indexDef->operatorClass($indexInfo['operatorClass']);
                 }
 
@@ -240,6 +377,11 @@ class SchemaBuilder
                 $property = $reflection->getProperty('indexDefinitions');
                 $property->setAccessible(true);
                 $indexDefinitions = $property->getValue($blueprint);
+
+                if (! is_array($indexDefinitions)) {
+                    continue;
+                }
+                /** @var list<IndexDefinition> $indexDefinitions */
                 $indexDefinitions[] = $indexDef;
                 $property->setValue($blueprint, $indexDefinitions);
             }
