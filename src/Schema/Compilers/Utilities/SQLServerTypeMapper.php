@@ -1,0 +1,40 @@
+<?php
+
+declare(strict_types=1);
+
+namespace Hibla\PdoQueryBuilder\Schema\Compilers\Utilities;
+
+use Hibla\PdoQueryBuilder\Schema\Column;
+
+/**
+ * SQLServer-specific type mapping
+ */
+class SQLServerTypeMapper extends ColumnTypeMapper
+{
+    public function mapType(string $type, Column $column): string
+    {
+        return match ($type) {
+            'BIGINT' => 'BIGINT',
+            'INT' => 'INT',
+            'MEDIUMINT' => 'SMALLINT',
+            'TINYINT' => 'TINYINT',
+            'SMALLINT' => 'SMALLINT',
+            'VARCHAR' => $column->getLength() ? "NVARCHAR({$column->getLength()})" : 'NVARCHAR(255)',
+            'TEXT', 'MEDIUMTEXT', 'LONGTEXT' => 'NVARCHAR(MAX)',
+            'DECIMAL' => $this->formatPrecisionScale('DECIMAL', $column),
+            'FLOAT' => 'FLOAT',
+            'DOUBLE' => 'FLOAT',
+            'DATETIME', 'TIMESTAMP' => 'DATETIME2',
+            'DATE' => 'DATE',
+            'JSON' => 'NVARCHAR(MAX)',
+            'BOOLEAN' => 'BIT',
+            'ENUM' => 'NVARCHAR(50)',
+            'POINT' => 'geometry',
+            'LINESTRING' => 'geometry',
+            'POLYGON' => 'geometry',
+            'GEOMETRY' => 'geometry',
+            'GEOGRAPHY' => 'geography',
+            default => $type,
+        };
+    }
+}
