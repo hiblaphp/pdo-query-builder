@@ -29,6 +29,11 @@ class Builder extends QueryBuilderBase
     private static bool $driverDetected = false;
 
     /**
+     * @var bool Whether to return results as objects
+     */
+    private bool $returnAsObject = false;
+
+    /**
      * Create a new AsyncQueryBuilder instance.
      *
      * @param  string  $table  The table name to query.
@@ -111,28 +116,78 @@ class Builder extends QueryBuilderBase
     }
 
     /**
+     * Set the query to return results as objects instead of arrays.
+     *
+     * @return static
+     */
+    public function toObject(): static
+    {
+        $clone = clone $this;
+        $clone->returnAsObject = true;
+
+        return $clone;
+    }
+
+    /**
+     * Set the query to return results as arrays instead of objects.
+     * Useful to override a previous toObject() call.
+     *
+     * @return static
+     */
+    public function toArray(): static
+    {
+        $clone = clone $this;
+        $clone->returnAsObject = false;
+
+        return $clone;
+    }
+
+    /**
+     * Convert array results to objects.
+     *
+     * @param  array<int, array<string, mixed>>  $results
+     * @return array<int, object>
+     */
+    private function convertToObjects(array $results): array
+    {
+        return array_map(static fn(array $row): object => (object) $row, $results);
+    }
+
+    /**
      * Execute the query and return all results.
      *
-     * @return PromiseInterface<array<int, array<string, mixed>>> A promise that resolves to the query results.
+     * @return PromiseInterface<array<int, array<string, mixed>>|array<int, object>>
      */
     public function get(): PromiseInterface
     {
         $sql = $this->buildSelectQuery();
 
-        return AsyncPDO::query($sql, $this->getCompiledBindings());
+        return async(function () use ($sql): array {
+            $results = await(AsyncPDO::query($sql, $this->getCompiledBindings()));
+
+            return $this->returnAsObject ? $this->convertToObjects($results) : $results;
+        });
     }
 
     /**
      * Get the first result from the query.
      *
-     * @return PromiseInterface<array<string, mixed>|false> A promise that resolves to the first result or false.
+     * @return PromiseInterface<array<string, mixed>|\stdClass|false>
      */
     public function first(): PromiseInterface
     {
         $instanceWithLimit = $this->limit(1);
         $sql = $instanceWithLimit->buildSelectQuery();
 
-        return AsyncPDO::fetchOne($sql, $instanceWithLimit->getCompiledBindings());
+        return async(function () use ($sql, $instanceWithLimit): array|\stdClass|false {
+            $result = await(AsyncPDO::fetchOne($sql, $instanceWithLimit->getCompiledBindings()));
+
+            if ($result === false) {
+                return false;
+            }
+
+            return $this->returnAsObject ? (object) $result : $result;
+        });
     }
 
     /**
@@ -140,7 +195,7 @@ class Builder extends QueryBuilderBase
      *
      * @param  mixed  $id  The ID value to search for.
      * @param  string  $column  The column name to search in.
-     * @return PromiseInterface<array<string, mixed>|false> A promise that resolves to the found record or false.
+     * @return PromiseInterface<array<string, mixed>|\stdClass|false>
      */
     public function find(mixed $id, string $column = 'id'): PromiseInterface
     {
@@ -152,13 +207,13 @@ class Builder extends QueryBuilderBase
      *
      * @param  mixed  $id  The ID value to search for.
      * @param  string  $column  The column name to search in.
-     * @return PromiseInterface<array<string, mixed>> A promise that resolves to the found record.
+     * @return PromiseInterface<array<string, mixed>|\stdClass>
      *
      * @throws \RuntimeException When no record is found.
      */
     public function findOrFail(mixed $id, string $column = 'id'): PromiseInterface
     {
-        return async(function () use ($id, $column): array {
+        return async(function () use ($id, $column): array|\stdClass {
             $result = await($this->find($id, $column));
             if ($result === null || $result === false) {
                 $idString = is_scalar($id) ? (string) $id : 'complex_type';
@@ -174,14 +229,52 @@ class Builder extends QueryBuilderBase
      * Get a single value from the first result.
      *
      * @param  string  $column  The column name to retrieve.
-     * @return PromiseInterface<mixed> A promise that resolves to the column value or null.
+     * @return PromiseInterface<mixed>
      */
     public function value(string $column): PromiseInterface
     {
         return async(function () use ($column): mixed {
             $result = await($this->select($column)->first());
 
-            return ($result !== false && isset($result[$column])) ? $result[$column] : null;
+            if ($result === false) {
+                return null;
+            }
+
+            if (is_array($result)) {
+                return $result[$column] ?? null;
+            }
+
+            return $result->$column ?? null;
+        });
+    }
+
+    /**
+     * Map the query results using a callback function.
+     *
+     * @param  callable(array<string, mixed>|object): mixed  $callback  The mapping function.
+     * @return PromiseInterface<array<int, mixed>>
+     */
+    public function map(callable $callback): PromiseInterface
+    {
+        return async(function () use ($callback): array {
+            $results = await($this->get());
+
+            return array_map($callback, $results);
+        });
+    }
+
+    /**
+     * Get the first result and map it using a callback function.
+     *
+     * @param  callable(array<string, mixed>|object): mixed  $callback  The mapping function.
+     * @return PromiseInterface<mixed|false>
+     */
+    public function firstMap(callable $callback): PromiseInterface
+    {
+        return async(function () use ($callback): mixed {
+            $result = await($this->first());
+
+            return $result !== false ? $callback($result) : false;
         });
     }
 
