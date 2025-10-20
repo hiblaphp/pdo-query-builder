@@ -8,6 +8,7 @@ use Hibla\PdoQueryBuilder\Schema\Blueprint;
 use Hibla\PdoQueryBuilder\Schema\Column;
 use Hibla\PdoQueryBuilder\Schema\Compilers\Utilities\SQLiteIndexCompiler;
 use Hibla\PdoQueryBuilder\Schema\Compilers\Utilities\SQLiteTypeMapper;
+use Hibla\PdoQueryBuilder\Schema\ForeignKey;
 use Hibla\PdoQueryBuilder\Schema\SchemaCompiler;
 
 class SQLiteSchemaCompiler implements SchemaCompiler
@@ -106,7 +107,7 @@ class SQLiteSchemaCompiler implements SchemaCompiler
         return " DEFAULT '{$escaped}'";
     }
 
-    private function compileForeignKey($foreignKey): string
+    private function compileForeignKey(ForeignKey $foreignKey): string
     {
         $cols = implode('`, `', $foreignKey->getColumns());
         $refCols = implode('`, `', $foreignKey->getReferenceColumns());

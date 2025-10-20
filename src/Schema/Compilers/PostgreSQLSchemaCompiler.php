@@ -11,10 +11,11 @@ use Hibla\PdoQueryBuilder\Schema\Compilers\Utilities\PostgreSQLForeignKeyCompile
 use Hibla\PdoQueryBuilder\Schema\Compilers\Utilities\PostgreSQLIndexCompiler;
 use Hibla\PdoQueryBuilder\Schema\Compilers\Utilities\PostgreSQLTypeMapper;
 use Hibla\PdoQueryBuilder\Schema\SchemaCompiler;
+use Hibla\PdoQueryBuilder\Schema\ForeignKey;
+use Hibla\PdoQueryBuilder\Schema\IndexDefinition;
 
 class PostgreSQLSchemaCompiler implements SchemaCompiler
 {
-    private bool $useConcurrentIndexes = false;
     private bool $useNotValidConstraints = false;
     private PostgreSQLTypeMapper $typeMapper;
     private PostgreSQLDefaultValueCompiler $defaultCompiler;
@@ -44,7 +45,7 @@ class PostgreSQLSchemaCompiler implements SchemaCompiler
         }
 
         foreach ($indexDefinitions as $indexDef) {
-            if (in_array($indexDef->getType(), ['PRIMARY', 'UNIQUE'])) {
+            if (in_array($indexDef->getType(), ['PRIMARY', 'UNIQUE'], true)) {
                 $columnDefinitions[] = '  '.$this->indexCompiler->compileIndexDefinition($indexDef);
             }
         }
@@ -82,6 +83,9 @@ class PostgreSQLSchemaCompiler implements SchemaCompiler
         return $sql;
     }
 
+    /**
+     * @return list<string>|string
+     */
     public function compileAlter(Blueprint $blueprint): string|array
     {
         $table = $blueprint->getTable();
@@ -100,22 +104,36 @@ class PostgreSQLSchemaCompiler implements SchemaCompiler
         return count($statements) === 1 ? $statements[0] : $statements;
     }
 
+    /**
+     * @param array<int, string> $columns
+     * @return list<string>
+     */
     private function compileDropColumns(string $table, array $columns): array
     {
-        return array_map(
-            fn ($col) => "ALTER TABLE \"{$table}\" DROP COLUMN IF EXISTS \"{$col}\"",
-            $columns
-        );
+        $statements = [];
+        foreach ($columns as $col) {
+            $statements[] = "ALTER TABLE \"{$table}\" DROP COLUMN IF EXISTS \"{$col}\"";
+        }
+        return $statements;
     }
 
+    /**
+     * @param array<int, string> $foreignKeys
+     * @return list<string>
+     */
     private function compileDropForeignKeys(string $table, array $foreignKeys): array
     {
-        return array_map(
-            fn ($fk) => "ALTER TABLE \"{$table}\" DROP CONSTRAINT IF EXISTS \"{$fk}\"",
-            $foreignKeys
-        );
+        $statements = [];
+        foreach ($foreignKeys as $fk) {
+            $statements[] = "ALTER TABLE \"{$table}\" DROP CONSTRAINT IF EXISTS \"{$fk}\"";
+        }
+        return $statements;
     }
 
+    /**
+     * @param list<list<string>> $indexes
+     * @return list<string>
+     */
     private function compileDropIndexes(string $table, array $indexes): array
     {
         $statements = [];
@@ -132,14 +150,23 @@ class PostgreSQLSchemaCompiler implements SchemaCompiler
         return $statements;
     }
 
+    /**
+     * @param array<int, array{from: string, to: string}> $renames
+     * @return list<string>
+     */
     private function compileRenameColumns(string $table, array $renames): array
     {
-        return array_map(
-            fn ($rename) => $this->compileRenameColumn(new Blueprint($table), $rename['from'], $rename['to']),
-            $renames
-        );
+        $statements = [];
+        foreach ($renames as $rename) {
+            $statements[] = $this->compileRenameColumn(new Blueprint($table), $rename['from'], $rename['to']);
+        }
+        return $statements;
     }
 
+    /**
+     * @param array<int, Column> $columns
+     * @return list<string>
+     */
     private function compileModifyColumns(string $table, array $columns): array
     {
         $statements = [];
@@ -150,6 +177,10 @@ class PostgreSQLSchemaCompiler implements SchemaCompiler
         return $statements;
     }
 
+    /**
+     * @param array<int, Column> $columns
+     * @return list<string>
+     */
     private function compileAddColumns(string $table, array $columns): array
     {
         $statements = [];
@@ -160,6 +191,10 @@ class PostgreSQLSchemaCompiler implements SchemaCompiler
         return $statements;
     }
 
+    /**
+     * @param array<int, IndexDefinition> $indexes
+     * @return list<string>
+     */
     private function compileAddIndexes(string $table, array $indexes): array
     {
         $statements = [];
@@ -170,6 +205,10 @@ class PostgreSQLSchemaCompiler implements SchemaCompiler
         return $statements;
     }
 
+    /**
+     * @param array<int, ForeignKey> $foreignKeys
+     * @return list<string>
+     */
     private function compileAddForeignKeys(string $table, array $foreignKeys): array
     {
         $statements = [];
@@ -184,11 +223,15 @@ class PostgreSQLSchemaCompiler implements SchemaCompiler
         return $statements;
     }
 
+    /**
+     * @param array<int, array{type: string, to?: string}> $commands
+     * @return list<string>
+     */
     private function compileRenameTable(string $table, array $commands): array
     {
         $statements = [];
         foreach ($commands as $command) {
-            if ($command['type'] === 'rename') {
+            if ($command['type'] === 'rename' && isset($command['to']) && is_string($command['to'])) {
                 $statements[] = $this->compileRename($table, $command['to']);
             }
         }
@@ -228,7 +271,10 @@ class PostgreSQLSchemaCompiler implements SchemaCompiler
     public function compileDropColumn(Blueprint $blueprint, array $columns): string
     {
         $table = $blueprint->getTable();
-        $drops = array_map(fn ($col) => "DROP COLUMN IF EXISTS \"{$col}\"", $columns);
+        $drops = [];
+        foreach ($columns as $col) {
+            $drops[] = "DROP COLUMN IF EXISTS \"{$col}\"";
+        }
 
         return "ALTER TABLE \"{$table}\" ".implode(', ', $drops);
     }

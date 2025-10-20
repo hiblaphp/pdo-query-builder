@@ -19,7 +19,7 @@ class PostgreSQLTypeMapper extends ColumnTypeMapper
             'MEDIUMINT' => $column->isAutoIncrement() ? 'SERIAL' : 'INTEGER',
             'TINYINT' => $column->getLength() === 1 ? 'BOOLEAN' : 'SMALLINT',
             'SMALLINT' => $column->isAutoIncrement() ? 'SMALLSERIAL' : 'SMALLINT',
-            'VARCHAR' => $column->getLength() ? "VARCHAR({$column->getLength()})" : 'VARCHAR',
+            'VARCHAR' => $column->getLength() !== null ? "VARCHAR({$column->getLength()})" : 'VARCHAR',
             'TEXT', 'MEDIUMTEXT', 'LONGTEXT' => 'TEXT',
             'DECIMAL' => $this->formatPrecisionScale('DECIMAL', $column),
             'FLOAT' => 'REAL',

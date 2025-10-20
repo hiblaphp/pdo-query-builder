@@ -179,7 +179,6 @@ class SQLiteSchemaBuilder
      */
     private function executeStatements(array $statements): PromiseInterface
     {
-        /** @phpstan-ignore-next-line */
         return async(function () use ($statements) {
             try {
                 foreach ($statements as $statement) {
@@ -206,7 +205,6 @@ class SQLiteSchemaBuilder
      */
     private function executeMultiple(array $statements): PromiseInterface
     {
-        /** @phpstan-ignore-next-line */
         return async(function () use ($statements) {
             $results = [];
             foreach ($statements as $sql) {

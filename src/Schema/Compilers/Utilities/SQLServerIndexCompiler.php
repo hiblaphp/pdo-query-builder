@@ -84,6 +84,9 @@ class SQLServerIndexCompiler extends IndexCompiler
             "  RAISERROR('Table [{$table}] must have a clustered primary key before creating spatial index', 16, 1)";
     }
 
+    /**
+     * @return array<int, string>
+     */
     public function compileAddIndexDefinition(string $table, IndexDefinition $indexDef): array
     {
         $type = $indexDef->getType();
@@ -112,15 +115,19 @@ class SQLServerIndexCompiler extends IndexCompiler
         return $statements;
     }
 
+    /**
+     * @param array<int, array<int, string>> $indexes
+     * @return array<int, string>
+     */
     public function compileDropIndexes(string $table, array $indexes): array
     {
         $statements = [];
         foreach ($indexes as $index) {
-            if ($index[0] === 'PRIMARY') {
+            $indexName = $index[0];
+            if ($indexName === 'PRIMARY') {
                 $statements[] = "IF EXISTS (SELECT * FROM sys.key_constraints WHERE name = 'PK_{$table}' AND parent_object_id = OBJECT_ID('[{$table}]'))\n".
                     "ALTER TABLE [{$table}] DROP CONSTRAINT [PK_{$table}]";
             } else {
-                $indexName = $index[0];
                 $statements[] = "IF EXISTS (SELECT * FROM sys.indexes WHERE name = '{$indexName}' AND object_id = OBJECT_ID('[{$table}]'))\n".
                     "DROP INDEX [{$indexName}] ON [{$table}]";
             }

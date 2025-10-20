@@ -6,6 +6,8 @@ namespace Hibla\PdoQueryBuilder\Schema\Compilers\Utilities;
 
 use Hibla\PdoQueryBuilder\Schema\Blueprint;
 use Hibla\PdoQueryBuilder\Schema\Column;
+use Hibla\PdoQueryBuilder\Schema\SchemaCompiler;
+use Hibla\PdoQueryBuilder\Schema\ForeignKey;
 use Hibla\PdoQueryBuilder\Schema\IndexDefinition;
 
 class SQLiteIndexCompiler extends IndexCompiler
@@ -17,6 +19,10 @@ class SQLiteIndexCompiler extends IndexCompiler
         $this->closeQuote = '`';
     }
 
+    /**
+     * @param array<int, IndexDefinition> $indexDefs
+     * @return array<int, string>
+     */
     public function compileAddIndexDefinition(string $table, array $indexDefs): array
     {
         $statements = [];
@@ -30,7 +36,7 @@ class SQLiteIndexCompiler extends IndexCompiler
 
             if ($type === 'UNIQUE') {
                 $statements[] = "CREATE UNIQUE INDEX IF NOT EXISTS `{$indexDef->getName()}` ON `{$table}` (`{$cols}`)";
-            } elseif (in_array($type, ['INDEX', 'FULLTEXT', 'SPATIAL'])) {
+            } elseif (in_array($type, ['INDEX', 'FULLTEXT', 'SPATIAL'], true)) {
                 $statements[] = "CREATE INDEX IF NOT EXISTS `{$indexDef->getName()}` ON `{$table}` (`{$cols}`)";
             }
         }
@@ -38,10 +44,14 @@ class SQLiteIndexCompiler extends IndexCompiler
         return $statements;
     }
 
-    public function compileTableRecreation(Blueprint $blueprint, array $existingTableColumns, $compiler): array
+    /**
+     * @param array<int, array<string, mixed>> $existingTableColumns
+     * @return array<int, string>
+     */
+    public function compileTableRecreation(Blueprint $blueprint, array $existingTableColumns, SchemaCompiler $compiler): array
     {
         $table = $blueprint->getTable();
-        $tempTable = "temp_{$table}_".bin2hex(random_bytes(4));
+        $tempTable = "temp_{$table}_" . bin2hex(random_bytes(4));
 
         $statements = [];
         $statements[] = 'PRAGMA foreign_keys=OFF';
@@ -50,7 +60,7 @@ class SQLiteIndexCompiler extends IndexCompiler
         $statements[] = $compiler->compileCreate($newBlueprint);
 
         $transferInfo = $this->getTransferColumns($blueprint, $existingTableColumns);
-        if (! empty($transferInfo['old']) && ! empty($transferInfo['new'])) {
+        if ($transferInfo['old'] !== [] && $transferInfo['new'] !== []) {
             $oldCols = implode('`, `', $transferInfo['old']);
             $newCols = implode('`, `', $transferInfo['new']);
             $statements[] = "INSERT INTO `{$tempTable}` (`{$newCols}`) SELECT `{$oldCols}` FROM `{$table}`";
@@ -59,10 +69,10 @@ class SQLiteIndexCompiler extends IndexCompiler
         $statements[] = "DROP TABLE `{$table}`";
         $statements[] = "ALTER TABLE `{$tempTable}` RENAME TO `{$table}`";
 
-        $dropIndexNames = array_map(fn ($idx) => $idx[0], $blueprint->getDropIndexes());
+        $dropIndexNames = array_map(fn($idx) => $idx[0], $blueprint->getDropIndexes());
         foreach ($blueprint->getIndexDefinitions() as $indexDef) {
             $indexName = $indexDef->getName();
-            if ($indexDef->getType() !== 'PRIMARY' && ! in_array($indexName, $dropIndexNames)) {
+            if ($indexDef->getType() !== 'PRIMARY' && ! in_array($indexName, $dropIndexNames, true)) {
                 $indexStatements = $this->compileAddIndexDefinition($table, [$indexDef]);
                 $statements = array_merge($statements, $indexStatements);
             }
@@ -74,6 +84,9 @@ class SQLiteIndexCompiler extends IndexCompiler
         return $statements;
     }
 
+    /**
+     * @param array<int, array<string, mixed>> $existingTableColumns
+     */
     private function buildNewBlueprint(Blueprint $originalBlueprint, string $newTableName, array $existingTableColumns): Blueprint
     {
         $newBlueprint = new Blueprint($newTableName);
@@ -83,9 +96,13 @@ class SQLiteIndexCompiler extends IndexCompiler
         $modifyMap = $this->getModifyMap($originalBlueprint->getModifyColumns());
 
         foreach ($existingTableColumns as $existingCol) {
+            if (!isset($existingCol['name']) || !is_string($existingCol['name'])) {
+                continue;
+            }
+
             $columnName = $existingCol['name'];
 
-            if (in_array($columnName, $dropColumns)) {
+            if (in_array($columnName, $dropColumns, true)) {
                 continue;
             }
 
@@ -117,17 +134,17 @@ class SQLiteIndexCompiler extends IndexCompiler
             $this->addColumnToBlueprint($newBlueprint, $clonedColumn);
         }
 
-        $dropIndexNames = array_map(fn ($idx) => $idx[0], $originalBlueprint->getDropIndexes());
+        $dropIndexNames = array_map(fn($idx) => $idx[0], $originalBlueprint->getDropIndexes());
         foreach ($originalBlueprint->getIndexDefinitions() as $indexDef) {
             $indexName = $indexDef->getName() ?? 'PRIMARY';
-            if (! in_array($indexName, $dropIndexNames)) {
+            if (! in_array($indexName, $dropIndexNames, true)) {
                 $this->addIndexDefinitionToBlueprint($newBlueprint, $indexDef);
             }
         }
 
         $dropForeignKeys = $originalBlueprint->getDropForeignKeys();
         foreach ($originalBlueprint->getForeignKeys() as $foreignKey) {
-            if (! in_array($foreignKey->getName(), $dropForeignKeys)) {
+            if (! in_array($foreignKey->getName(), $dropForeignKeys, true)) {
                 $this->addForeignKeyToBlueprint($newBlueprint, $foreignKey);
             }
         }
@@ -135,21 +152,33 @@ class SQLiteIndexCompiler extends IndexCompiler
         return $newBlueprint;
     }
 
+    /**
+     * @param array<string, mixed> $pragmaRow
+     */
     private function createColumnFromPragma(array $pragmaRow): Column
     {
-        $column = new Column($pragmaRow['name'], $this->mapSqliteTypeToGeneric($pragmaRow['type']));
+        $name = $pragmaRow['name'] ?? '';
+        $type = $pragmaRow['type'] ?? 'TEXT';
 
-        if ($pragmaRow['notnull'] == 0) {
+        if (!is_string($name) || !is_string($type)) {
+            throw new \InvalidArgumentException('Invalid pragma row data');
+        }
+
+        $column = new Column($name, $this->mapSqliteTypeToGeneric($type));
+
+        $notnull = $pragmaRow['notnull'] ?? 1;
+        if (is_int($notnull) && $notnull === 0) {
             $column->nullable();
         }
 
-        if ($pragmaRow['dflt_value'] !== null) {
+        if (isset($pragmaRow['dflt_value']) && is_string($pragmaRow['dflt_value'])) {
             $column->default($this->parseDefaultValue($pragmaRow['dflt_value']));
         }
 
-        if ($pragmaRow['pk'] == 1) {
+        $pk = $pragmaRow['pk'] ?? 0;
+        if (is_int($pk) && $pk === 1) {
             $column->primary();
-            if (stripos($pragmaRow['type'], 'INTEGER') !== false) {
+            if (stripos($type, 'INTEGER') !== false) {
                 $column->autoIncrement();
             }
         }
@@ -174,12 +203,13 @@ class SQLiteIndexCompiler extends IndexCompiler
 
     private function parseDefaultValue(string $value): mixed
     {
-        if (preg_match("/^'(.*)'$/", $value, $matches)) {
+        if (preg_match("/^'(.*)'$/", $value, $matches) !== 0) {
             return $matches[1];
         }
 
         if (is_numeric($value)) {
-            return strpos($value, '.') !== false ? (float) $value : (int) $value;
+            $pos = strpos($value, '.');
+            return ($pos !== false) ? (float) $value : (int) $value;
         }
 
         if (strtoupper($value) === 'NULL') {
@@ -189,6 +219,10 @@ class SQLiteIndexCompiler extends IndexCompiler
         return $value;
     }
 
+    /**
+     * @param array<int, array<string, mixed>> $existingTableColumns
+     * @return array<string, array<int, string>>
+     */
     private function getTransferColumns(Blueprint $blueprint, array $existingTableColumns): array
     {
         $oldColumns = [];
@@ -197,9 +231,13 @@ class SQLiteIndexCompiler extends IndexCompiler
         $renameMap = $this->getRenameMap($blueprint->getRenameColumns());
 
         foreach ($existingTableColumns as $existingCol) {
+            if (!isset($existingCol['name']) || !is_string($existingCol['name'])) {
+                continue;
+            }
+
             $columnName = $existingCol['name'];
 
-            if (in_array($columnName, $dropColumns)) {
+            if (in_array($columnName, $dropColumns, true)) {
                 continue;
             }
 
@@ -210,16 +248,26 @@ class SQLiteIndexCompiler extends IndexCompiler
         return ['old' => $oldColumns, 'new' => $newColumns];
     }
 
+    /**
+     * @param array<int, array<string, string>> $renameColumns
+     * @return array<string, string>
+     */
     private function getRenameMap(array $renameColumns): array
     {
         $map = [];
         foreach ($renameColumns as $rename) {
-            $map[$rename['from']] = $rename['to'];
+            if (isset($rename['from'], $rename['to']) && is_string($rename['from']) && is_string($rename['to'])) {
+                $map[$rename['from']] = $rename['to'];
+            }
         }
 
         return $map;
     }
 
+    /**
+     * @param array<int, Column> $modifyColumns
+     * @return array<string, Column>
+     */
     private function getModifyMap(array $modifyColumns): array
     {
         $map = [];
@@ -235,6 +283,7 @@ class SQLiteIndexCompiler extends IndexCompiler
         $reflection = new \ReflectionClass($blueprint);
         $property = $reflection->getProperty('columns');
         $property->setAccessible(true);
+        /** @var array<int, Column> $columns */
         $columns = $property->getValue($blueprint);
         $columns[] = $column;
         $property->setValue($blueprint, $columns);
@@ -245,16 +294,18 @@ class SQLiteIndexCompiler extends IndexCompiler
         $reflection = new \ReflectionClass($blueprint);
         $property = $reflection->getProperty('indexDefinitions');
         $property->setAccessible(true);
+        /** @var array<int, IndexDefinition> $indexDefinitions */
         $indexDefinitions = $property->getValue($blueprint);
         $indexDefinitions[] = $indexDef;
         $property->setValue($blueprint, $indexDefinitions);
     }
 
-    private function addForeignKeyToBlueprint(Blueprint $blueprint, $foreignKey): void
+    private function addForeignKeyToBlueprint(Blueprint $blueprint, ForeignKey $foreignKey): void
     {
         $reflection = new \ReflectionClass($blueprint);
         $property = $reflection->getProperty('foreignKeys');
         $property->setAccessible(true);
+        /** @var array<int, ForeignKey> $foreignKeys */
         $foreignKeys = $property->getValue($blueprint);
         $foreignKeys[] = $foreignKey;
         $property->setValue($blueprint, $foreignKeys);

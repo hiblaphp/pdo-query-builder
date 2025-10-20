@@ -11,6 +11,9 @@ use Hibla\PdoQueryBuilder\Schema\Column;
  */
 class ColumnTypeMapper
 {
+    /**
+     * @var array<string, string>
+     */
     protected array $typeMap = [];
 
     public function mapType(string $type, Column $column): string
@@ -30,6 +33,6 @@ class ColumnTypeMapper
 
     protected function isAutoIncrementType(string $type, Column $column): bool
     {
-        return $column->isAutoIncrement() && in_array($type, ['BIGINT', 'INT', 'MEDIUMINT', 'SMALLINT']);
+        return $column->isAutoIncrement() && in_array($type, ['BIGINT', 'INT', 'MEDIUMINT', 'SMALLINT'], true);
     }
 }

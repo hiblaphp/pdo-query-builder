@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace Hibla\PdoQueryBuilder\Schema\Compilers\Utilities;
 
+use Hibla\PdoQueryBuilder\Schema\ForeignKey;
+
 class SQLServerForeignKeyCompiler extends ForeignKeyCompiler
 {
     public function __construct()
@@ -13,7 +15,7 @@ class SQLServerForeignKeyCompiler extends ForeignKeyCompiler
         $this->closeQuote = ']';
     }
 
-    public function compile($foreignKey): string
+    public function compile(ForeignKey $foreignKey): string
     {
         $cols = implode($this->columnDelimiter, $foreignKey->getColumns());
         $refCols = implode($this->columnDelimiter, $foreignKey->getReferenceColumns());
@@ -21,15 +23,17 @@ class SQLServerForeignKeyCompiler extends ForeignKeyCompiler
         $sql = "CONSTRAINT [{$foreignKey->getName()}] FOREIGN KEY ([{$cols}]) ".
             "REFERENCES [{$foreignKey->getReferenceTable()}] ([{$refCols}])";
 
-        if ($foreignKey->getOnDelete()) {
-            $action = $this->normalizeAction($foreignKey->getOnDelete());
+        $onDelete = $foreignKey->getOnDelete();
+        if ($onDelete !== '') {
+            $action = $this->normalizeAction($onDelete);
             if ($action !== 'NO ACTION') {
                 $sql .= " ON DELETE {$action}";
             }
         }
 
-        if ($foreignKey->getOnUpdate()) {
-            $action = $this->normalizeAction($foreignKey->getOnUpdate());
+        $onUpdate = $foreignKey->getOnUpdate();
+        if ($onUpdate !== '') {
+            $action = $this->normalizeAction($onUpdate);
             if ($action !== 'NO ACTION') {
                 $sql .= " ON UPDATE {$action}";
             }

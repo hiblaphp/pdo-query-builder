@@ -30,6 +30,7 @@ class PostgreSQLIndexCompiler extends IndexCompiler
 
     /**
      * Add index to existing table - returns array of statements
+     * @return list<string>
      */
     public function compileAddIndexDefinition(string $table, IndexDefinition $indexDef): array
     {
@@ -49,9 +50,11 @@ class PostgreSQLIndexCompiler extends IndexCompiler
         } elseif ($type === 'INDEX') {
             $cols = $this->getColumnsList($indexDef);
             $sql = "CREATE INDEX IF NOT EXISTS \"{$indexDef->getName()}\" ON \"{$table}\" (\"{$cols}\")";
-            if ($indexDef->getAlgorithm()) {
-                $algo = strtoupper($indexDef->getAlgorithm());
-                if (in_array($algo, ['BTREE', 'HASH', 'GIST', 'GIN', 'BRIN'])) {
+            
+            $algorithm = $indexDef->getAlgorithm();
+            if ($algorithm !== null) {
+                $algo = strtoupper($algorithm);
+                if (in_array($algo, ['BTREE', 'HASH', 'GIST', 'GIN', 'BRIN'], true)) {
                     $sql .= " USING {$algo}";
                 }
             }
@@ -62,7 +65,7 @@ class PostgreSQLIndexCompiler extends IndexCompiler
     }
 
     /**
-     * PostgreSQL-specific fulltext index creation
+     * @return list<string>
      */
     protected function compileFulltextIndexStatements(string $table, IndexDefinition $indexDef): array
     {
@@ -73,7 +76,7 @@ class PostgreSQLIndexCompiler extends IndexCompiler
     }
 
     /**
-     * PostgreSQL-specific spatial index creation
+     * @return list<string>
      */
     protected function compileSpatialIndexStatements(string $table, IndexDefinition $indexDef): array
     {
@@ -84,6 +87,9 @@ class PostgreSQLIndexCompiler extends IndexCompiler
         return ["CREATE INDEX IF NOT EXISTS \"{$name}\" ON \"{$table}\" USING {$operatorClass} (\"{$cols}\")"];
     }
 
+    /**
+     * @return list<string>
+     */
     public function compileAddColumn(string $table, Column $column): array
     {
         $statements = [];
@@ -104,14 +110,18 @@ class PostgreSQLIndexCompiler extends IndexCompiler
             $statements[] = "ALTER TABLE \"{$table}\" ALTER COLUMN \"{$column->getName()}\" SET DEFAULT CURRENT_TIMESTAMP";
         }
 
-        if ($column->getComment() !== null) {
-            $comment = addslashes($column->getComment());
-            $statements[] = "COMMENT ON COLUMN \"{$table}\".\"{$column->getName()}\" IS '{$comment}'";
+        $comment = $column->getComment();
+        if ($comment !== null) {
+            $escapedComment = addslashes($comment);
+            $statements[] = "COMMENT ON COLUMN \"{$table}\".\"{$column->getName()}\" IS '{$escapedComment}'";
         }
 
         return $statements;
     }
 
+    /**
+     * @return list<string>
+     */
     public function compileModifyColumn(string $table, Column $column): array
     {
         $statements = [];

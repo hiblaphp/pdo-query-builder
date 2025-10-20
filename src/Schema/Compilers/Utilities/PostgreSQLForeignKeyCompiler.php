@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace Hibla\PdoQueryBuilder\Schema\Compilers\Utilities;
 
+use Hibla\PdoQueryBuilder\Schema\ForeignKey;
+
 class PostgreSQLForeignKeyCompiler extends ForeignKeyCompiler
 {
     public function __construct()
@@ -13,7 +15,7 @@ class PostgreSQLForeignKeyCompiler extends ForeignKeyCompiler
         $this->closeQuote = '"';
     }
 
-    public function compile($foreignKey, bool $notValid = false): string
+    public function compile(ForeignKey $foreignKey, bool $notValid = false): string
     {
         $sql = parent::compile($foreignKey);
 

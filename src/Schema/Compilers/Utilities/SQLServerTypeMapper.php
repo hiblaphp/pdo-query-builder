@@ -19,7 +19,7 @@ class SQLServerTypeMapper extends ColumnTypeMapper
             'MEDIUMINT' => 'SMALLINT',
             'TINYINT' => 'TINYINT',
             'SMALLINT' => 'SMALLINT',
-            'VARCHAR' => $column->getLength() ? "NVARCHAR({$column->getLength()})" : 'NVARCHAR(255)',
+            'VARCHAR' => $column->getLength() !== null ? "NVARCHAR({$column->getLength()})" : 'NVARCHAR(255)',
             'TEXT', 'MEDIUMTEXT', 'LONGTEXT' => 'NVARCHAR(MAX)',
             'DECIMAL' => $this->formatPrecisionScale('DECIMAL', $column),
             'FLOAT' => 'FLOAT',

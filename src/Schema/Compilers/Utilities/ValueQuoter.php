@@ -20,7 +20,7 @@ class ValueQuoter
 
     public function quote(string $value): string
     {
-        if ($this->connection) {
+        if ($this->connection !== null) {
             return $this->connection->quote($value);
         }
 

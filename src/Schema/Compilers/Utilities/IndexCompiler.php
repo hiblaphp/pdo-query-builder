@@ -33,8 +33,11 @@ class IndexCompiler
         return implode($this->columnDelimiter, $indexDef->getColumns());
     }
 
-    protected function quoteName(string $name): string
+    protected function quoteName(?string $name): string
     {
+        if ($name === null) {
+            return '';
+        }
         return $this->openQuote.$name.$this->closeQuote;
     }
 

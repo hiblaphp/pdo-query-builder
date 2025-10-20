@@ -20,7 +20,7 @@ class PostgreSQLDefaultValueCompiler extends DefaultValueCompiler
         }
 
         if (is_bool($default)) {
-            if ($column && $column->getType() === 'TINYINT' && $column->getLength() === 1) {
+            if ($column !== null && $column->getType() === 'TINYINT' && $column->getLength() === 1) {
                 return $default ? 'true' : 'false';
             }
 
@@ -28,13 +28,17 @@ class PostgreSQLDefaultValueCompiler extends DefaultValueCompiler
         }
 
         if (is_numeric($default)) {
-            if ($column && $column->getType() === 'TINYINT' && $column->getLength() === 1) {
-                return $default ? 'true' : 'false';
+            if ($column !== null && $column->getType() === 'TINYINT' && $column->getLength() === 1) {
+                return ($default !== 0 && $default !== 0.0 && $default !== '0') ? 'true' : 'false';
             }
 
             return (string) $default;
         }
 
-        return "'".addslashes((string) $default)."'";
+        if (is_string($default)) {
+            return "'".addslashes($default)."'";
+        }
+
+        return "''";
     }
 }

@@ -12,6 +12,8 @@ use Hibla\PdoQueryBuilder\Schema\Compilers\Utilities\MySQLIndexCompiler;
 use Hibla\PdoQueryBuilder\Schema\Compilers\Utilities\MySQLTypeMapper;
 use Hibla\PdoQueryBuilder\Schema\Compilers\Utilities\ValueQuoter;
 use Hibla\PdoQueryBuilder\Schema\SchemaCompiler;
+use Hibla\PdoQueryBuilder\Schema\ForeignKey;
+use Hibla\PdoQueryBuilder\Schema\IndexDefinition;
 use PDO;
 
 class MySQLSchemaCompiler implements SchemaCompiler
@@ -42,24 +44,34 @@ class MySQLSchemaCompiler implements SchemaCompiler
 
     private function validateMySQLVersion(): void
     {
-        if (! $this->connection) {
+        if ($this->connection === null) {
             return;
         }
 
         try {
             $stmt = $this->connection->query('SELECT VERSION()');
+            if ($stmt === false) {
+                return;
+            }
+
             $version = $stmt->fetchColumn();
 
-            if (preg_match('/^(\d+)\.(\d+)/', $version, $matches)) {
-                $major = (int) $matches[1];
+            if (!is_string($version)) {
+                return;
+            }
 
-                if ($major < 8) {
-                    throw new \RuntimeException(
-                        "MySQL version {$version} is not supported. ".
-                            'This library requires MySQL '.self::MINIMUM_VERSION.' or higher. '.
-                            'Please upgrade your MySQL server.'
-                    );
-                }
+            if (preg_match('/^(\d+)\.(\d+)/', $version, $matches) !== 1) {
+                return;
+            }
+
+            $major = (int) $matches[1];
+
+            if ($major < 8) {
+                throw new \RuntimeException(
+                    "MySQL version {$version} is not supported. " .
+                        'This library requires MySQL ' . self::MINIMUM_VERSION . ' or higher. ' .
+                        'Please upgrade your MySQL server.'
+                );
             }
         } catch (\PDOException $e) {
             // Connection error, let it fail naturally later
@@ -78,15 +90,15 @@ class MySQLSchemaCompiler implements SchemaCompiler
         $columnDefinitions = [];
 
         foreach ($columns as $column) {
-            $columnDefinitions[] = '  '.$this->compileColumn($column);
+            $columnDefinitions[] = '  ' . $this->compileColumn($column);
         }
 
         foreach ($indexDefinitions as $indexDef) {
-            $columnDefinitions[] = '  '.$this->indexCompiler->compileIndexDefinition($indexDef);
+            $columnDefinitions[] = '  ' . $this->indexCompiler->compileIndexDefinition($indexDef);
         }
 
         foreach ($foreignKeys as $foreignKey) {
-            $columnDefinitions[] = '  '.$this->foreignKeyCompiler->compile($foreignKey);
+            $columnDefinitions[] = '  ' . $this->foreignKeyCompiler->compile($foreignKey);
         }
 
         $sql .= implode(",\n", $columnDefinitions);
@@ -116,8 +128,9 @@ class MySQLSchemaCompiler implements SchemaCompiler
             $sql .= $this->defaultCompiler->compileCurrentTimestamp();
         }
 
-        if ($column->getOnUpdate()) {
-            $sql .= " ON UPDATE {$column->getOnUpdate()}";
+        $onUpdate = $column->getOnUpdate();
+        if ($onUpdate !== null) {
+            $sql .= " ON UPDATE {$onUpdate}";
         }
 
         if ($column->isAutoIncrement()) {
@@ -128,17 +141,22 @@ class MySQLSchemaCompiler implements SchemaCompiler
             $sql .= ' UNIQUE';
         }
 
-        if ($column->getComment()) {
-            $sql .= ' COMMENT '.$this->quoter->quote($column->getComment());
+        $comment = $column->getComment();
+        if ($comment !== null) {
+            $sql .= ' COMMENT ' . $this->quoter->quote($comment);
         }
 
-        if ($column->getAfter()) {
-            $sql .= " AFTER `{$column->getAfter()}`";
+        $after = $column->getAfter();
+        if ($after !== null) {
+            $sql .= " AFTER `{$after}`";
         }
 
         return $sql;
     }
 
+    /**
+     * @return list<string>|string
+     */
     public function compileAlter(Blueprint $blueprint): string|array
     {
         $table = $blueprint->getTable();
@@ -153,25 +171,43 @@ class MySQLSchemaCompiler implements SchemaCompiler
         $statements = array_merge($statements, $this->compileAddIndexes($table, $blueprint->getIndexDefinitions()));
         $statements = array_merge($statements, $this->compileAddForeignKeys($table, $blueprint->getForeignKeys()));
 
-        return empty($statements) ? '' : (count($statements) === 1 ? $statements[0] : $statements);
+        if (count($statements) === 0) {
+            return '';
+        }
+
+        return count($statements) === 1 ? $statements[0] : $statements;
     }
 
+    /**
+     * @param array<int, array{from: string, to: string}> $renames
+     * @return list<string>
+     */
     private function compileRenameColumns(string $table, array $renames): array
     {
-        return array_map(
-            fn ($rename) => "ALTER TABLE `{$table}` RENAME COLUMN `{$rename['from']}` TO `{$rename['to']}`",
-            $renames
-        );
+        $statements = [];
+        foreach ($renames as $rename) {
+            $statements[] = "ALTER TABLE `{$table}` RENAME COLUMN `{$rename['from']}` TO `{$rename['to']}`";
+        }
+        return $statements;
     }
 
+    /**
+     * @param array<int, string> $foreignKeys
+     * @return list<string>
+     */
     private function compileDropForeignKeys(string $table, array $foreignKeys): array
     {
-        return array_map(
-            fn ($fk) => "ALTER TABLE `{$table}` DROP FOREIGN KEY `{$fk}`",
-            $foreignKeys
-        );
+        $statements = [];
+        foreach ($foreignKeys as $fk) {
+            $statements[] = "ALTER TABLE `{$table}` DROP FOREIGN KEY `{$fk}`";
+        }
+        return $statements;
     }
 
+    /**
+     * @param list<list<string>> $indexes
+     * @return list<string>
+     */
     private function compileDropIndexes(string $table, array $indexes): array
     {
         $statements = [];
@@ -186,42 +222,59 @@ class MySQLSchemaCompiler implements SchemaCompiler
         return $statements;
     }
 
+    /**
+     * @param array<int, string> $columns
+     * @return list<string>
+     */
     private function compileDropColumns(string $table, array $columns): array
     {
-        return array_map(
-            fn ($col) => "ALTER TABLE `{$table}` DROP COLUMN `{$col}`",
-            $columns
-        );
+        $statements = [];
+        foreach ($columns as $col) {
+            $statements[] = "ALTER TABLE `{$table}` DROP COLUMN `{$col}`";
+        }
+        return $statements;
     }
 
+    /**
+     * @param array<int, Column> $columns
+     * @return list<string>
+     */
     private function compileModifyColumns(string $table, array $columns): array
     {
-        if (empty($columns)) {
+        if (count($columns) === 0) {
             return [];
         }
 
-        $modifications = array_map(
-            fn ($col) => 'MODIFY COLUMN '.$this->compileColumn($col),
-            $columns
-        );
+        $statements = [];
+        foreach ($columns as $col) {
+            $statements[] = 'MODIFY COLUMN ' . $this->compileColumn($col);
+        }
 
-        return ["ALTER TABLE `{$table}` ".implode(', ', $modifications)];
+        return ["ALTER TABLE `{$table}` " . implode(', ', $statements)];
     }
 
+    /**
+     * @param array<int, Column> $columns
+     * @return list<string>
+     */
     private function compileAddColumns(string $table, array $columns): array
     {
-        if (empty($columns)) {
+        if (count($columns) === 0) {
             return [];
         }
 
-        $additions = array_map(
-            fn ($col) => 'ADD COLUMN '.$this->compileColumn($col),
-            $columns
-        );
+        $statements = [];
+        foreach ($columns as $col) {
+            $statements[] = 'ADD COLUMN ' . $this->compileColumn($col);
+        }
 
-        return ["ALTER TABLE `{$table}` ".implode(', ', $additions)];
+        return ["ALTER TABLE `{$table}` " . implode(', ', $statements)];
     }
 
+    /**
+     * @param array<int, IndexDefinition> $indexes
+     * @return list<string>
+     */
     private function compileAddIndexes(string $table, array $indexes): array
     {
         $statements = [];
@@ -232,12 +285,17 @@ class MySQLSchemaCompiler implements SchemaCompiler
         return $statements;
     }
 
+    /**
+     * @param array<int, ForeignKey> $foreignKeys
+     * @return list<string>
+     */
     private function compileAddForeignKeys(string $table, array $foreignKeys): array
     {
-        return array_map(
-            fn ($fk) => "ALTER TABLE `{$table}` ADD ".$this->foreignKeyCompiler->compile($fk),
-            $foreignKeys
-        );
+        $statements = [];
+        foreach ($foreignKeys as $fk) {
+            $statements[] = "ALTER TABLE `{$table}` ADD " . $this->foreignKeyCompiler->compile($fk);
+        }
+        return $statements;
     }
 
     public function compileDrop(string $table): string
@@ -252,8 +310,8 @@ class MySQLSchemaCompiler implements SchemaCompiler
 
     public function compileTableExists(string $table): string
     {
-        return 'SELECT COUNT(*) FROM information_schema.tables '.
-            'WHERE table_schema = DATABASE() AND table_name = '.$this->quoter->quote($table);
+        return 'SELECT COUNT(*) FROM information_schema.tables ' .
+            'WHERE table_schema = DATABASE() AND table_name = ' . $this->quoter->quote($table);
     }
 
     public function compileRename(string $from, string $to): string
@@ -264,9 +322,12 @@ class MySQLSchemaCompiler implements SchemaCompiler
     public function compileDropColumn(Blueprint $blueprint, array $columns): string
     {
         $table = $blueprint->getTable();
-        $drops = array_map(fn ($col) => "DROP COLUMN `{$col}`", $columns);
+        $drops = [];
+        foreach ($columns as $col) {
+            $drops[] = "DROP COLUMN `{$col}`";
+        }
 
-        return "ALTER TABLE `{$table}` ".implode(', ', $drops);
+        return "ALTER TABLE `{$table}` " . implode(', ', $drops);
     }
 
     public function compileRenameColumn(Blueprint $blueprint, string $from, string $to): string
