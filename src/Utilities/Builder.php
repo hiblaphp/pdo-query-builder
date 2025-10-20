@@ -16,7 +16,7 @@ use Rcalicdan\QueryBuilderPrimitives\QueryBuilderBase;
  * returns a new instance instead of modifying the current one, ensuring a
  * predictable and safe state management.
  */
-class PDOQueryBuilder extends QueryBuilderBase
+class Builder extends QueryBuilderBase
 {
     /**
      * @var string|null Cached driver to avoid repeated detection
@@ -96,7 +96,10 @@ class PDOQueryBuilder extends QueryBuilderBase
             return null;
         }
 
-        return $connectionConfig['driver'] ?? null;
+        // FIX: Ensure the returned value is a string or null.
+        $driver = $connectionConfig['driver'] ?? null;
+
+        return is_string($driver) ? $driver : null;
     }
 
     /**
@@ -156,7 +159,6 @@ class PDOQueryBuilder extends QueryBuilderBase
      */
     public function findOrFail(mixed $id, string $column = 'id'): PromiseInterface
     {
-        // @phpstan-ignore-next-line
         return async(function () use ($id, $column): array {
             $result = await($this->find($id, $column));
             if ($result === null || $result === false) {
@@ -177,7 +179,6 @@ class PDOQueryBuilder extends QueryBuilderBase
      */
     public function value(string $column): PromiseInterface
     {
-        // @phpstan-ignore-next-line
         return async(function () use ($column): mixed {
             $result = await($this->select($column)->first());
 
@@ -207,7 +208,6 @@ class PDOQueryBuilder extends QueryBuilderBase
      */
     public function exists(): PromiseInterface
     {
-        // @phpstan-ignore-next-line
         return async(function (): bool {
             $count = await($this->count());
 

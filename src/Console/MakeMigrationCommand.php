@@ -17,7 +17,7 @@ class MakeMigrationCommand extends Command
     use LoadsSchemaConfiguration;
 
     private SymfonyStyle $io;
-    private string $projectRoot;
+    private ?string $projectRoot = null;
     private string $migrationsPath;
     private string $migrationName;
     private ?string $table;
@@ -39,9 +39,18 @@ class MakeMigrationCommand extends Command
         $this->io = new SymfonyStyle($input, $output);
         $this->io->title('Create Migration');
 
-        $this->migrationName = $input->getArgument('name');
-        $this->table = $input->getOption('table');
-        $this->alter = $input->getOption('alter');
+        $migrationNameValue = $input->getArgument('name');
+        if (! is_string($migrationNameValue) || trim($migrationNameValue) === '') {
+            $this->io->error('The migration name must be a non-empty string.');
+
+            return Command::FAILURE;
+        }
+        $this->migrationName = $migrationNameValue;
+
+        $tableOption = $input->getOption('table');
+        $this->table = is_string($tableOption) ? $tableOption : null;
+        $alterOption = $input->getOption('alter');
+        $this->alter = is_string($alterOption) ? $alterOption : null;
 
         if (! $this->initializeProjectRoot()) {
             return Command::FAILURE;
@@ -61,7 +70,7 @@ class MakeMigrationCommand extends Command
     private function initializeProjectRoot(): bool
     {
         $this->projectRoot = $this->findProjectRoot();
-        if (! $this->projectRoot) {
+        if ($this->projectRoot === null) {
             $this->io->error('Could not find project root');
 
             return false;
@@ -122,6 +131,9 @@ class MakeMigrationCommand extends Command
     private function generateSequentialFileName(): string
     {
         $files = glob($this->migrationsPath.'/*.php');
+        if ($files === false) {
+            $files = []; // Default to empty array on error
+        }
         $nextNumber = count($files) + 1;
         $paddedNumber = str_pad((string) $nextNumber, 4, '0', STR_PAD_LEFT);
 
@@ -130,11 +142,11 @@ class MakeMigrationCommand extends Command
 
     private function generateMigrationStub(): string
     {
-        if ($this->table) {
+        if ($this->table !== null) {
             return $this->getCreateStub();
         }
 
-        if ($this->alter) {
+        if ($this->alter !== null) {
             return $this->getAlterStub();
         }
 
@@ -220,7 +232,9 @@ return new class
 
     private function findProjectRoot(): ?string
     {
-        $dir = getcwd() ?: __DIR__;
+        $currentDir = getcwd();
+        $dir = ($currentDir !== false) ? $currentDir : __DIR__;
+
         for ($i = 0; $i < 10; $i++) {
             if (file_exists($dir.'/composer.json')) {
                 return $dir;

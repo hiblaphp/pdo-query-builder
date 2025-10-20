@@ -12,7 +12,10 @@ use Symfony\Component\Console\Style\SymfonyStyle;
 class StatusCommand extends Command
 {
     private SymfonyStyle $io;
-    private string $projectRoot;
+    private ?string $projectRoot = null;
+    /**
+     * @var array<string, string>
+     */
     private array $configFiles = [
         'pdo-query-builder.php' => 'Config File',
         'pdo-schema.php' => 'Schema File',
@@ -32,7 +35,7 @@ class StatusCommand extends Command
         $this->io->title('PDO Query Builder - Status');
 
         $this->projectRoot = $this->findProjectRoot();
-        if (! $this->projectRoot) {
+        if ($this->projectRoot === null) {
             $this->io->error('Could not find project root');
 
             return Command::FAILURE;
@@ -57,8 +60,15 @@ class StatusCommand extends Command
         $this->io->table(['Item', 'Status'], $rows);
     }
 
+    /**
+     * @return list<array{0: string, 1: string}>
+     */
     private function buildStatusRows(): array
     {
+        if ($this->projectRoot === null) {
+            throw new \LogicException('Project root must be initialized before building status rows.');
+        }
+
         $rows = [
             ['Project Root', $this->projectRoot],
         ];
@@ -90,12 +100,17 @@ class StatusCommand extends Command
 
     private function getConfigFilePath(string $filename): string
     {
+        if ($this->projectRoot === null) {
+            throw new \LogicException('Project root must be initialized before getting config file path.');
+        }
+
         return $this->projectRoot.'/config/'.$filename;
     }
 
     private function findProjectRoot(): ?string
     {
-        $dir = getcwd() ?: __DIR__;
+        $currentDir = getcwd();
+        $dir = ($currentDir !== false) ? $currentDir : __DIR__;
         for ($i = 0; $i < 10; $i++) {
             if (file_exists($dir.'/composer.json')) {
                 return $dir;

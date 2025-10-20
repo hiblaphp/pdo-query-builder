@@ -8,6 +8,7 @@ use Hibla\PdoQueryBuilder\Console\Traits\LoadsSchemaConfiguration;
 use Hibla\PdoQueryBuilder\DB;
 use Hibla\PdoQueryBuilder\Schema\MigrationRepository;
 use Hibla\PdoQueryBuilder\Schema\SchemaBuilder;
+use Hibla\Promise\Interfaces\PromiseInterface;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Input\InputOption;
@@ -20,7 +21,7 @@ class MigrateRollbackCommand extends Command
 
     private SymfonyStyle $io;
     private OutputInterface $output;
-    private string $projectRoot;
+    private ?string $projectRoot = null;
     private string $migrationsPath;
     private MigrationRepository $repository;
     private SchemaBuilder $schema;
@@ -53,7 +54,8 @@ class MigrateRollbackCommand extends Command
             $this->repository = new MigrationRepository($this->getMigrationsTable());
             $this->schema = new SchemaBuilder();
 
-            $step = (int) $input->getOption('step');
+            $stepOption = $input->getOption('step');
+            $step = is_numeric($stepOption) ? (int) $stepOption : 1;
 
             if (! $this->performRollback($step)) {
                 return Command::FAILURE;
@@ -72,7 +74,7 @@ class MigrateRollbackCommand extends Command
     private function initializeProjectRoot(): bool
     {
         $this->projectRoot = $this->findProjectRoot();
-        if (! $this->projectRoot) {
+        if ($this->projectRoot === null) {
             $this->io->error('Could not find project root');
 
             return false;
@@ -95,9 +97,10 @@ class MigrateRollbackCommand extends Command
 
     private function performRollback(int $step): bool
     {
+        /** @var list<array<string, mixed>> $lastBatchMigrations */
         $lastBatchMigrations = await($this->repository->getLast());
 
-        if (empty($lastBatchMigrations)) {
+        if (count($lastBatchMigrations) === 0) {
             $this->io->warning('Nothing to rollback');
 
             return true;
@@ -120,17 +123,33 @@ class MigrateRollbackCommand extends Command
         return true;
     }
 
+    /**
+     * @param array<string, mixed> $migrationData
+     */
     private function rollbackMigration(array $migrationData): bool
     {
-        $migrationName = $migrationData['migration'];
+        $migrationName = $migrationData['migration'] ?? null;
+        if (! is_string($migrationName)) {
+            $this->io->warning('Skipping invalid migration record.');
+
+            return false;
+        }
+
         $file = $this->migrationsPath.'/'.$migrationName;
 
         if (! $this->validateMigrationFile($file, $migrationName)) {
-            return false;
+            await($this->repository->delete($migrationName));
+
+            return true;
         }
 
         try {
             $migration = require $file;
+            if (! is_object($migration)) {
+                $this->io->error("Migration file {$migrationName} did not return an object.");
+
+                return false;
+            }
 
             if (! $this->validateMigrationClass($migration, $migrationName)) {
                 return false;
@@ -138,7 +157,11 @@ class MigrateRollbackCommand extends Command
 
             $this->io->write("Rolling back: {$migrationName}...");
 
-            await($migration->down($this->schema));
+            /** @var callable(SchemaBuilder): PromiseInterface<mixed> $downMethod */
+            $downMethod = [$migration, 'down'];
+            $promise = $downMethod($this->schema);
+            await($promise);
+
             await($this->repository->delete($migrationName));
 
             $this->io->writeln(' <info>✓</info>');
@@ -198,7 +221,8 @@ class MigrateRollbackCommand extends Command
 
     private function findProjectRoot(): ?string
     {
-        $dir = getcwd() ?: __DIR__;
+        $currentDir = getcwd();
+        $dir = ($currentDir !== false) ? $currentDir : __DIR__;
         for ($i = 0; $i < 10; $i++) {
             if (file_exists($dir.'/composer.json')) {
                 return $dir;

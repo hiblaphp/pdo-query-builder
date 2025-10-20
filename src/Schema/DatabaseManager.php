@@ -245,8 +245,6 @@ class DatabaseManager
         return (bool) $stmt->fetchColumn();
     }
 
-
-
     private function checkSQLiteDatabase(string $database): bool
     {
         return $database === ':memory:' || file_exists($database);

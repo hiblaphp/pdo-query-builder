@@ -17,7 +17,7 @@ class MySQLIndexCompiler extends IndexCompiler
 
     /**
      * Add index to existing table via ALTER TABLE
-     * 
+     *
      * @return list<string>
      */
     public function compileAddIndexDefinition(string $table, IndexDefinition $indexDef): array
@@ -45,6 +45,7 @@ class MySQLIndexCompiler extends IndexCompiler
         if ($algorithm !== null && $algorithm !== '') {
             $sql .= " USING {$algorithm}";
         }
+
         return $sql;
     }
 
@@ -54,6 +55,7 @@ class MySQLIndexCompiler extends IndexCompiler
         if ($algorithm !== null && $algorithm !== '') {
             $sql .= " USING {$algorithm}";
         }
+
         return $sql;
     }
 
@@ -63,6 +65,7 @@ class MySQLIndexCompiler extends IndexCompiler
         if ($algorithm !== null && $algorithm !== '') {
             $sql .= " WITH PARSER {$algorithm}";
         }
+
         return $sql;
     }
 
@@ -72,6 +75,7 @@ class MySQLIndexCompiler extends IndexCompiler
         if ($algorithm !== null && $algorithm !== '') {
             $sql .= " USING {$algorithm}";
         }
+
         return $sql;
     }
 

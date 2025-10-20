@@ -9,8 +9,8 @@ use Hibla\PdoQueryBuilder\Exception\DatabaseConfigNotFoundException;
 use Hibla\PdoQueryBuilder\Exception\InvalidConnectionConfigException;
 use Hibla\PdoQueryBuilder\Exception\InvalidDefaultConnectionException;
 use Hibla\PdoQueryBuilder\Exception\InvalidPoolSizeException;
+use Hibla\PdoQueryBuilder\Utilities\Builder;
 use Hibla\PdoQueryBuilder\Utilities\ConfigLoader;
-use Hibla\PdoQueryBuilder\Utilities\PDOQueryBuilder;
 use Hibla\Promise\Interfaces\PromiseInterface;
 
 /**
@@ -123,7 +123,7 @@ class DB
     {
         AsyncPDO::reset();
         ConfigLoader::reset();
-        PDOQueryBuilder::resetDriverCache();
+        Builder::resetDriverCache();
         self::$isInitialized = false;
         self::$hasValidationError = false;
         self::$isManuallyConfigured = false;
@@ -132,22 +132,22 @@ class DB
     /**
      * Start a new query builder instance for the given table.
      */
-    public static function table(string $table): PDOQueryBuilder
+    public static function table(string $table): Builder
     {
         self::initializeIfNeeded();
 
-        return new PDOQueryBuilder($table);
+        return new Builder($table);
     }
 
     /**
      * Start a new query builder instance with a specific driver.
      * Useful for testing or multi-database scenarios.
      */
-    public static function tableWithDriver(string $table, string $driver): PDOQueryBuilder
+    public static function tableWithDriver(string $table, string $driver): Builder
     {
         self::initializeIfNeeded();
 
-        $builder = new PDOQueryBuilder($table);
+        $builder = new Builder($table);
 
         return $builder->setDriver($driver);
     }

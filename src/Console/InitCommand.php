@@ -13,7 +13,7 @@ use Symfony\Component\Console\Style\SymfonyStyle;
 class InitCommand extends Command
 {
     private SymfonyStyle $io;
-    private string $projectRoot;
+    private ?string $projectRoot = null;
     private bool $force;
 
     protected function configure(): void
@@ -29,12 +29,12 @@ class InitCommand extends Command
     protected function execute(InputInterface $input, OutputInterface $output): int
     {
         $this->io = new SymfonyStyle($input, $output);
-        $this->force = $input->getOption('force');
+        $this->force = (bool) $input->getOption('force');
 
         $this->io->title('PDO Query Builder - Initialize');
 
         $this->projectRoot = $this->findProjectRoot();
-        if (! $this->projectRoot) {
+        if ($this->projectRoot === null) {
             $this->io->error('Could not find project root');
 
             return Command::FAILURE;
@@ -85,7 +85,7 @@ class InitCommand extends Command
             }
         }
 
-        return empty($failedFiles) ? Command::SUCCESS : Command::FAILURE;
+        return count($failedFiles) === 0 ? Command::SUCCESS : Command::FAILURE;
     }
 
     private function copyFile(string $filename, string $sourceConfig, string $configDir): bool
@@ -117,6 +117,7 @@ class InitCommand extends Command
 
     private function createAsyncPdoExecutable(): void
     {
+        // This check is now safe.
         $asyncPdoPath = $this->projectRoot.'/async-pdo';
 
         if (file_exists($asyncPdoPath) && ! $this->force) {
@@ -186,7 +187,7 @@ PHP;
 
     private function promptEnvFileCreation(): void
     {
-        if (! file_exists($this->projectRoot.'/.env')) {
+        if ($this->projectRoot !== null && ! file_exists($this->projectRoot.'/.env')) {
             $this->io->section('Create .env file with:');
             $this->io->listing([
                 'DB_CONNECTION=mysql',
@@ -201,7 +202,9 @@ PHP;
 
     private function findProjectRoot(): ?string
     {
-        $dir = getcwd() ?: __DIR__;
+        $currentDir = getcwd();
+        $dir = ($currentDir !== false) ? $currentDir : __DIR__;
+
         for ($i = 0; $i < 10; $i++) {
             if (file_exists($dir.'/composer.json')) {
                 return $dir;

@@ -5,8 +5,11 @@ declare(strict_types=1);
 namespace Hibla\PdoQueryBuilder\Schema;
 
 use function Hibla\async;
+
 use Hibla\AsyncPDO\AsyncPDO;
+
 use function Hibla\await;
+
 use Hibla\Promise\Interfaces\PromiseInterface;
 
 class SQLiteSchemaBuilder
@@ -48,7 +51,7 @@ class SQLiteSchemaBuilder
             count($blueprint->getDropForeignKeys()) > 0 ||
             count($blueprint->getDropIndexes()) > 0;
 
-        if (!$needsRecreation) {
+        if (! $needsRecreation) {
             /** @phpstan-ignore-next-line */
             return $this->executeAlter($blueprint);
         }

@@ -5,8 +5,11 @@ declare(strict_types=1);
 namespace Hibla\PdoQueryBuilder\Schema;
 
 use function Hibla\async;
+
 use Hibla\AsyncPDO\AsyncPDO;
+
 use function Hibla\await;
+
 use Hibla\PdoQueryBuilder\Utilities\ConfigLoader;
 use Hibla\Promise\Interfaces\PromiseInterface;
 
@@ -142,6 +145,7 @@ class SchemaBuilder
 
         if (is_array($sql)) {
             $statements = $this->toList($sql);
+
             return $this->executeMultipleOrNull($statements);
         }
 
@@ -187,6 +191,7 @@ class SchemaBuilder
                 return $this->nullPromise();
             }
             $statements = $this->toList($sql);
+
             return $this->executeMultipleOrNull($statements);
         }
 
@@ -209,6 +214,7 @@ class SchemaBuilder
 
         if (is_array($sql)) {
             $statements = $this->toList($sql);
+
             return $this->executeMultipleNoNull($statements);
         }
 
@@ -241,6 +247,7 @@ class SchemaBuilder
                 return $this->nullPromise();
             }
             $statements = $this->toList($sql);
+
             return $this->executeMultipleOrNull($statements);
         }
 
@@ -273,6 +280,7 @@ class SchemaBuilder
                 return $this->nullPromise();
             }
             $statements = $this->toList($sql);
+
             return $this->executeMultipleOrNull($statements);
         }
 
@@ -300,7 +308,7 @@ class SchemaBuilder
     private function nullPromise(): PromiseInterface
     {
         /** @phpstan-ignore-next-line */
-        return async(static fn() => null);
+        return async(static fn () => null);
     }
 
     /**

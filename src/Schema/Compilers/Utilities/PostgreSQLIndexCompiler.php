@@ -50,7 +50,7 @@ class PostgreSQLIndexCompiler extends IndexCompiler
         } elseif ($type === 'INDEX') {
             $cols = $this->getColumnsList($indexDef);
             $sql = "CREATE INDEX IF NOT EXISTS \"{$indexDef->getName()}\" ON \"{$table}\" (\"{$cols}\")";
-            
+
             $algorithm = $indexDef->getAlgorithm();
             if ($algorithm !== null) {
                 $algo = strtoupper($algorithm);

@@ -38,7 +38,7 @@ class DefaultValueCompiler
 
             return $this->formatString($default);
         }
-        
+
         if (is_object($default) && method_exists($default, '__toString')) {
             return $this->formatString((string) $default);
         }
@@ -74,6 +74,7 @@ class DefaultValueCompiler
     protected function formatString(string $value): string
     {
         $escapedValue = str_replace("'", "''", $value);
+
         return "'{$escapedValue}'";
     }
 }

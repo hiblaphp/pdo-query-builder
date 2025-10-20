@@ -56,10 +56,23 @@ class MigrateRefreshCommand extends Command
 
     private function executeCommand(string $commandName): bool
     {
-        $command = $this->getApplication()->find($commandName);
-        $input = new ArrayInput([]);
-        $code = $command->run($input, $this->output);
+        $application = $this->getApplication();
+        if ($application === null) {
+            $this->io->error('Application instance not found.');
 
-        return $code === Command::SUCCESS;
+            return false;
+        }
+
+        try {
+            $command = $application->find($commandName);
+            $input = new ArrayInput([]);
+            $code = $command->run($input, $this->output);
+
+            return $code === Command::SUCCESS;
+        } catch (\Throwable $e) {
+            $this->io->error("Failed to execute command '{$commandName}': " . $e->getMessage());
+
+            return false;
+        }
     }
 }

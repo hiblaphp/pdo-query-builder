@@ -38,6 +38,7 @@ class IndexCompiler
         if ($name === null) {
             return '';
         }
+
         return $this->openQuote.$name.$this->closeQuote;
     }
 

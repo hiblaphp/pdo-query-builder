@@ -11,9 +11,9 @@ use Hibla\PdoQueryBuilder\Schema\Compilers\Utilities\MySQLForeignKeyCompiler;
 use Hibla\PdoQueryBuilder\Schema\Compilers\Utilities\MySQLIndexCompiler;
 use Hibla\PdoQueryBuilder\Schema\Compilers\Utilities\MySQLTypeMapper;
 use Hibla\PdoQueryBuilder\Schema\Compilers\Utilities\ValueQuoter;
-use Hibla\PdoQueryBuilder\Schema\SchemaCompiler;
 use Hibla\PdoQueryBuilder\Schema\ForeignKey;
 use Hibla\PdoQueryBuilder\Schema\IndexDefinition;
+use Hibla\PdoQueryBuilder\Schema\SchemaCompiler;
 use PDO;
 
 class MySQLSchemaCompiler implements SchemaCompiler
@@ -56,7 +56,7 @@ class MySQLSchemaCompiler implements SchemaCompiler
 
             $version = $stmt->fetchColumn();
 
-            if (!is_string($version)) {
+            if (! is_string($version)) {
                 return;
             }
 
@@ -188,6 +188,7 @@ class MySQLSchemaCompiler implements SchemaCompiler
         foreach ($renames as $rename) {
             $statements[] = "ALTER TABLE `{$table}` RENAME COLUMN `{$rename['from']}` TO `{$rename['to']}`";
         }
+
         return $statements;
     }
 
@@ -201,6 +202,7 @@ class MySQLSchemaCompiler implements SchemaCompiler
         foreach ($foreignKeys as $fk) {
             $statements[] = "ALTER TABLE `{$table}` DROP FOREIGN KEY `{$fk}`";
         }
+
         return $statements;
     }
 
@@ -232,6 +234,7 @@ class MySQLSchemaCompiler implements SchemaCompiler
         foreach ($columns as $col) {
             $statements[] = "ALTER TABLE `{$table}` DROP COLUMN `{$col}`";
         }
+
         return $statements;
     }
 
@@ -295,6 +298,7 @@ class MySQLSchemaCompiler implements SchemaCompiler
         foreach ($foreignKeys as $fk) {
             $statements[] = "ALTER TABLE `{$table}` ADD " . $this->foreignKeyCompiler->compile($fk);
         }
+
         return $statements;
     }
 

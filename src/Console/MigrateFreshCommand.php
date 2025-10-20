@@ -6,7 +6,6 @@ namespace Hibla\PdoQueryBuilder\Console;
 
 use Hibla\PdoQueryBuilder\Console\Traits\LoadsSchemaConfiguration;
 use Hibla\PdoQueryBuilder\DB;
-use Hibla\PdoQueryBuilder\Schema\SchemaBuilder;
 use Hibla\PdoQueryBuilder\Utilities\ConfigLoader;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Input\ArrayInput;
@@ -21,8 +20,7 @@ class MigrateFreshCommand extends Command
 
     private SymfonyStyle $io;
     private OutputInterface $output;
-    private string $projectRoot;
-    private SchemaBuilder $schema;
+    private ?string $projectRoot = null;
     private string $driver;
 
     protected function configure(): void
@@ -40,7 +38,7 @@ class MigrateFreshCommand extends Command
         $this->output = $output;
         $this->io->title('Fresh Migration');
 
-        $force = $input->getOption('force');
+        $force = (bool) $input->getOption('force');
 
         if (! $force && ! $this->confirmFresh()) {
             $this->io->warning('Fresh migration cancelled');
@@ -54,7 +52,6 @@ class MigrateFreshCommand extends Command
 
         try {
             $this->initializeDatabase();
-            $this->schema = new SchemaBuilder();
             $this->driver = $this->detectDriver();
 
             $this->io->section('Dropping all tables...');
@@ -94,7 +91,7 @@ class MigrateFreshCommand extends Command
     private function initializeProjectRoot(): bool
     {
         $this->projectRoot = $this->findProjectRoot();
-        if (! $this->projectRoot) {
+        if ($this->projectRoot === null) {
             $this->io->error('Could not find project root');
 
             return false;
@@ -108,22 +105,23 @@ class MigrateFreshCommand extends Command
         try {
             $tables = $this->getAllTables();
 
-            if (empty($tables)) {
+            if (count($tables) === 0) {
                 $this->io->note('No tables to drop');
 
                 return true;
             }
 
-            // Disable foreign key checks
             $this->disableForeignKeyChecks();
 
             foreach ($tables as $table) {
+                if (! is_string($table)) {
+                    continue;
+                }
                 $this->io->write("Dropping table: {$table}...");
                 $this->dropTable($table);
                 $this->io->writeln(' <info>✓</info>');
             }
 
-            // Re-enable foreign key checks
             $this->enableForeignKeyChecks();
 
             return true;
@@ -148,11 +146,12 @@ class MigrateFreshCommand extends Command
         };
 
         $promise = DB::raw($sql);
-        if ($promise !== null) {
-            await($promise);
-        }
+        await($promise);
     }
 
+    /**
+     * @return list<string>
+     */
     private function getAllTables(): array
     {
         $sql = match ($this->driver) {
@@ -168,14 +167,17 @@ class MigrateFreshCommand extends Command
                        WHERE table_schema = DATABASE()',
         };
 
+        /** @var list<array<string, mixed>> $result */
         $result = await(DB::raw($sql));
 
-        return match ($this->driver) {
-            'mysql', 'sqlsrv' => array_column($result, 'table_name'),
-            'pgsql' => array_column($result, 'tablename'),
-            'sqlite' => array_column($result, 'name'),
-            default => array_column($result, 'table_name'),
+        $columnName = match ($this->driver) {
+            'pgsql' => 'tablename',
+            'sqlite' => 'name',
+            default => 'table_name',
         };
+
+        /** @var list<string> */
+        return array_column($result, $columnName);
     }
 
     private function disableForeignKeyChecks(): void
@@ -188,12 +190,10 @@ class MigrateFreshCommand extends Command
             default => null,
         };
 
-        if ($sql) {
+        if ($sql !== null) {
             try {
                 $promise = DB::raw($sql);
-                if ($promise !== null) {
-                    await($promise);
-                }
+                await($promise);
             } catch (\Throwable $e) {
                 // Some drivers might not support this, continue anyway
             }
@@ -210,12 +210,10 @@ class MigrateFreshCommand extends Command
             default => null,
         };
 
-        if ($sql) {
+        if ($sql !== null) {
             try {
                 $promise = DB::raw($sql);
-                if ($promise !== null) {
-                    await($promise);
-                }
+                await($promise);
             } catch (\Throwable $e) {
                 // Some drivers might not support this, continue anyway
             }
@@ -224,7 +222,14 @@ class MigrateFreshCommand extends Command
 
     private function runMigrations(): bool
     {
-        $command = $this->getApplication()->find('migrate');
+        $application = $this->getApplication();
+        if ($application === null) {
+            $this->io->error('Could not find application instance.');
+
+            return false;
+        }
+
+        $command = $application->find('migrate');
         $input = new ArrayInput(['--force' => true]);
         $code = $command->run($input, $this->output);
 
@@ -242,10 +247,23 @@ class MigrateFreshCommand extends Command
             }
 
             $defaultConnection = $dbConfig['default'] ?? 'mysql';
-            $connections = $dbConfig['connections'] ?? [];
-            $connectionConfig = $connections[$defaultConnection] ?? [];
+            if (! is_string($defaultConnection)) {
+                return 'mysql';
+            }
 
-            return strtolower($connectionConfig['driver'] ?? 'mysql');
+            $connections = $dbConfig['connections'] ?? [];
+            if (! is_array($connections)) {
+                return 'mysql';
+            }
+
+            $connectionConfig = $connections[$defaultConnection] ?? [];
+            if (! is_array($connectionConfig)) {
+                return 'mysql';
+            }
+
+            $driver = $connectionConfig['driver'] ?? 'mysql';
+
+            return is_string($driver) ? strtolower($driver) : 'mysql';
         } catch (\Throwable $e) {
             return 'mysql';
         }
@@ -272,7 +290,9 @@ class MigrateFreshCommand extends Command
 
     private function findProjectRoot(): ?string
     {
-        $dir = getcwd() ?: __DIR__;
+        $currentDir = getcwd();
+        $dir = ($currentDir !== false) ? $currentDir : __DIR__;
+
         for ($i = 0; $i < 10; $i++) {
             if (file_exists($dir.'/composer.json')) {
                 return $dir;

@@ -8,6 +8,7 @@ use Hibla\PdoQueryBuilder\Console\Traits\LoadsSchemaConfiguration;
 use Hibla\PdoQueryBuilder\DB;
 use Hibla\PdoQueryBuilder\Schema\MigrationRepository;
 use Hibla\PdoQueryBuilder\Schema\SchemaBuilder;
+use Hibla\Promise\Interfaces\PromiseInterface;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Output\OutputInterface;
@@ -19,7 +20,7 @@ class MigrateResetCommand extends Command
 
     private SymfonyStyle $io;
     private OutputInterface $output;
-    private string $projectRoot;
+    private ?string $projectRoot = null;
     private string $migrationsPath;
     private MigrationRepository $repository;
     private SchemaBuilder $schema;
@@ -77,7 +78,7 @@ class MigrateResetCommand extends Command
     private function initializeProjectRoot(): bool
     {
         $this->projectRoot = $this->findProjectRoot();
-        if (! $this->projectRoot) {
+        if ($this->projectRoot === null) {
             $this->io->error('Could not find project root');
 
             return false;
@@ -88,9 +89,10 @@ class MigrateResetCommand extends Command
 
     private function performReset(): bool
     {
+        /** @var list<array<string, mixed>> $allMigrations */
         $allMigrations = await($this->repository->getRan());
 
-        if (empty($allMigrations)) {
+        if (count($allMigrations) === 0) {
             $this->io->warning('Nothing to reset');
 
             return true;
@@ -107,9 +109,18 @@ class MigrateResetCommand extends Command
         return true;
     }
 
+    /**
+     * @param array<string, mixed> $migrationData
+     */
     private function resetMigration(array $migrationData): void
     {
-        $migrationName = $migrationData['migration'];
+        $migrationName = $migrationData['migration'] ?? null;
+        if (! is_string($migrationName)) {
+            $this->io->warning('Skipping invalid migration record.');
+
+            return;
+        }
+
         $file = $this->migrationsPath.'/'.$migrationName;
 
         if (! $this->validateMigrationFile($file, $migrationName)) {
@@ -120,6 +131,11 @@ class MigrateResetCommand extends Command
 
         try {
             $migration = require $file;
+            if (! is_object($migration)) {
+                $this->io->error("Migration file {$migrationName} did not return an object.");
+
+                return;
+            }
 
             $this->executeMigrationDown($migration, $migrationName);
             await($this->repository->delete($migrationName));
@@ -132,7 +148,12 @@ class MigrateResetCommand extends Command
     {
         if (method_exists($migration, 'down')) {
             $this->io->write("Rolling back: {$migrationName}...");
-            await($migration->down($this->schema));
+
+            /** @var callable(SchemaBuilder): PromiseInterface<mixed> $downMethod */
+            $downMethod = [$migration, 'down'];
+            $promise = $downMethod($this->schema);
+            await($promise);
+
             $this->io->writeln(' <info>✓</info>');
         }
     }
@@ -178,7 +199,9 @@ class MigrateResetCommand extends Command
 
     private function findProjectRoot(): ?string
     {
-        $dir = getcwd() ?: __DIR__;
+        $currentDir = getcwd();
+        $dir = ($currentDir !== false) ? $currentDir : __DIR__;
+
         for ($i = 0; $i < 10; $i++) {
             if (file_exists($dir.'/composer.json')) {
                 return $dir;

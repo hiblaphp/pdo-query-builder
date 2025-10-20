@@ -17,7 +17,7 @@ class MigrateStatusCommand extends Command
     use LoadsSchemaConfiguration;
 
     private SymfonyStyle $io;
-    private string $projectRoot;
+    private ?string $projectRoot = null;
     private string $migrationsPath;
 
     protected function configure(): void
@@ -56,7 +56,7 @@ class MigrateStatusCommand extends Command
     private function initializeProjectRoot(): bool
     {
         $this->projectRoot = $this->findProjectRoot();
-        if (! $this->projectRoot) {
+        if ($this->projectRoot === null) {
             $this->io->error('Could not find project root');
 
             return false;
@@ -83,32 +83,43 @@ class MigrateStatusCommand extends Command
         await($repository->createRepository());
 
         $migrationFiles = $this->getMigrationFiles();
-        if (empty($migrationFiles)) {
+        if (count($migrationFiles) === 0) {
             $this->io->warning('No migration files found');
 
             return;
         }
 
+        /** @var list<array<string, mixed>> $ranMigrations */
         $ranMigrations = await($repository->getRan());
         $rows = $this->buildStatusRows($migrationFiles, $ranMigrations);
 
         $this->io->table(['Migration', 'Status'], $rows);
     }
 
+    /**
+     * @return list<string>
+     */
     private function getMigrationFiles(): array
     {
-        $files = glob($this->migrationsPath.'/*.php');
+        $files = glob($this->migrationsPath . '/*.php');
         if ($files === false) {
             return [];
         }
 
         sort($files);
 
+        /** @var list<string> */
         return array_map('basename', $files);
     }
 
+    /**
+     * @param list<string> $migrationFiles
+     * @param list<array<string, mixed>> $ranMigrations
+     * @return list<array{0: string, 1: string}>
+     */
     private function buildStatusRows(array $migrationFiles, array $ranMigrations): array
     {
+        /** @var list<string> $ranMigrationNames */
         $ranMigrationNames = array_column($ranMigrations, 'migration');
         $rows = [];
 
@@ -120,9 +131,12 @@ class MigrateStatusCommand extends Command
         return $rows;
     }
 
+    /**
+     * @param list<string> $ranMigrationNames
+     */
     private function getMigrationStatus(string $migrationName, array $ranMigrationNames): string
     {
-        return in_array($migrationName, $ranMigrationNames)
+        return in_array($migrationName, $ranMigrationNames, true)
             ? '<info>✓ Ran</info>'
             : '<comment>Pending</comment>';
     }
@@ -140,7 +154,7 @@ class MigrateStatusCommand extends Command
 
     private function handleError(\Throwable $e): void
     {
-        $this->io->error('Failed to get migration status: '.$e->getMessage());
+        $this->io->error('Failed to get migration status: ' . $e->getMessage());
         if ($this->io->isVerbose()) {
             $this->io->writeln($e->getTraceAsString());
         }
@@ -148,9 +162,10 @@ class MigrateStatusCommand extends Command
 
     private function findProjectRoot(): ?string
     {
-        $dir = getcwd() ?: __DIR__;
+        $currentDir = getcwd();
+        $dir = ($currentDir !== false) ? $currentDir : __DIR__;
         for ($i = 0; $i < 10; $i++) {
-            if (file_exists($dir.'/composer.json')) {
+            if (file_exists($dir . '/composer.json')) {
                 return $dir;
             }
             $parent = dirname($dir);

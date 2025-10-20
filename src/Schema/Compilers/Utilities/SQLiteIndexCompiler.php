@@ -6,9 +6,9 @@ namespace Hibla\PdoQueryBuilder\Schema\Compilers\Utilities;
 
 use Hibla\PdoQueryBuilder\Schema\Blueprint;
 use Hibla\PdoQueryBuilder\Schema\Column;
-use Hibla\PdoQueryBuilder\Schema\SchemaCompiler;
 use Hibla\PdoQueryBuilder\Schema\ForeignKey;
 use Hibla\PdoQueryBuilder\Schema\IndexDefinition;
+use Hibla\PdoQueryBuilder\Schema\SchemaCompiler;
 
 class SQLiteIndexCompiler extends IndexCompiler
 {
@@ -69,7 +69,7 @@ class SQLiteIndexCompiler extends IndexCompiler
         $statements[] = "DROP TABLE `{$table}`";
         $statements[] = "ALTER TABLE `{$tempTable}` RENAME TO `{$table}`";
 
-        $dropIndexNames = array_map(fn($idx) => $idx[0], $blueprint->getDropIndexes());
+        $dropIndexNames = array_map(fn ($idx) => $idx[0], $blueprint->getDropIndexes());
         foreach ($blueprint->getIndexDefinitions() as $indexDef) {
             $indexName = $indexDef->getName();
             if ($indexDef->getType() !== 'PRIMARY' && ! in_array($indexName, $dropIndexNames, true)) {
@@ -96,7 +96,7 @@ class SQLiteIndexCompiler extends IndexCompiler
         $modifyMap = $this->getModifyMap($originalBlueprint->getModifyColumns());
 
         foreach ($existingTableColumns as $existingCol) {
-            if (!isset($existingCol['name']) || !is_string($existingCol['name'])) {
+            if (! isset($existingCol['name']) || ! is_string($existingCol['name'])) {
                 continue;
             }
 
@@ -134,7 +134,7 @@ class SQLiteIndexCompiler extends IndexCompiler
             $this->addColumnToBlueprint($newBlueprint, $clonedColumn);
         }
 
-        $dropIndexNames = array_map(fn($idx) => $idx[0], $originalBlueprint->getDropIndexes());
+        $dropIndexNames = array_map(fn ($idx) => $idx[0], $originalBlueprint->getDropIndexes());
         foreach ($originalBlueprint->getIndexDefinitions() as $indexDef) {
             $indexName = $indexDef->getName() ?? 'PRIMARY';
             if (! in_array($indexName, $dropIndexNames, true)) {
@@ -160,7 +160,7 @@ class SQLiteIndexCompiler extends IndexCompiler
         $name = $pragmaRow['name'] ?? '';
         $type = $pragmaRow['type'] ?? 'TEXT';
 
-        if (!is_string($name) || !is_string($type)) {
+        if (! is_string($name) || ! is_string($type)) {
             throw new \InvalidArgumentException('Invalid pragma row data');
         }
 
@@ -209,6 +209,7 @@ class SQLiteIndexCompiler extends IndexCompiler
 
         if (is_numeric($value)) {
             $pos = strpos($value, '.');
+
             return ($pos !== false) ? (float) $value : (int) $value;
         }
 
@@ -231,7 +232,7 @@ class SQLiteIndexCompiler extends IndexCompiler
         $renameMap = $this->getRenameMap($blueprint->getRenameColumns());
 
         foreach ($existingTableColumns as $existingCol) {
-            if (!isset($existingCol['name']) || !is_string($existingCol['name'])) {
+            if (! isset($existingCol['name']) || ! is_string($existingCol['name'])) {
                 continue;
             }
 

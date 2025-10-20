@@ -10,9 +10,9 @@ use Hibla\PdoQueryBuilder\Schema\Compilers\Utilities\PostgreSQLDefaultValueCompi
 use Hibla\PdoQueryBuilder\Schema\Compilers\Utilities\PostgreSQLForeignKeyCompiler;
 use Hibla\PdoQueryBuilder\Schema\Compilers\Utilities\PostgreSQLIndexCompiler;
 use Hibla\PdoQueryBuilder\Schema\Compilers\Utilities\PostgreSQLTypeMapper;
-use Hibla\PdoQueryBuilder\Schema\SchemaCompiler;
 use Hibla\PdoQueryBuilder\Schema\ForeignKey;
 use Hibla\PdoQueryBuilder\Schema\IndexDefinition;
+use Hibla\PdoQueryBuilder\Schema\SchemaCompiler;
 
 class PostgreSQLSchemaCompiler implements SchemaCompiler
 {
@@ -114,6 +114,7 @@ class PostgreSQLSchemaCompiler implements SchemaCompiler
         foreach ($columns as $col) {
             $statements[] = "ALTER TABLE \"{$table}\" DROP COLUMN IF EXISTS \"{$col}\"";
         }
+
         return $statements;
     }
 
@@ -127,6 +128,7 @@ class PostgreSQLSchemaCompiler implements SchemaCompiler
         foreach ($foreignKeys as $fk) {
             $statements[] = "ALTER TABLE \"{$table}\" DROP CONSTRAINT IF EXISTS \"{$fk}\"";
         }
+
         return $statements;
     }
 
@@ -160,6 +162,7 @@ class PostgreSQLSchemaCompiler implements SchemaCompiler
         foreach ($renames as $rename) {
             $statements[] = $this->compileRenameColumn(new Blueprint($table), $rename['from'], $rename['to']);
         }
+
         return $statements;
     }
 

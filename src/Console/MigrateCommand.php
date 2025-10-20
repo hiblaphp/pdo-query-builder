@@ -10,6 +10,7 @@ use Hibla\PdoQueryBuilder\Schema\DatabaseManager;
 use Hibla\PdoQueryBuilder\Schema\MigrationRepository;
 use Hibla\PdoQueryBuilder\Schema\SchemaBuilder;
 use Hibla\PdoQueryBuilder\Utilities\ConfigLoader;
+use Hibla\Promise\Interfaces\PromiseInterface;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Input\InputOption;
@@ -22,7 +23,7 @@ class MigrateCommand extends Command
 
     private SymfonyStyle $io;
     private OutputInterface $output;
-    private string $projectRoot;
+    private ?string $projectRoot = null;
     private string $migrationsPath;
     private MigrationRepository $repository;
     private SchemaBuilder $schema;
@@ -52,7 +53,7 @@ class MigrateCommand extends Command
         }
 
         try {
-            $force = $input->getOption('force');
+            $force = (bool) $input->getOption('force');
 
             $dbCheckResult = $this->ensureDatabaseExists($force);
 
@@ -73,7 +74,8 @@ class MigrateCommand extends Command
             $this->io->writeln('Preparing migration repository...');
             await($this->repository->createRepository());
 
-            $step = (int) $input->getOption('step');
+            $stepOption = $input->getOption('step');
+            $step = is_numeric($stepOption) ? (int) $stepOption : 0;
 
             if (! $this->performMigration($step)) {
                 return Command::FAILURE;
@@ -177,10 +179,23 @@ class MigrateCommand extends Command
             }
 
             $defaultConnection = $dbConfig['default'] ?? 'mysql';
-            $connections = $dbConfig['connections'] ?? [];
-            $config = $connections[$defaultConnection] ?? [];
+            if (! is_string($defaultConnection)) {
+                return 'unknown';
+            }
 
-            return $config['database'] ?? 'unknown';
+            $connections = $dbConfig['connections'] ?? [];
+            if (! is_array($connections)) {
+                return 'unknown';
+            }
+
+            $config = $connections[$defaultConnection] ?? [];
+            if (! is_array($config)) {
+                return 'unknown';
+            }
+
+            $database = $config['database'] ?? 'unknown';
+
+            return is_string($database) ? $database : 'unknown';
         } catch (\Throwable $e) {
             return 'unknown';
         }
@@ -199,7 +214,7 @@ class MigrateCommand extends Command
     private function initializeProjectRoot(): bool
     {
         $this->projectRoot = $this->findProjectRoot();
-        if (! $this->projectRoot) {
+        if ($this->projectRoot === null) {
             $this->io->error('Could not find project root');
 
             return false;
@@ -225,7 +240,7 @@ class MigrateCommand extends Command
         $ranMigrations = await($this->repository->getRan());
         $pendingMigrations = $this->getPendingMigrations($ranMigrations);
 
-        if (empty($pendingMigrations)) {
+        if (count($pendingMigrations) === 0) {
             $this->io->success('Nothing to migrate');
 
             return true;
@@ -248,6 +263,10 @@ class MigrateCommand extends Command
         return true;
     }
 
+    /**
+     * @param array<int, array<string, mixed>> $ranMigrations
+     * @return list<string>
+     */
     private function getPendingMigrations(array $ranMigrations): array
     {
         $files = glob($this->migrationsPath.'/*.php');
@@ -259,16 +278,16 @@ class MigrateCommand extends Command
 
         $ranMigrationNames = array_column($ranMigrations, 'migration');
 
-        return array_filter($files, function ($file) use ($ranMigrationNames) {
-            return ! in_array(basename($file), $ranMigrationNames);
-        });
+        return array_values(array_filter($files, function ($file) use ($ranMigrationNames) {
+            return ! in_array(basename($file), $ranMigrationNames, true);
+        }));
     }
 
     private function getNextBatchNumber(): int
     {
         $batchNumber = await($this->repository->getNextBatchNumber());
 
-        return ($batchNumber ?? 0) + 1;
+        return (is_int($batchNumber) ? $batchNumber : 0) + 1;
     }
 
     private function runMigration(string $file, int $batchNumber): bool
@@ -278,13 +297,17 @@ class MigrateCommand extends Command
         try {
             $migration = require $file;
 
-            if (! $this->validateMigrationClass($migration, $migrationName)) {
+            if (! is_object($migration) || ! $this->validateMigrationClass($migration, $migrationName)) {
                 return false;
             }
 
             $this->io->write("Migrating: {$migrationName}...");
 
-            await($migration->up($this->schema));
+            /** @var callable(SchemaBuilder): PromiseInterface<mixed> $upMethod */
+            $upMethod = [$migration, 'up'];
+            $promise = $upMethod($this->schema);
+            await($promise);
+
             await($this->repository->log($migrationName, $batchNumber));
 
             $this->io->writeln(' <info>✓</info>');
@@ -333,7 +356,9 @@ class MigrateCommand extends Command
 
     private function findProjectRoot(): ?string
     {
-        $dir = getcwd() ?: __DIR__;
+        $currentDir = getcwd();
+        $dir = ($currentDir !== false) ? $currentDir : __DIR__;
+
         for ($i = 0; $i < 10; $i++) {
             if (file_exists($dir.'/composer.json')) {
                 return $dir;

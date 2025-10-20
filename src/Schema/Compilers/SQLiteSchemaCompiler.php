@@ -9,10 +9,12 @@ use Hibla\PdoQueryBuilder\Schema\Column;
 use Hibla\PdoQueryBuilder\Schema\Compilers\Utilities\SQLiteIndexCompiler;
 use Hibla\PdoQueryBuilder\Schema\Compilers\Utilities\SQLiteTypeMapper;
 use Hibla\PdoQueryBuilder\Schema\ForeignKey;
+use Hibla\PdoQueryBuilder\Schema\IndexDefinition;
 use Hibla\PdoQueryBuilder\Schema\SchemaCompiler;
 
 class SQLiteSchemaCompiler implements SchemaCompiler
 {
+    /** @var array<int, array<string, mixed>> */
     private array $existingTableColumns = [];
     private SQLiteTypeMapper $typeMapper;
     private SQLiteIndexCompiler $indexCompiler;
@@ -23,6 +25,9 @@ class SQLiteSchemaCompiler implements SchemaCompiler
         $this->indexCompiler = new SQLiteIndexCompiler();
     }
 
+    /**
+     * @param array<int, array<string, mixed>> $columns
+     */
     public function setExistingTableColumns(array $columns): void
     {
         $this->existingTableColumns = $columns;
@@ -39,7 +44,7 @@ class SQLiteSchemaCompiler implements SchemaCompiler
 
         $columnDefinitions = [];
         foreach ($columns as $column) {
-            $columnDefinitions[] = '  '.$this->compileColumn($column);
+            $columnDefinitions[] = '  ' . $this->compileColumn($column);
         }
 
         foreach ($indexDefinitions as $indexDef) {
@@ -50,7 +55,7 @@ class SQLiteSchemaCompiler implements SchemaCompiler
         }
 
         foreach ($foreignKeys as $foreignKey) {
-            $columnDefinitions[] = '  '.$this->compileForeignKey($foreignKey);
+            $columnDefinitions[] = '  ' . $this->compileForeignKey($foreignKey);
         }
 
         $sql .= implode(",\n", $columnDefinitions);
@@ -77,7 +82,7 @@ class SQLiteSchemaCompiler implements SchemaCompiler
 
         if ($column->hasDefault()) {
             $sql .= $this->compileDefaultValue($column->getDefault());
-        } elseif ($column->shouldUseCurrent() && in_array($column->getType(), ['DATETIME', 'TIMESTAMP'])) {
+        } elseif ($column->shouldUseCurrent() && in_array($column->getType(), ['DATETIME', 'TIMESTAMP'], true)) {
             $sql .= ' DEFAULT CURRENT_TIMESTAMP';
         }
 
@@ -95,14 +100,16 @@ class SQLiteSchemaCompiler implements SchemaCompiler
         }
 
         if (is_bool($default)) {
-            return ' DEFAULT '.($default ? '1' : '0');
+            return ' DEFAULT ' . ($default ? '1' : '0');
         }
 
         if (is_numeric($default)) {
             return " DEFAULT {$default}";
         }
 
-        $escaped = str_replace("'", "''", $default);
+        // @phpstan-ignore-next-line
+        $stringDefault = strval($default);
+        $escaped = str_replace("'", "''", $stringDefault);
 
         return " DEFAULT '{$escaped}'";
     }
@@ -125,18 +132,24 @@ class SQLiteSchemaCompiler implements SchemaCompiler
         return $fkDef;
     }
 
-    public function compileAlter(Blueprint $blueprint): string|array
+    /**
+     * @return list<string>|string
+     */
+    public function compileAlter(Blueprint $blueprint): array|string
     {
         $table = $blueprint->getTable();
         $statements = [];
 
-        $needsRecreation = ! empty($blueprint->getDropColumns()) ||
-            ! empty($blueprint->getModifyColumns()) ||
-            ! empty($blueprint->getDropForeignKeys()) ||
-            ! empty($blueprint->getDropIndexes());
+        $needsRecreation = count($blueprint->getDropColumns()) > 0 ||
+            count($blueprint->getModifyColumns()) > 0 ||
+            count($blueprint->getDropForeignKeys()) > 0 ||
+            count($blueprint->getDropIndexes()) > 0;
 
         if ($needsRecreation) {
-            return $this->indexCompiler->compileTableRecreation($blueprint, $this->existingTableColumns, $this);
+            $result = $this->indexCompiler->compileTableRecreation($blueprint, $this->existingTableColumns, $this);
+
+            // @phpstan-ignore-next-line
+            return $result;
         }
 
         $statements = array_merge($statements, $this->compileAddColumns($table, $blueprint->getColumns()));
@@ -144,25 +157,42 @@ class SQLiteSchemaCompiler implements SchemaCompiler
         $statements = array_merge($statements, $this->compileRenameTable($table, $blueprint->getCommands()));
         $statements = array_merge($statements, $this->compileAddIndexes($table, $blueprint->getIndexDefinitions()));
 
-        return empty($statements) ? [] : $statements;
+        /** @var list<string> $statements */
+        return $statements;
     }
 
+    /**
+     * @param array<int, Column> $columns
+     * @return list<string>
+     */
     private function compileAddColumns(string $table, array $columns): array
     {
-        return array_map(
-            fn ($col) => "ALTER TABLE `{$table}` ADD COLUMN ".$this->compileColumn($col),
+        $result = array_map(
+            fn (Column $col) => "ALTER TABLE `{$table}` ADD COLUMN " . $this->compileColumn($col),
             $columns
         );
+
+        return array_values($result);
     }
 
+    /**
+     * @param array<int, array{from: string, to: string}> $renames
+     * @return list<string>
+     */
     private function compileRenameColumns(string $table, array $renames): array
     {
-        return array_map(
-            fn ($rename) => "ALTER TABLE `{$table}` RENAME COLUMN `{$rename['from']}` TO `{$rename['to']}`",
+        $result = array_map(
+            fn (array $rename) => "ALTER TABLE `{$table}` RENAME COLUMN `{$rename['from']}` TO `{$rename['to']}`",
             $renames
         );
+
+        return array_values($result);
     }
 
+    /**
+     * @param array<int, array{type: string, to: string}> $commands
+     * @return list<string>
+     */
     private function compileRenameTable(string $table, array $commands): array
     {
         $statements = [];
@@ -175,9 +205,15 @@ class SQLiteSchemaCompiler implements SchemaCompiler
         return $statements;
     }
 
+    /**
+     * @param array<int, IndexDefinition> $indexes
+     * @return list<string>
+     */
     private function compileAddIndexes(string $table, array $indexes): array
     {
-        return $this->indexCompiler->compileAddIndexDefinition($table, $indexes);
+        $result = $this->indexCompiler->compileAddIndexDefinition($table, $indexes);
+
+        return array_values($result);
     }
 
     public function compileDrop(string $table): string
