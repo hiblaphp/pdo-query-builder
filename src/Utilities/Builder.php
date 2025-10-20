@@ -96,7 +96,6 @@ class Builder extends QueryBuilderBase
             return null;
         }
 
-        // FIX: Ensure the returned value is a string or null.
         $driver = $connectionConfig['driver'] ?? null;
 
         return is_string($driver) ? $driver : null;
@@ -229,6 +228,51 @@ class Builder extends QueryBuilderBase
         $sql = $this->buildInsertQuery($data);
 
         return AsyncPDO::execute($sql, array_values($data));
+    }
+
+    /**
+     * Insert or update a record based on unique columns.
+     *
+     * @param  array<string, mixed>|array<array<string, mixed>>  $data  The data to insert or update as column => value pairs.
+     * @param  array<string>  $uniqueColumns  The columns to check for uniqueness.
+     * @param  array<string>  $updateColumns  The columns to update on conflict.
+     * @return PromiseInterface<int> A promise that resolves to the number of affected rows.
+     */
+    public function upsert(array $data, array $uniqueColumns, array $updateColumns): PromiseInterface
+    {
+        if ($data === []) {
+            return Promise::resolved(0);
+        }
+
+        $sql = $this->buildUpsertQuery($data, $uniqueColumns, $updateColumns);
+
+        $params = $this->flattenBatchParameters($data);
+
+        return AsyncPDO::execute($sql, $params);
+    }
+
+    /**
+     * Flatten batch parameters from nested arrays to a single flat array.
+     *
+     * @param  array<string, mixed>|array<int, array<string, mixed>>  $data
+     * @return array<int, mixed> Flattened parameters
+     */
+    protected function flattenBatchParameters(array $data): array
+    {
+        $firstItem = reset($data);
+        $isBatch = is_array($firstItem) && !isset($firstItem[0]);
+
+        if (!$isBatch) {
+            return array_values($data);
+        }
+
+        $flattened = [];
+        /** @var array<string, mixed> $row */
+        foreach ($data as $row) {
+            $flattened = array_merge($flattened, array_values($row));
+        }
+
+        return $flattened;
     }
 
     /**
