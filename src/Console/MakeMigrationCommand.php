@@ -161,8 +161,10 @@ use Hibla\PdoQueryBuilder\Schema\Blueprint;
 use Hibla\PdoQueryBuilder\Schema\SchemaBuilder;
 use Hibla\Promise\Interfaces\PromiseInterface;
 
-return new class
-{
+return new class() {
+    /**
+     * @return PromiseInterface<int|null>
+     */
     public function up(SchemaBuilder \$schema): PromiseInterface
     {
         return \$schema->create('{$this->table}', function (Blueprint \$table) {
@@ -170,7 +172,10 @@ return new class
             \$table->timestamps();
         });
     }
-
+    
+    /**
+     * @return PromiseInterface<int>
+     */
     public function down(SchemaBuilder \$schema): PromiseInterface
     {
         return \$schema->dropIfExists('{$this->table}');
@@ -187,8 +192,10 @@ use Hibla\PdoQueryBuilder\Schema\Blueprint;
 use Hibla\PdoQueryBuilder\Schema\SchemaBuilder;
 use Hibla\Promise\Interfaces\PromiseInterface;
 
-return new class
-{
+return new class () {
+    /**
+     * @return PromiseInterface<int|null>
+     */
     public function up(SchemaBuilder \$schema): PromiseInterface
     {
         return \$schema->table('{$this->alter}', function (Blueprint \$table) {
@@ -196,6 +203,9 @@ return new class
         });
     }
 
+    /**
+     * @return PromiseInterface<int>
+     */
     public function down(SchemaBuilder \$schema): PromiseInterface
     {
         return \$schema->table('{$this->alter}', function (Blueprint \$table) {
@@ -215,8 +225,7 @@ use Hibla\PdoQueryBuilder\Schema\SchemaBuilder;
 use Hibla\Promise\Interfaces\PromiseInterface;
 use Hibla\Promise\Promise;
 
-return new class
-{
+return new class () {
     public function up(SchemaBuilder \$schema): PromiseInterface
     {
         // Write your migration here and return a promise
