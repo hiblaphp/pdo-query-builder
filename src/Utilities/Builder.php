@@ -452,7 +452,7 @@ class Builder extends QueryBuilderBase
         return async(function () use ($perPage, $page, $path): Paginator {
             $total = await($this->count());
 
-            $results = await($this->limit($perPage, ($page - 1) * $perPage)->get());
+            $results = await($this->forPage($page, $perPage)->get());
 
             return new Paginator(
                 items: $results,
