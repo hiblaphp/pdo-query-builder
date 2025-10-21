@@ -10,8 +10,8 @@ use Hibla\AsyncPDO\AsyncPDO;
 
 use function Hibla\await;
 
-use Hibla\PdoQueryBuilder\Utilities\ConfigLoader;
 use Hibla\Promise\Interfaces\PromiseInterface;
+use Rcalicdan\ConfigLoader\Config;
 
 class SchemaBuilder
 {
@@ -25,8 +25,7 @@ class SchemaBuilder
 
     private function detectDriver(): string
     {
-        $configLoader = ConfigLoader::getInstance();
-        $dbConfig = $configLoader->get('pdo-query-builder');
+        $dbConfig = Config::get('pdo-query-builder');
 
         if (! is_array($dbConfig)) {
             return 'mysql';
@@ -308,7 +307,7 @@ class SchemaBuilder
     private function nullPromise(): PromiseInterface
     {
         /** @phpstan-ignore-next-line */
-        return async(static fn() => null);
+        return async(static fn () => null);
     }
 
     /**

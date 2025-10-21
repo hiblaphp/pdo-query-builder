@@ -5,13 +5,13 @@ declare(strict_types=1);
 namespace Hibla\PdoQueryBuilder;
 
 use Hibla\AsyncPDO\AsyncPDO;
-use Hibla\PdoQueryBuilder\Exception\DatabaseConfigNotFoundException;
-use Hibla\PdoQueryBuilder\Exception\InvalidConnectionConfigException;
-use Hibla\PdoQueryBuilder\Exception\InvalidDefaultConnectionException;
-use Hibla\PdoQueryBuilder\Exception\InvalidPoolSizeException;
+use Hibla\PdoQueryBuilder\Exceptions\DatabaseConfigNotFoundException;
+use Hibla\PdoQueryBuilder\Exceptions\InvalidConnectionConfigException;
+use Hibla\PdoQueryBuilder\Exceptions\InvalidDefaultConnectionException;
+use Hibla\PdoQueryBuilder\Exceptions\InvalidPoolSizeException;
 use Hibla\PdoQueryBuilder\Utilities\Builder;
-use Hibla\PdoQueryBuilder\Utilities\ConfigLoader;
 use Hibla\Promise\Interfaces\PromiseInterface;
+use Rcalicdan\ConfigLoader\Config;
 
 /**
  * DB API - Main entry point for auto-configured async database operations using AsyncPDO under the hood
@@ -66,8 +66,7 @@ class DB
         self::$hasValidationError = false;
 
         try {
-            $configLoader = ConfigLoader::getInstance();
-            $dbConfigAll = $configLoader->get('pdo-query-builder');
+            $dbConfigAll = Config::get('pdo-query-builder');
 
             if (! is_array($dbConfigAll)) {
                 throw new DatabaseConfigNotFoundException();
@@ -122,7 +121,7 @@ class DB
     public static function reset(): void
     {
         AsyncPDO::reset();
-        ConfigLoader::reset();
+        Config::reset();
         Builder::resetDriverCache();
         self::$isInitialized = false;
         self::$hasValidationError = false;

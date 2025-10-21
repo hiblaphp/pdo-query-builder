@@ -9,8 +9,8 @@ use Hibla\PdoQueryBuilder\DB;
 use Hibla\PdoQueryBuilder\Schema\DatabaseManager;
 use Hibla\PdoQueryBuilder\Schema\MigrationRepository;
 use Hibla\PdoQueryBuilder\Schema\SchemaBuilder;
-use Hibla\PdoQueryBuilder\Utilities\ConfigLoader;
 use Hibla\Promise\Interfaces\PromiseInterface;
+use Rcalicdan\ConfigLoader\Config;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Input\InputOption;
@@ -171,8 +171,7 @@ class MigrateCommand extends Command
     private function getDatabaseName(): string
     {
         try {
-            $configLoader = ConfigLoader::getInstance();
-            $dbConfig = $configLoader->get('pdo-query-builder');
+            $dbConfig = Config::get('pdo-query-builder');
 
             if (! is_array($dbConfig)) {
                 return 'unknown';

@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace Hibla\PdoQueryBuilder\Exception;
+namespace Hibla\PdoQueryBuilder\Exceptions;
 
 /**
  * Thrown when database configuration file is missing

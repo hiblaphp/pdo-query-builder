@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace Hibla\PdoQueryBuilder\Schema;
 
-use Hibla\PdoQueryBuilder\Utilities\ConfigLoader;
 use PDO;
+use Rcalicdan\ConfigLoader\Config;
 
 /**
  * @phpstan-type TConnectionConfig array{
@@ -27,8 +27,7 @@ class DatabaseManager
 
     public function __construct()
     {
-        $configLoader = ConfigLoader::getInstance();
-        $dbConfig = $configLoader->get('pdo-query-builder');
+        $dbConfig = Config::get('pdo-query-builder');
 
         if (! is_array($dbConfig)) {
             throw new \RuntimeException('Invalid database configuration format');
@@ -77,7 +76,7 @@ class DatabaseManager
             };
         } catch (\Throwable $e) {
             throw new \RuntimeException(
-                "Failed to create database '{$database}': ".$e->getMessage(),
+                "Failed to create database '{$database}': " . $e->getMessage(),
                 0,
                 $e
             );

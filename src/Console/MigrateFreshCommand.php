@@ -6,7 +6,7 @@ namespace Hibla\PdoQueryBuilder\Console;
 
 use Hibla\PdoQueryBuilder\Console\Traits\LoadsSchemaConfiguration;
 use Hibla\PdoQueryBuilder\DB;
-use Hibla\PdoQueryBuilder\Utilities\ConfigLoader;
+use Rcalicdan\ConfigLoader\Config;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Input\ArrayInput;
 use Symfony\Component\Console\Input\InputInterface;
@@ -239,8 +239,7 @@ class MigrateFreshCommand extends Command
     private function detectDriver(): string
     {
         try {
-            $configLoader = ConfigLoader::getInstance();
-            $dbConfig = $configLoader->get('pdo-query-builder');
+            $dbConfig = Config::get('pdo-query-builder');
 
             if (! is_array($dbConfig)) {
                 return 'mysql';

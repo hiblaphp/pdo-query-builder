@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace Hibla\PdoQueryBuilder\Exception;
+namespace Hibla\PdoQueryBuilder\Exceptions;
 
 /**
  * Thrown when the project root cannot be found

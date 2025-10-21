@@ -5,8 +5,8 @@ declare(strict_types=1);
 namespace Hibla\PdoQueryBuilder\Schema;
 
 use Hibla\AsyncPDO\AsyncPDO;
-use Hibla\PdoQueryBuilder\Utilities\ConfigLoader;
 use Hibla\Promise\Interfaces\PromiseInterface;
+use Rcalicdan\ConfigLoader\Config;
 
 class MigrationRepository
 {
@@ -27,8 +27,7 @@ class MigrationRepository
     private function detectDriver(): string
     {
         try {
-            $configLoader = ConfigLoader::getInstance();
-            $dbConfig = $configLoader->get('pdo-query-builder');
+            $dbConfig = Config::get('pdo-query-builder');
 
             if (! is_array($dbConfig)) {
                 return 'mysql';

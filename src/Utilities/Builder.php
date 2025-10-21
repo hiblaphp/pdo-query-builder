@@ -7,6 +7,7 @@ namespace Hibla\PdoQueryBuilder\Utilities;
 use Hibla\AsyncPDO\AsyncPDO;
 use Hibla\Promise\Interfaces\PromiseInterface;
 use Hibla\Promise\Promise;
+use Rcalicdan\ConfigLoader\Config;
 use Rcalicdan\QueryBuilderPrimitives\QueryBuilderBase;
 
 /**
@@ -79,8 +80,7 @@ class Builder extends QueryBuilderBase
      */
     private function getDriverFromConfig(): ?string
     {
-        $configLoader = ConfigLoader::getInstance();
-        $dbConfig = $configLoader->get('pdo-query-builder');
+        $dbConfig = Config::get('pdo-query-builder');
 
         if (! is_array($dbConfig)) {
             return null;
@@ -150,7 +150,7 @@ class Builder extends QueryBuilderBase
      */
     private function convertToObjects(array $results): array
     {
-        return array_map(static fn(array $row): object => (object) $row, $results);
+        return array_map(static fn (array $row): object => (object) $row, $results);
     }
 
     /**
@@ -353,9 +353,9 @@ class Builder extends QueryBuilderBase
     protected function flattenBatchParameters(array $data): array
     {
         $firstItem = reset($data);
-        $isBatch = is_array($firstItem) && !isset($firstItem[0]);
+        $isBatch = is_array($firstItem) && ! isset($firstItem[0]);
 
-        if (!$isBatch) {
+        if (! $isBatch) {
             return array_values($data);
         }
 

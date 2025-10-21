@@ -2,11 +2,11 @@
 
 declare(strict_types=1);
 
-namespace Hibla\PdoQueryBuilder\Exception;
+namespace Hibla\PdoQueryBuilder\Exceptions;
 
 /**
  * Base exception for all PdoQueryBuilder exceptions
  */
-class PdoQueryBuilderException extends \RuntimeException
+class PDOQueryBuilderException extends \RuntimeException
 {
 }

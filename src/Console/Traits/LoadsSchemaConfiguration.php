@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace Hibla\PdoQueryBuilder\Console\Traits;
 
-use Hibla\PdoQueryBuilder\Utilities\ConfigLoader;
+use Rcalicdan\ConfigLoader\Config;
 
 trait LoadsSchemaConfiguration
 {
@@ -22,8 +22,7 @@ trait LoadsSchemaConfiguration
         $loadedConfig = [];
 
         try {
-            $configLoader = ConfigLoader::getInstance();
-            $config = $configLoader->get('pdo-schema');
+            $config = Config::get('pdo-schema');
 
             if (is_array($config)) {
                 $loadedConfig = $config;
@@ -58,8 +57,8 @@ trait LoadsSchemaConfiguration
         $projectRoot = $this->projectRoot ?? '.';
 
         return [
-            'schema_path' => $projectRoot.'/database/schema',
-            'migrations_path' => $projectRoot.'/database/migrations',
+            'schema_path' => $projectRoot . '/database/schema',
+            'migrations_path' => $projectRoot . '/database/migrations',
             'migrations_table' => 'migrations',
             'naming_convention' => 'timestamp',
             'timezone' => 'UTC',
@@ -76,7 +75,7 @@ trait LoadsSchemaConfiguration
         $projectRoot = $this->projectRoot ?? '.';
 
         if (! $this->isAbsolutePath($path)) {
-            $path = $projectRoot.'/'.ltrim($path, '/');
+            $path = $projectRoot . '/' . ltrim($path, '/');
         }
 
         return $path;

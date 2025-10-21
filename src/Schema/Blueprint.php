@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace Hibla\PdoQueryBuilder\Schema;
 
+use Rcalicdan\ConfigLoader\Config;
+
 class Blueprint
 {
     private string $table;
@@ -539,12 +541,15 @@ class Blueprint
     }
 
     /**
-     * Add nullable created_at and updated_at timestamp columns.
+     * Add nullable created_at and updated_at timestamp columns with timezone support.
      */
-    public function timestamps(): void
+    public function timestamps(?string $timezone = null): void
     {
-        $this->timestamp('created_at')->nullable()->useCurrent();
-        $this->timestamp('updated_at')->nullable()->useCurrent()->onUpdate('CURRENT_TIMESTAMP');
+        /** @var string $timezone */
+        $timezone = Config::get('pdo-schema.timezone', 'UTC');
+
+        $this->timestamp('created_at')->nullable()->useCurrent()->timezone($timezone);
+        $this->timestamp('updated_at')->nullable()->useCurrent()->useCurrentOnUpdate()->timezone($timezone);
     }
 
     /**

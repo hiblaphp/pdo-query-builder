@@ -4,8 +4,10 @@ declare(strict_types=1);
 
 namespace Hibla\PdoQueryBuilder\Schema;
 
+use Carbon\Carbon;
 use Doctrine\Inflector\Inflector as DoctrineInflector;
 use Doctrine\Inflector\InflectorFactory;
+use Rcalicdan\ConfigLoader\Config;
 
 /**
  * @phpstan-type TColumnIndex array{type: 'UNIQUE'|'INDEX'|'FULLTEXT'|'SPATIAL', name: string|null, algorithm: string|null, operatorClass?: string|null}
@@ -25,10 +27,12 @@ use Doctrine\Inflector\InflectorFactory;
  *     comment: string|null,
  *     after: string|null,
  *     useCurrent: bool,
+ *     useCurrentOnUpdate: bool,
  *     onUpdate: string|null,
  *     enumValues: list<string>,
  *     hasForeignKey: bool,
- *     columnIndexes: list<TColumnIndex>
+ *     columnIndexes: list<TColumnIndex>,
+ *     timezone: string|null
  * }
  */
 class Column
@@ -48,6 +52,7 @@ class Column
     private ?string $comment = null;
     private ?string $after = null;
     private bool $useCurrent = false;
+    private bool $useCurrentOnUpdate = false;
     private ?string $onUpdate = null;
     /** @var list<string> */
     private array $enumValues = [];
@@ -56,6 +61,7 @@ class Column
     private static ?DoctrineInflector $inflector = null;
     /** @var list<TColumnIndex> */
     private array $columnIndexes = [];
+    private ?string $timezone = null;
 
     public function __construct(
         string $name,
@@ -69,6 +75,12 @@ class Column
         $this->length = $length;
         $this->precision = $precision;
         $this->scale = $scale;
+
+        if (in_array($type, ['TIMESTAMP', 'DATETIME', 'DATE'], true)) {
+            /** @var string $tz */
+            $tz = Config::get('pdo-schema.timezone', 'UTC');
+            $this->timezone = $tz;
+        }
     }
 
     /**
@@ -266,6 +278,14 @@ class Column
     }
 
     /**
+     * Check if the column should use current timestamp on update.
+     */
+    public function shouldUseCurrentOnUpdate(): bool
+    {
+        return $this->useCurrentOnUpdate;
+    }
+
+    /**
      * Get the "on update" action for the column.
      */
     public function getOnUpdate(): ?string
@@ -308,6 +328,14 @@ class Column
     }
 
     /**
+     * Get the timezone for this column.
+     */
+    public function getTimezone(): ?string
+    {
+        return $this->timezone;
+    }
+
+    /**
      * Allow the column to be nullable.
      */
     public function nullable(bool $value = true): self
@@ -322,6 +350,11 @@ class Column
      */
     public function default(mixed $value): self
     {
+        // If value is a Carbon instance, convert to appropriate format
+        if ($value instanceof Carbon) {
+            $value = $value->setTimezone($this->timezone ?? 'UTC')->toDateTimeString();
+        }
+
         $this->default = $value;
         $this->hasDefault = true;
 
@@ -406,11 +439,34 @@ class Column
     }
 
     /**
+     * Set the column to use current timestamp on update.
+     */
+    public function useCurrentOnUpdate(bool $value = true): self
+    {
+        $this->useCurrentOnUpdate = $value;
+        if ($value) {
+            $this->onUpdate = 'CURRENT_TIMESTAMP';
+        }
+
+        return $this;
+    }
+
+    /**
      * Specify an "on update" action for the column.
      */
     public function onUpdate(string $value): self
     {
         $this->onUpdate = $value;
+
+        return $this;
+    }
+
+    /**
+     * Set the timezone for this column.
+     */
+    public function timezone(string $timezone): self
+    {
+        $this->timezone = $timezone;
 
         return $this;
     }
@@ -628,6 +684,7 @@ class Column
                 'unsigned' => is_bool($value) ? $column->unsigned($value) : null,
                 'unique' => is_bool($value) ? $column->unique($value) : null,
                 'comment' => is_string($value) ? $column->comment($value) : null,
+                'timezone' => is_string($value) ? $column->timezone($value) : null,
                 default => null,
             };
         }
@@ -657,10 +714,12 @@ class Column
             'comment' => $this->comment,
             'after' => $this->after,
             'useCurrent' => $this->useCurrent,
+            'useCurrentOnUpdate' => $this->useCurrentOnUpdate,
             'onUpdate' => $this->onUpdate,
             'enumValues' => $this->enumValues,
             'hasForeignKey' => $this->foreignKey !== null,
             'columnIndexes' => $this->columnIndexes,
+            'timezone' => $this->timezone,
         ];
     }
 
@@ -714,6 +773,10 @@ class Column
             $column->useCurrent();
         }
 
+        if ($data['useCurrentOnUpdate'] ?? false) {
+            $column->useCurrentOnUpdate();
+        }
+
         if (isset($data['onUpdate'])) {
             $column->onUpdate($data['onUpdate']);
         }
@@ -724,6 +787,10 @@ class Column
 
         if (isset($data['columnIndexes']) && $data['columnIndexes'] !== []) {
             $column->columnIndexes = $data['columnIndexes'];
+        }
+
+        if (isset($data['timezone'])) {
+            $column->timezone($data['timezone']);
         }
 
         return $column;
