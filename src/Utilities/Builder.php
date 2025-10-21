@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace Hibla\PdoQueryBuilder\Utilities;
 
 use Hibla\AsyncPDO\AsyncPDO;
+use Hibla\PdoQueryBuilder\Pagination\CursorPaginator;
+use Hibla\PdoQueryBuilder\Pagination\Paginator;
 use Hibla\Promise\Interfaces\PromiseInterface;
 use Hibla\Promise\Promise;
 use Rcalicdan\ConfigLoader\Config;
@@ -150,7 +152,7 @@ class Builder extends QueryBuilderBase
      */
     private function convertToObjects(array $results): array
     {
-        return array_map(static fn (array $row): object => (object) $row, $results);
+        return array_map(static fn(array $row): object => (object) $row, $results);
     }
 
     /**
@@ -430,5 +432,98 @@ class Builder extends QueryBuilderBase
         $sql = $this->buildDeleteQuery();
 
         return AsyncPDO::execute($sql, $this->getCompiledBindings());
+    }
+
+    /**
+     * Paginate the results with automatic request handling.
+     *
+     * @param  int  $perPage  Records per page
+     * @param  string|null  $path  The path for pagination links
+     * @return PromiseInterface<Paginator>
+     */
+    public function paginatePage(int $perPage = 15, ?string $path = null): PromiseInterface
+    {
+        $page = max(1, (int) ($_GET['page'] ?? 1));
+
+        if ($path === null) {
+            $path = $this->getCurrentPath();
+        }
+
+        return async(function () use ($perPage, $page, $path): Paginator {
+            $total = await($this->count());
+
+            $results = await($this->limit($perPage, ($page - 1) * $perPage)->get());
+
+            return new Paginator(
+                items: $results,
+                total: $total,
+                perPage: $perPage,
+                currentPage: $page,
+                path: $path,
+            );
+        });
+    }
+
+    /**
+     * Paginate with cursor-based pagination (automatic request handling).
+     *
+     * @param  int  $perPage  Records per page
+     * @param  string  $cursorColumn  The column to use for cursor
+     * @param  string|null  $path  The path for pagination links
+     * @return PromiseInterface<CursorPaginator>
+     */
+    public function cursorPaginate(
+        int $perPage = 15,
+        string $cursorColumn = 'id',
+        ?string $path = null,
+    ): PromiseInterface {
+        $cursor = $_GET['cursor'] ?? null;
+
+        if ($path === null) {
+            $path = $this->getCurrentPath();
+        }
+
+        return async(function () use ($perPage, $cursor, $cursorColumn, $path): CursorPaginator {
+            $query = $this;
+
+            if ($cursor !== null) {
+                $cursorValue = base64_decode($cursor, true);
+                $query = $query->where($cursorColumn, '>', $cursorValue);
+            }
+
+            $results = await($query->limit($perPage + 1)->get());
+            $hasMore = count($results) > $perPage;
+
+            if ($hasMore) {
+                array_pop($results);
+            }
+
+            $nextCursor = null;
+            if ($hasMore && !empty($results)) {
+                $lastItem = end($results);
+                $cursorValue = is_array($lastItem) ? $lastItem[$cursorColumn] : $lastItem->$cursorColumn;
+                $nextCursor = base64_encode((string) $cursorValue);
+            }
+
+            return new CursorPaginator(
+                items: $results,
+                perPage: $perPage,
+                nextCursor: $nextCursor,
+                cursorColumn: $cursorColumn,
+                path: $path,
+            );
+        });
+    }
+
+    /**
+     * Get current request path for pagination links
+     */
+    private function getCurrentPath(): string
+    {
+        $scheme = isset($_SERVER['HTTPS']) ? 'https' : 'http';
+        $host = $_SERVER['HTTP_HOST'];
+        $path = parse_url($_SERVER['REQUEST_URI'], PHP_URL_PATH);
+
+        return $scheme . '://' . $host . $path;
     }
 }
