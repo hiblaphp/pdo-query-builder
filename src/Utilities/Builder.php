@@ -441,7 +441,7 @@ class Builder extends QueryBuilderBase
      * @param  string|null  $path  The path for pagination links
      * @return PromiseInterface<Paginator>
      */
-    public function paginatePage(int $perPage = 15, ?string $path = null): PromiseInterface
+    public function paginate(int $perPage = 15, ?string $path = null): PromiseInterface
     {
         $page = max(1, (int) ($_GET['page'] ?? 1));
 
