@@ -4,7 +4,8 @@ declare(strict_types=1);
 
 namespace Hibla\PdoQueryBuilder\Utilities;
 
-use Hibla\AsyncPDO\AsyncPDO;
+use Hibla\AsyncPDO\AsyncPDOConnection;
+use Hibla\PdoQueryBuilder\DB;
 use Hibla\PdoQueryBuilder\Pagination\CursorPaginator;
 use Hibla\PdoQueryBuilder\Pagination\Paginator;
 use Hibla\Promise\Interfaces\PromiseInterface;
@@ -42,15 +43,23 @@ class Builder extends QueryBuilderBase
     private bool $returnAsObject = false;
 
     /**
+     * @var AsyncPDOConnection|null The connection instance to use for queries
+     */
+    private ?AsyncPDOConnection $connection = null;
+
+    /**
      * Create a new AsyncQueryBuilder instance.
      *
      * @param  string  $table  The table name to query.
+     * @param  AsyncPDOConnection|null  $connection  Optional connection instance
      */
-    final public function __construct(string $table = '')
+    final public function __construct(string $table = '', ?AsyncPDOConnection $connection = null)
     {
         if ($table !== '') {
             $this->table = $table;
         }
+
+        $this->connection = $connection;
 
         if (! self::$driverDetected) {
             $this->autoDetectDriver();
@@ -62,6 +71,47 @@ class Builder extends QueryBuilderBase
         if (! self::$templatesConfigured) {
             $this->configureTemplates();
             self::$templatesConfigured = true;
+        }
+    }
+
+    /**
+     * Set the connection for this builder instance.
+     *
+     * @param  AsyncPDOConnection  $connection
+     * @return static
+     */
+    public function setConnection(AsyncPDOConnection $connection): static
+    {
+        $clone = clone $this;
+        $clone->connection = $connection;
+
+        return $clone;
+    }
+
+    /**
+     * Get the connection instance.
+     *
+     * @return AsyncPDOConnection
+     *
+     * @throws \RuntimeException If no connection can be obtained
+     */
+    private function getConnection(): AsyncPDOConnection
+    {
+        if ($this->connection !== null) {
+            return $this->connection;
+        }
+
+        try {
+            $proxy = DB::connection();
+            $connection = $proxy->getConnection();
+
+            $this->connection = $connection;
+
+            return $connection;
+        } catch (\Throwable $e) {
+            throw new \RuntimeException(
+                'No connection available. Ensure database configuration is loaded properly. Error: ' . $e->getMessage()
+            );
         }
     }
 
@@ -123,7 +173,7 @@ class Builder extends QueryBuilderBase
         $sql = $this->buildSelectQuery();
 
         return async(function () use ($sql): array {
-            $results = await(AsyncPDO::query($sql, $this->getCompiledBindings()));
+            $results = await($this->getConnection()->query($sql, $this->getCompiledBindings()));
 
             return $this->returnAsObject ? $this->convertToObjects($results) : $results;
         });
@@ -140,7 +190,7 @@ class Builder extends QueryBuilderBase
         $sql = $instanceWithLimit->buildSelectQuery();
 
         return async(function () use ($sql, $instanceWithLimit): array|\stdClass|false {
-            $result = await(AsyncPDO::fetchOne($sql, $instanceWithLimit->getCompiledBindings()));
+            $result = await($instanceWithLimit->getConnection()->fetchOne($sql, $instanceWithLimit->getCompiledBindings()));
 
             if ($result === false) {
                 return false;
@@ -248,7 +298,7 @@ class Builder extends QueryBuilderBase
     {
         $sql = $this->buildCountQuery($column);
         /** @var PromiseInterface<int> */
-        $promise = AsyncPDO::fetchValue($sql, $this->getCompiledBindings());
+        $promise = $this->getConnection()->fetchValue($sql, $this->getCompiledBindings());
 
         return $promise;
     }
@@ -280,7 +330,7 @@ class Builder extends QueryBuilderBase
         }
         $sql = $this->buildInsertQuery($data);
 
-        return AsyncPDO::execute($sql, array_values($data));
+        return $this->getConnection()->execute($sql, array_values($data));
     }
 
     /**
@@ -301,7 +351,7 @@ class Builder extends QueryBuilderBase
 
         $params = $this->flattenBatchParameters($data);
 
-        return AsyncPDO::execute($sql, $params);
+        return $this->getConnection()->execute($sql, $params);
     }
 
     /**
@@ -348,7 +398,7 @@ class Builder extends QueryBuilderBase
             }
         }
 
-        return AsyncPDO::execute($sql, $bindings);
+        return $this->getConnection()->execute($sql, $bindings);
     }
 
     /**
@@ -377,7 +427,7 @@ class Builder extends QueryBuilderBase
         $whereBindings = $this->getCompiledBindings();
         $bindings = array_merge(array_values($data), $whereBindings);
 
-        return AsyncPDO::execute($sql, $bindings);
+        return $this->getConnection()->execute($sql, $bindings);
     }
 
     /**
@@ -389,7 +439,7 @@ class Builder extends QueryBuilderBase
     {
         $sql = $this->buildDeleteQuery();
 
-        return AsyncPDO::execute($sql, $this->getCompiledBindings());
+        return $this->getConnection()->execute($sql, $this->getCompiledBindings());
     }
 
     /**
@@ -562,7 +612,7 @@ class Builder extends QueryBuilderBase
     }
 
     /**
-     * Auto-detect the database driver from the current AsyncPDO connection.
+     * Auto-detect the database driver from the current connection.
      * This runs only once and caches the result.
      */
     private function autoDetectDriver(): void

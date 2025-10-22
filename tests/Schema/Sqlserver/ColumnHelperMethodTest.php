@@ -35,12 +35,12 @@ describe('Column Helper Methods', function () {
             $table->timestamps();
         })->await();
 
-        AsyncPDO::execute(
+        \Hibla\PdoQueryBuilder\DB::rawExecute(
             'INSERT INTO users (name) VALUES (?)',
             ['Test User']
         )->await();
 
-        $user = AsyncPDO::fetchOne('SELECT * FROM users WHERE name = ?', ['Test User'])->await();
+        $user = \Hibla\PdoQueryBuilder\DB::rawFirst('SELECT * FROM users WHERE name = ?', ['Test User'])->await();
 
         expect($user['created_at'])->not->toBeNull();
         expect($user['updated_at'])->not->toBeNull();

@@ -103,7 +103,7 @@ class MigrationRepository
             )",
         };
 
-        return AsyncPDO::execute($sql, []);
+        return \Hibla\PdoQueryBuilder\DB::rawExecute($sql, []);
     }
 
     /**
@@ -115,7 +115,7 @@ class MigrationRepository
     {
         $table = $this->quoteIdentifier($this->table);
 
-        return AsyncPDO::query(
+        return \Hibla\PdoQueryBuilder\DB::raw(
             "SELECT migration FROM {$table} ORDER BY batch, migration",
             []
         );
@@ -136,7 +136,7 @@ class MigrationRepository
             default => "SELECT migration FROM {$table} ORDER BY batch DESC, migration DESC LIMIT ?",
         };
 
-        return AsyncPDO::query($sql, [$steps]);
+        return \Hibla\PdoQueryBuilder\DB::raw($sql, [$steps]);
     }
 
     /**
@@ -148,7 +148,7 @@ class MigrationRepository
     {
         $table = $this->quoteIdentifier($this->table);
 
-        return AsyncPDO::query(
+        return \Hibla\PdoQueryBuilder\DB::raw(
             "SELECT migration FROM {$table} WHERE batch = (SELECT MAX(batch) FROM {$table})",
             []
         );
@@ -165,7 +165,7 @@ class MigrationRepository
     {
         $table = $this->quoteIdentifier($this->table);
 
-        return AsyncPDO::execute(
+        return \Hibla\PdoQueryBuilder\DB::rawExecute(
             "INSERT INTO {$table} (migration, batch) VALUES (?, ?)",
             [$file, $batch]
         );
@@ -181,7 +181,7 @@ class MigrationRepository
     {
         $table = $this->quoteIdentifier($this->table);
 
-        return AsyncPDO::execute(
+        return \Hibla\PdoQueryBuilder\DB::rawExecute(
             "DELETE FROM {$table} WHERE migration = ?",
             [$migration]
         );
@@ -196,7 +196,7 @@ class MigrationRepository
     {
         $table = $this->quoteIdentifier($this->table);
 
-        return AsyncPDO::fetchValue(
+        return \Hibla\PdoQueryBuilder\DB::rawValue(
             "SELECT MAX(batch) FROM {$table}",
             []
         );
@@ -220,6 +220,6 @@ class MigrationRepository
                        WHERE table_schema = DATABASE() AND table_name = ?',
         };
 
-        return AsyncPDO::fetchValue($sql, [$this->table]);
+        return \Hibla\PdoQueryBuilder\DB::rawValue($sql, [$this->table]);
     }
 }

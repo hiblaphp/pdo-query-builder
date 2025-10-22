@@ -25,6 +25,7 @@ return [
     | Here are the database connections configured for your application.
     | Each connection can be customized with specific driver options and
     | PDO attributes to control behavior like error handling and fetch modes.
+    | You can add more connections as needed for your application.
     |
     | Supported drivers: "sqlite", "mysql", "pgsql", "sqlsrv"
     |

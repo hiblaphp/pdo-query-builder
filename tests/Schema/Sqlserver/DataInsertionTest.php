@@ -21,12 +21,12 @@ describe('Data Insertion and Verification', function () {
             $table->integer('age')->default(0);
         })->await();
 
-        AsyncPDO::execute(
+        \Hibla\PdoQueryBuilder\DB::rawExecute(
             'INSERT INTO users (name, email, age) VALUES (?, ?, ?)',
             ['John Doe', 'john@example.com', 30]
         )->await();
 
-        $user = AsyncPDO::fetchOne('SELECT * FROM users WHERE email = ?', ['john@example.com'])->await();
+        $user = \Hibla\PdoQueryBuilder\DB::rawFirst('SELECT * FROM users WHERE email = ?', ['john@example.com'])->await();
 
         expect($user)->not->toBeNull();
         expect($user['name'])->toBe('John Doe');
@@ -43,12 +43,12 @@ describe('Data Insertion and Verification', function () {
             $table->boolean('active')->default(true);
         })->await();
 
-        AsyncPDO::execute(
+        \Hibla\PdoQueryBuilder\DB::rawExecute(
             'INSERT INTO products (name) VALUES (?)',
             ['Test Product']
         )->await();
 
-        $product = AsyncPDO::fetchOne('SELECT * FROM products WHERE name = ?', ['Test Product'])->await();
+        $product = \Hibla\PdoQueryBuilder\DB::rawFirst('SELECT * FROM products WHERE name = ?', ['Test Product'])->await();
 
         expect($product)->not->toBeNull();
         expect((float) $product['price'])->toBe(0.00);
@@ -65,12 +65,12 @@ describe('Data Insertion and Verification', function () {
             $table->string('website')->nullable();
         })->await();
 
-        AsyncPDO::execute(
+        \Hibla\PdoQueryBuilder\DB::rawExecute(
             'INSERT INTO profiles (bio) VALUES (?)',
             [null]
         )->await();
 
-        $profile = AsyncPDO::fetchOne('SELECT TOP 1 * FROM profiles ORDER BY id DESC', [])->await();
+        $profile = \Hibla\PdoQueryBuilder\DB::rawFirst('SELECT TOP 1 * FROM profiles ORDER BY id DESC', [])->await();
 
         expect($profile)->not->toBeNull();
         expect($profile['bio'])->toBeNull();
@@ -85,13 +85,13 @@ describe('Data Insertion and Verification', function () {
             $table->string('email')->unique();
         })->await();
 
-        AsyncPDO::execute(
+        \Hibla\PdoQueryBuilder\DB::rawExecute(
             'INSERT INTO users (email) VALUES (?)',
             ['test@example.com']
         )->await();
 
         expect(function () {
-            AsyncPDO::execute(
+            \Hibla\PdoQueryBuilder\DB::rawExecute(
                 'INSERT INTO users (email) VALUES (?)',
                 ['test@example.com']
             )->await();
@@ -110,24 +110,24 @@ describe('Data Insertion and Verification', function () {
             $table->string('title');
         })->await();
 
-        AsyncPDO::execute(
+        \Hibla\PdoQueryBuilder\DB::rawExecute(
             'INSERT INTO users (name) VALUES (?)',
             ['John Doe']
         )->await();
 
-        $userId = AsyncPDO::fetchValue('SELECT id FROM users WHERE name = ?', ['John Doe'])->await();
+        $userId = \Hibla\PdoQueryBuilder\DB::rawValue('SELECT id FROM users WHERE name = ?', ['John Doe'])->await();
 
-        AsyncPDO::execute(
+        \Hibla\PdoQueryBuilder\DB::rawExecute(
             'INSERT INTO posts (user_id, title) VALUES (?, ?)',
             [$userId, 'Test Post']
         )->await();
 
-        $post = AsyncPDO::fetchOne('SELECT * FROM posts WHERE title = ?', ['Test Post'])->await();
+        $post = \Hibla\PdoQueryBuilder\DB::rawFirst('SELECT * FROM posts WHERE title = ?', ['Test Post'])->await();
         expect($post)->not->toBeNull();
         expect((int) $post['user_id'])->toBe((int) $userId);
 
         expect(function () {
-            AsyncPDO::execute(
+            \Hibla\PdoQueryBuilder\DB::rawExecute(
                 'INSERT INTO posts (user_id, title) VALUES (?, ?)',
                 [99999, 'Invalid Post']
             )->await();
@@ -146,29 +146,29 @@ describe('Data Insertion and Verification', function () {
             $table->string('title');
         })->await();
 
-        AsyncPDO::execute(
+        \Hibla\PdoQueryBuilder\DB::rawExecute(
             'INSERT INTO users (name) VALUES (?)',
             ['Jane Doe']
         )->await();
 
-        $userId = AsyncPDO::fetchValue('SELECT id FROM users WHERE name = ?', ['Jane Doe'])->await();
+        $userId = \Hibla\PdoQueryBuilder\DB::rawValue('SELECT id FROM users WHERE name = ?', ['Jane Doe'])->await();
 
-        AsyncPDO::execute(
+        \Hibla\PdoQueryBuilder\DB::rawExecute(
             'INSERT INTO posts (user_id, title) VALUES (?, ?)',
             [$userId, 'Post 1']
         )->await();
 
-        AsyncPDO::execute(
+        \Hibla\PdoQueryBuilder\DB::rawExecute(
             'INSERT INTO posts (user_id, title) VALUES (?, ?)',
             [$userId, 'Post 2']
         )->await();
 
-        $postCount = AsyncPDO::fetchValue('SELECT COUNT(*) FROM posts WHERE user_id = ?', [$userId])->await();
+        $postCount = \Hibla\PdoQueryBuilder\DB::rawValue('SELECT COUNT(*) FROM posts WHERE user_id = ?', [$userId])->await();
         expect((int) $postCount)->toBe(2);
 
-        AsyncPDO::execute('DELETE FROM users WHERE id = ?', [$userId])->await();
+        \Hibla\PdoQueryBuilder\DB::rawExecute('DELETE FROM users WHERE id = ?', [$userId])->await();
 
-        $postCount = AsyncPDO::fetchValue('SELECT COUNT(*) FROM posts WHERE user_id = ?', [$userId])->await();
+        $postCount = \Hibla\PdoQueryBuilder\DB::rawValue('SELECT COUNT(*) FROM posts WHERE user_id = ?', [$userId])->await();
         expect((int) $postCount)->toBe(0);
     });
 });
