@@ -90,19 +90,22 @@ class DB
 
             /** @var array<string, mixed> $validatedConfig */
             $validatedConfig = [];
+            $poolSize = 10;
+
             foreach ($connectionConfig as $key => $value) {
                 if (! is_string($key)) {
                     throw new InvalidConnectionConfigException('Database connection configuration must have string keys only.');
                 }
-                $validatedConfig[$key] = $value;
-            }
 
-            $poolSize = 10;
-            if (isset($dbConfigAll['pool_size'])) {
-                if (! is_int($dbConfigAll['pool_size']) || $dbConfigAll['pool_size'] < 1) {
-                    throw new InvalidPoolSizeException();
+                if ($key === 'pool_size') {
+                    if (! is_int($value) || $value < 1) {
+                        throw new InvalidPoolSizeException();
+                    }
+                    $poolSize = $value;
+                    continue;
                 }
-                $poolSize = $dbConfigAll['pool_size'];
+
+                $validatedConfig[$key] = $value;
             }
 
             AsyncPDO::init($validatedConfig, $poolSize);

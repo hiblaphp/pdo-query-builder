@@ -37,6 +37,7 @@ return [
                 null => __DIR__ . '/../database/database.sqlite',
                 default => $path,
             },
+            'pool_size' => env('DB_POOL_SIZE', 10, true),
             'options' => [
                 PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
                 PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
@@ -51,6 +52,7 @@ return [
             'username' => env('DB_USERNAME', 'root'),
             'password' => env('DB_PASSWORD', ''),
             'charset' => 'utf8mb4',
+            'pool_size' => env('DB_POOL_SIZE', 10, true),
             'options' => [
                 PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
                 PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
@@ -67,6 +69,7 @@ return [
             'username' => env('DB_USERNAME', 'postgres'),
             'password' => env('DB_PASSWORD', ''),
             'charset' => 'utf8',
+            'pool_size' => env('DB_POOL_SIZE', 10, true),
             'options' => [
                 PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
                 PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
@@ -82,24 +85,13 @@ return [
             'database' => env('DB_DATABASE', 'test'),
             'username' => env('DB_USERNAME', ''),
             'password' => env('DB_PASSWORD', ''),
+            'pool_size' => env('DB_POOL_SIZE', 10, true),
             'options' => [
                 PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
                 PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
             ],
         ],
     ],
-
-    /*
-    |--------------------------------------------------------------------------
-    | Connection Pool Size
-    |--------------------------------------------------------------------------
-    |
-    | The maximum number of database connections to maintain in the pool.
-    | Connection pooling improves performance by reusing existing connections
-    | instead of creating new ones for each request.
-    |
-    */
-    'pool_size' => env('DB_POOL_SIZE', 10, true),
 
     /*
     |--------------------------------------------------------------------------
