@@ -5,8 +5,30 @@ use function Rcalicdan\ConfigLoader\env;
 require 'vendor/autoload.php';
 
 return [
+    /*
+    |--------------------------------------------------------------------------
+    | Default Database Connection
+    |--------------------------------------------------------------------------
+    |
+    | This option controls the default database connection that will be used
+    | by your application. The value should match one of the connection names
+    | defined in the 'connections' array below.
+    |
+    */
     'default' => env('DB_CONNECTION', 'sqlite'),
 
+    /*
+    |--------------------------------------------------------------------------
+    | Database Connections
+    |--------------------------------------------------------------------------
+    |
+    | Here are the database connections configured for your application.
+    | Each connection can be customized with specific driver options and
+    | PDO attributes to control behavior like error handling and fetch modes.
+    |
+    | Supported drivers: "sqlite", "mysql", "pgsql", "sqlsrv"
+    |
+    */
     'connections' => [
         'sqlite' => [
             'driver' => 'sqlite',
@@ -67,6 +89,16 @@ return [
         ],
     ],
 
+    /*
+    |--------------------------------------------------------------------------
+    | Connection Pool Size
+    |--------------------------------------------------------------------------
+    |
+    | The maximum number of database connections to maintain in the pool.
+    | Connection pooling improves performance by reusing existing connections
+    | instead of creating new ones for each request.
+    |
+    */
     'pool_size' => env('DB_POOL_SIZE', 10, true),
 
     /*
@@ -78,6 +110,8 @@ return [
     | 
     | - 'templates_path': The directory where templates will be published and loaded.
     |                     Set to null to use the default built-in templates.
+    | - 'default_template': The default pagination template to use.
+    | - 'default_cursor_template': The default cursor pagination template to use.
     | 
     | To publish templates, run: php async-pdo publish:templates
     | The templates will be copied to the path specified below.
@@ -85,5 +119,7 @@ return [
     */
     'pagination' => [
         'templates_path' => null,
+        'default_template' => 'tailwind',
+        'default_cursor_template' => 'cursor-tailwind',
     ],
 ];

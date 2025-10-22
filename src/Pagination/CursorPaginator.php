@@ -2,6 +2,8 @@
 
 namespace Hibla\PdoQueryBuilder\Pagination;
 
+use Rcalicdan\ConfigLoader\Config;
+
 class CursorPaginator
 {
     private static ?TemplateEngine $templateEngine = null;
@@ -104,8 +106,13 @@ class CursorPaginator
      * @param  string  $template  Template name (cursor-simple, cursor-bootstrap, cursor-tailwind)
      * @param  string|null  $basePath  Base path for pagination links. If null, uses current path
      */
-    public function render(string $template = 'cursor-simple', ?string $basePath = null): string
+    public function render(?string $template = null, ?string $basePath = null): string
     {
+        if ($template === null) {
+            /** @var string $template */
+            $template = Config::get('pdo-schema.pagination.default_cursor_template') ?? 'cursor-simple';
+        }
+
         if (!$this->hasMore()) {
             return '';
         }

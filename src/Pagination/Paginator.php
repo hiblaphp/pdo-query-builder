@@ -2,6 +2,8 @@
 
 namespace Hibla\PdoQueryBuilder\Pagination;
 
+use Rcalicdan\ConfigLoader\Config;
+
 class Paginator
 {
     private static ?TemplateEngine $templateEngine = null;
@@ -192,8 +194,13 @@ class Paginator
      * @param  string  $template  Template name (bootstrap, tailwind, simple)
      * @return string Rendered HTML
      */
-    public function render(string $template = 'bootstrap'): string
+    public function render(?string $template = null): string
     {
+        if ($template === null) {
+            /** @var string $template */
+            $template = Config::get('pdo-schema.pagination.default_template') ?? 'tailwind';
+        }
+
         if (!$this->hasPages()) {
             return '';
         }
@@ -210,7 +217,7 @@ class Paginator
      */
     public function links(?string $view = null): string
     {
-        return $this->render($view ?? 'bootstrap');
+        return $this->render($view);
     }
 
     /**

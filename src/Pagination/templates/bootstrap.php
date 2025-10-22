@@ -3,7 +3,7 @@
         <!-- Previous Page Link -->
         <?php if ($paginator->currentPage() > 1): ?>
             <li class="page-item">
-                <a class="page-link" href="<?php echo htmlspecialchars($paginator->previousPageUrl()); ?>" aria-label="Previous">
+                <a class="page-link" href="<?= htmlspecialchars($paginator->previousPageUrl()); ?>" aria-label="Previous">
                     <span aria-hidden="true">&laquo;</span>
                     Previous
                 </a>
@@ -24,7 +24,7 @@
 
         <?php if ($start > 1): ?>
             <li class="page-item">
-                <a class="page-link" href="<?php echo htmlspecialchars($paginator->url(1)); ?>">1</a>
+                <a class="page-link" href="<?= htmlspecialchars($paginator->url(1)); ?>">1</a>
             </li>
             <?php if ($start > 2): ?>
                 <li class="page-item disabled"><span class="page-link">...</span></li>
@@ -35,14 +35,14 @@
             <?php if ($page === $currentPage): ?>
                 <li class="page-item active" aria-current="page">
                     <span class="page-link">
-                        <?php echo $page; ?>
+                        <?= $page; ?>
                         <span class="sr-only">(current)</span>
                     </span>
                 </li>
             <?php else: ?>
                 <li class="page-item">
-                    <a class="page-link" href="<?php echo htmlspecialchars($paginator->url($page)); ?>">
-                        <?php echo $page; ?>
+                    <a class="page-link" href="<?= htmlspecialchars($paginator->url($page)); ?>">
+                        <?= $page; ?>
                     </a>
                 </li>
             <?php endif; ?>
@@ -53,8 +53,8 @@
                 <li class="page-item disabled"><span class="page-link">...</span></li>
             <?php endif; ?>
             <li class="page-item">
-                <a class="page-link" href="<?php echo htmlspecialchars($paginator->url($lastPage)); ?>">
-                    <?php echo $lastPage; ?>
+                <a class="page-link" href="<?= htmlspecialchars($paginator->url($lastPage)); ?>">
+                    <?= $lastPage; ?>
                 </a>
             </li>
         <?php endif; ?>
@@ -62,7 +62,7 @@
         <!-- Next Page Link -->
         <?php if ($paginator->hasMore()): ?>
             <li class="page-item">
-                <a class="page-link" href="<?php echo htmlspecialchars($paginator->nextPageUrl()); ?>" aria-label="Next">
+                <a class="page-link" href="<?= htmlspecialchars($paginator->nextPageUrl()); ?>" aria-label="Next">
                     Next
                     <span aria-hidden="true">&raquo;</span>
                 </a>
