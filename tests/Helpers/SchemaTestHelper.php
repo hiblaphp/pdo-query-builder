@@ -46,7 +46,7 @@ class SchemaTestHelper
         $config = self::getDriverConfig($driver);
         DB::init($config, $poolSize);
 
-        \Hibla\PdoQueryBuilder\DB::rawExecute('SELECT 1')->await();
+        DB::rawExecute('SELECT 1')->await();
     }
 
     /**
@@ -112,7 +112,7 @@ class SchemaTestHelper
 
     public static function initializeDatabase(): void
     {
-        \Hibla\PdoQueryBuilder\DB::rawExecute('SELECT 1')->await();
+        DB::rawExecute('SELECT 1')->await();
     }
 
     public static function createSchemaBuilder(?string $driver = null): SchemaBuilder

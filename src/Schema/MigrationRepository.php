@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace Hibla\PdoQueryBuilder\Schema;
 
-use Hibla\AsyncPDO\AsyncPDO;
 use Hibla\Promise\Interfaces\PromiseInterface;
 use Rcalicdan\ConfigLoader\Config;
 

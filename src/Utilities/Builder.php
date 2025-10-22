@@ -160,7 +160,7 @@ class Builder extends QueryBuilderBase
      */
     private function convertToObjects(array $results): array
     {
-        return array_map(static fn(array $row): object => (object) $row, $results);
+        return array_map(static fn (array $row): object => (object) $row, $results);
     }
 
     /**
@@ -523,7 +523,7 @@ class Builder extends QueryBuilderBase
         ?string $cursor,
         string $cursorColumn,
     ): self {
-        if (!is_string($cursor) || $cursor === '') {
+        if (! is_string($cursor) || $cursor === '') {
             return $this;
         }
 
@@ -546,7 +546,7 @@ class Builder extends QueryBuilderBase
         string $cursorColumn,
         bool $hasMore,
     ): ?string {
-        if (!$hasMore || count($results) === 0) {
+        if (! $hasMore || count($results) === 0) {
             return null;
         }
 
@@ -571,6 +571,7 @@ class Builder extends QueryBuilderBase
         }
 
         $vars = get_object_vars($item);
+
         return $vars[$column] ?? null;
     }
 
@@ -585,7 +586,7 @@ class Builder extends QueryBuilderBase
             return null;
         }
 
-        if (!is_scalar($value) && !(is_object($value) && method_exists($value, '__toString'))) {
+        if (! is_scalar($value) && ! (is_object($value) && method_exists($value, '__toString'))) {
             return null;
         }
 

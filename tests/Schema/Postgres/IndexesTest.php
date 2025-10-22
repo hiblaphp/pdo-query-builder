@@ -72,7 +72,7 @@ describe('Indexes', function () {
 
     it('creates table with various spatial types', function () {
         try {
-            \Hibla\PdoQueryBuilder\DB::rawExecute('CREATE EXTENSION IF NOT EXISTS postgis', [])->await();
+            DB::rawExecute('CREATE EXTENSION IF NOT EXISTS postgis', [])->await();
         } catch (Exception $e) {
             $this->markTestSkipped('PostGIS extension not available');
         }
@@ -93,7 +93,7 @@ describe('Indexes', function () {
 
     it('creates table with SRID specification', function () {
         try {
-            \Hibla\PdoQueryBuilder\DB::rawExecute('CREATE EXTENSION IF NOT EXISTS postgis', [])->await();
+            DB::rawExecute('CREATE EXTENSION IF NOT EXISTS postgis', [])->await();
         } catch (Exception $e) {
             $this->markTestSkipped('PostGIS extension not available');
         }

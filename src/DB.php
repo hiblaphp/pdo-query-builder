@@ -4,12 +4,12 @@ declare(strict_types=1);
 
 namespace Hibla\PdoQueryBuilder;
 
-use Hibla\Promise\Interfaces\PromiseInterface;
 use Hibla\AsyncPDO\AsyncPDOConnection;
 use Hibla\PdoQueryBuilder\Exceptions\DatabaseConfigNotFoundException;
 use Hibla\PdoQueryBuilder\Exceptions\InvalidConnectionConfigException;
 use Hibla\PdoQueryBuilder\Exceptions\InvalidPoolSizeException;
 use Hibla\PdoQueryBuilder\Utilities\Builder;
+use Hibla\Promise\Interfaces\PromiseInterface;
 use Rcalicdan\ConfigLoader\Config;
 
 /**
@@ -26,7 +26,9 @@ class DB
     /**
      * Private constructor to prevent direct instantiation.
      */
-    private function __construct() {}
+    private function __construct()
+    {
+    }
 
     /**
      * Get or create a connection proxy.
@@ -77,6 +79,7 @@ class DB
                     throw new InvalidPoolSizeException();
                 }
                 $poolSize = $value;
+
                 continue;
             }
 
@@ -128,18 +131,18 @@ class DB
     public static function initMultiple(array $connections, ?string $defaultConnection = null): void
     {
         foreach ($connections as $name => $connectionData) {
-            if (!is_string($name)) {
+            if (! is_string($name)) {
                 throw new InvalidConnectionConfigException('Connection names must be strings.');
             }
 
-            if (!isset($connectionData['config']) || !is_array($connectionData['config'])) {
+            if (! isset($connectionData['config']) || ! is_array($connectionData['config'])) {
                 throw new InvalidConnectionConfigException("Connection '{$name}' must have a 'config' array.");
             }
 
             $config = $connectionData['config'];
             $poolSize = $connectionData['pool_size'] ?? 10;
 
-            if (!is_int($poolSize) || $poolSize < 1) {
+            if (! is_int($poolSize) || $poolSize < 1) {
                 throw new InvalidPoolSizeException();
             }
 
@@ -149,7 +152,7 @@ class DB
 
         // Set default connection
         if ($defaultConnection !== null) {
-            if (!isset(self::$connections[$defaultConnection])) {
+            if (! isset(self::$connections[$defaultConnection])) {
                 throw new InvalidConnectionConfigException("Default connection '{$defaultConnection}' does not exist.");
             }
             self::$defaultConnectionName = $defaultConnection;
@@ -169,7 +172,7 @@ class DB
      */
     public static function setDefaultConnection(string $name): void
     {
-        if (!isset(self::$connections[$name])) {
+        if (! isset(self::$connections[$name])) {
             throw new InvalidConnectionConfigException("Connection '{$name}' does not exist.");
         }
 
@@ -222,6 +225,7 @@ class DB
     public static function table(string $table): Builder
     {
         $proxy = self::connection();
+
         return $proxy->table($table);
     }
 
@@ -235,6 +239,7 @@ class DB
     public static function raw(string $sql, array $bindings = []): PromiseInterface
     {
         $proxy = self::connection();
+
         return $proxy->raw($sql, $bindings);
     }
 
@@ -248,6 +253,7 @@ class DB
     public static function rawFirst(string $sql, array $bindings = []): PromiseInterface
     {
         $proxy = self::connection();
+
         return $proxy->rawFirst($sql, $bindings);
     }
 
@@ -261,6 +267,7 @@ class DB
     public static function rawValue(string $sql, array $bindings = []): PromiseInterface
     {
         $proxy = self::connection();
+
         return $proxy->rawValue($sql, $bindings);
     }
 
@@ -274,6 +281,7 @@ class DB
     public static function rawExecute(string $sql, array $bindings = []): PromiseInterface
     {
         $proxy = self::connection();
+
         return $proxy->rawExecute($sql, $bindings);
     }
 
@@ -291,6 +299,7 @@ class DB
     public static function transaction(callable $callback, int $attempts = 1): PromiseInterface
     {
         $proxy = self::connection();
+
         return $proxy->transaction($callback, $attempts);
     }
 
@@ -323,6 +332,7 @@ class DB
     public static function run(callable $callback): PromiseInterface
     {
         $proxy = self::connection();
+
         /** @phpstan-var PromiseInterface<TResult> */
         return $proxy->run($callback);
     }

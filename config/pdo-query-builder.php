@@ -100,12 +100,12 @@ return [
     |--------------------------------------------------------------------------
     |
     | Configure where pagination templates should be published and loaded from.
-    | 
+    |
     | - 'templates_path': The directory where templates will be published and loaded.
     |                     Set to null to use the default built-in templates.
     | - 'default_template': The default pagination template to use.
     | - 'default_cursor_template': The default cursor pagination template to use.
-    | 
+    |
     | To publish templates, run: php async-pdo publish:templates
     | The templates will be copied to the path specified below.
     |

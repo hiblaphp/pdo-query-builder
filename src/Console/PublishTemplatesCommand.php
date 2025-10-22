@@ -38,6 +38,7 @@ class PublishTemplatesCommand extends Command
         $this->projectRoot = $this->findProjectRoot();
         if ($this->projectRoot === null) {
             $this->io->error('Could not find project root');
+
             return Command::FAILURE;
         }
 
@@ -49,12 +50,13 @@ class PublishTemplatesCommand extends Command
         if ($targetPath === null) {
             $this->io->error('No templates path configured. Please set pagination.templates_path in config/pdo-query-builder.php');
             $this->io->note('Example: \'templates_path\' => __DIR__ . \'/../resources/views/pagination\'');
+
             return Command::FAILURE;
         }
 
         $this->io->info("Publishing templates to: {$targetPath}");
 
-        if (!$this->ensureDirectoryExists($targetPath)) {
+        if (! $this->ensureDirectoryExists($targetPath)) {
             return Command::FAILURE;
         }
 
@@ -76,18 +78,18 @@ class PublishTemplatesCommand extends Command
         try {
             $dbConfig = Config::get('pdo-query-builder');
 
-            if (!is_array($dbConfig)) {
+            if (! is_array($dbConfig)) {
                 return null;
             }
 
             $paginationConfig = $dbConfig['pagination'] ?? [];
-            if (!is_array($paginationConfig)) {
+            if (! is_array($paginationConfig)) {
                 return null;
             }
 
             $templatesPath = $paginationConfig['templates_path'] ?? null;
 
-            if (!is_string($templatesPath)) {
+            if (! is_string($templatesPath)) {
                 return null;
             }
 
@@ -98,6 +100,7 @@ class PublishTemplatesCommand extends Command
             return $templatesPath;
         } catch (\Throwable $e) {
             $this->io->warning("Could not load config: {$e->getMessage()}");
+
             return null;
         }
     }
@@ -131,12 +134,14 @@ class PublishTemplatesCommand extends Command
             return true;
         }
 
-        if (!mkdir($path, 0755, true)) {
+        if (! mkdir($path, 0755, true)) {
             $this->io->error("Failed to create directory: {$path}");
+
             return false;
         }
 
         $this->io->info("✓ Created directory: {$path}");
+
         return true;
     }
 
@@ -147,10 +152,11 @@ class PublishTemplatesCommand extends Command
     {
         $sourceTemplatesDir = $this->getSourceTemplatesPath();
 
-        if (!is_dir($sourceTemplatesDir)) {
+        if (! is_dir($sourceTemplatesDir)) {
             $this->io->error("Source templates directory not found: {$sourceTemplatesDir}");
             $this->io->note('Attempted paths for debugging:');
             $this->debugTemplatePaths();
+
             return 0;
         }
 
@@ -160,7 +166,7 @@ class PublishTemplatesCommand extends Command
             'simple.php',
             'cursor-simple.php',
             'cursor-bootstrap.php',
-            'cursor-tailwind.php'
+            'cursor-tailwind.php',
         ];
 
         $copiedCount = 0;
@@ -171,14 +177,16 @@ class PublishTemplatesCommand extends Command
             $source = $sourceTemplatesDir . DIRECTORY_SEPARATOR . $template;
             $destination = $targetPath . DIRECTORY_SEPARATOR . $template;
 
-            if (!file_exists($source)) {
+            if (! file_exists($source)) {
                 $this->io->warning("Source not found: {$template}");
+
                 continue;
             }
 
-            if (file_exists($destination) && !$this->force) {
-                if (!$this->io->confirm("  Template '{$template}' already exists. Overwrite?", false)) {
+            if (file_exists($destination) && ! $this->force) {
+                if (! $this->io->confirm("  Template '{$template}' already exists. Overwrite?", false)) {
                     $this->io->text("  <comment>⊘</comment> Skipped: {$template}");
+
                     continue;
                 }
             }

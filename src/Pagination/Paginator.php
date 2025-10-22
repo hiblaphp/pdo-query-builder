@@ -18,7 +18,8 @@ class Paginator
         private int $currentPage,
         private ?string $path = null,
         private ?string $query = null,
-    ) {}
+    ) {
+    }
 
     /**
      * Set a custom templates path
@@ -141,7 +142,7 @@ class Paginator
      */
     public function nextPageUrl(): ?string
     {
-        if (!$this->hasMore()) {
+        if (! $this->hasMore()) {
             return null;
         }
 
@@ -201,7 +202,7 @@ class Paginator
             $template = Config::get('pdo-schema.pagination.default_template') ?? 'tailwind';
         }
 
-        if (!$this->hasPages()) {
+        if (! $this->hasPages()) {
             return '';
         }
 
@@ -212,7 +213,7 @@ class Paginator
 
     /**
      * Render pagination links (alias for render, Laravel-style convenience method)
-     * 
+     *
      * @param  string|null  $view  Template name (bootstrap, tailwind, simple). If null, uses 'bootstrap'
      */
     public function links(?string $view = null): string

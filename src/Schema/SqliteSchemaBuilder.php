@@ -6,8 +6,6 @@ namespace Hibla\PdoQueryBuilder\Schema;
 
 use function Hibla\async;
 
-use Hibla\AsyncPDO\AsyncPDO;
-
 use function Hibla\await;
 
 use Hibla\Promise\Interfaces\PromiseInterface;

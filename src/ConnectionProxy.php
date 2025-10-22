@@ -76,6 +76,7 @@ class ConnectionProxy
     public function tableWithDriver(string $table, string $driver): Builder
     {
         $builder = new Builder($table, $this->connection);
+
         return $builder->setDriver($driver);
     }
 

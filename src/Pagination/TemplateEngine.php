@@ -16,7 +16,7 @@ class TemplateEngine
      */
     public static function setTemplatesPath(string $path): void
     {
-        if (!is_dir($path)) {
+        if (! is_dir($path)) {
             throw new \RuntimeException("Templates path does not exist: {$path}");
         }
     }
@@ -36,7 +36,7 @@ class TemplateEngine
 
         $templatePath = $this->getTemplatePath($template);
 
-        if (!file_exists($templatePath)) {
+        if (! file_exists($templatePath)) {
             throw new \RuntimeException("Template not found: {$template} at {$templatePath}");
         }
 
@@ -46,6 +46,7 @@ class TemplateEngine
         include $templatePath;
 
         $content = ob_get_clean();
+
         return $content !== false ? $content : '';
     }
 
@@ -56,7 +57,7 @@ class TemplateEngine
     private function getTemplatePath(string $template): string
     {
         $templatePath = str_replace('.', DIRECTORY_SEPARATOR, $template);
-        
+
         $path = $this->templatesPath . DIRECTORY_SEPARATOR . $templatePath . '.php';
 
         return $path;
