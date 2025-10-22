@@ -42,8 +42,8 @@ class PublishTemplatesCommand extends Command
         }
 
         $customPath = $input->getOption('path');
-        $targetPath = is_string($customPath) && $customPath !== '' 
-            ? $this->resolveCustomPath($customPath) 
+        $targetPath = is_string($customPath) && $customPath !== ''
+            ? $this->resolveCustomPath($customPath)
             : $this->getConfiguredPath();
 
         if ($targetPath === null) {
@@ -154,7 +154,15 @@ class PublishTemplatesCommand extends Command
             return 0;
         }
 
-        $templates = ['bootstrap.php', 'tailwind.php', 'simple.php', 'cursor-simple.php'];
+        $templates = [
+            'bootstrap.php',
+            'tailwind.php',
+            'simple.php',
+            'cursor-simple.php',
+            'cursor-bootstrap.php',
+            'cursor-tailwind.php'
+        ];
+
         $copiedCount = 0;
 
         $this->io->section('Publishing Templates:');
@@ -205,6 +213,8 @@ class PublishTemplatesCommand extends Command
             '  - tailwind.php      → Tailwind CSS styled pagination',
             '  - simple.php        → Simple text-based pagination',
             '  - cursor-simple.php → Simple cursor-based pagination',
+            '  - cursor-bootstrap.php → Bootstrap 5 styled cursor pagination',
+            '  - cursor-tailwind.php → Tailwind CSS styled cursor pagination',
         ]);
 
         $this->io->text([

@@ -547,6 +547,10 @@ class Builder extends QueryBuilderBase
      */
     private function getCurrentPath(): string
     {
+        if (php_sapi_name() === 'cli') {
+            return '';
+        }
+
         $scheme = isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off' ? 'https' : 'http';
         $host = is_string($_SERVER['HTTP_HOST'] ?? null) ? $_SERVER['HTTP_HOST'] : 'localhost';
         $requestUri = is_string($_SERVER['REQUEST_URI'] ?? null) ? $_SERVER['REQUEST_URI'] : '/';
