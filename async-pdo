@@ -5,6 +5,7 @@ require_once __DIR__ . '/vendor/autoload.php';
 
 use Symfony\Component\Console\Application;
 use Hibla\PdoQueryBuilder\Console\InitCommand;
+use Hibla\PdoQueryBuilder\Console\PublishTemplatesCommand;
 use Hibla\PdoQueryBuilder\Console\MakeMigrationCommand;
 use Hibla\PdoQueryBuilder\Console\MigrateCommand;
 use Hibla\PdoQueryBuilder\Console\MigrateRollbackCommand;
@@ -18,6 +19,7 @@ $application = new Application('Async PDO Query Builder', '1.0.0');
 
 // Register all commands
 $application->add(new InitCommand());
+$application->add(new PublishTemplatesCommand());
 $application->add(new MakeMigrationCommand());
 $application->add(new MigrateCommand());
 $application->add(new MigrateRollbackCommand());

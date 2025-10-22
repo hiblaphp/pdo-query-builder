@@ -6,6 +6,9 @@ class CursorPaginator
 {
     private static ?TemplateEngine $templateEngine = null;
 
+    /**
+     * @param array<int|string, mixed> $items
+     */
     public function __construct(
         private array $items,
         private int $perPage,
@@ -34,26 +37,50 @@ class CursorPaginator
         return self::$templateEngine;
     }
 
+    /**
+     * Get the current path
+     */
+    public function path(): ?string
+    {
+        return $this->path;
+    }
+
+    /**
+     * @return array<int|string, mixed>
+     */
     public function items(): array
     {
         return $this->items;
     }
 
+    /**
+     * Get items per page
+     */
     public function perPage(): int
     {
         return $this->perPage;
     }
 
+
+    /**
+     * Get the cursor value for the next page
+     */
     public function nextCursor(): ?string
     {
         return $this->nextCursor;
     }
 
+    /**
+     * Check if there are more items to paginate
+     */
     public function hasMore(): bool
     {
         return $this->nextCursor !== null;
     }
 
+    /**
+     * Get the next page URL
+     */
     public function nextPageUrl(?string $basePath = null): ?string
     {
         if (!$this->hasMore()) {
@@ -73,10 +100,9 @@ class CursorPaginator
 
     /**
      * Render cursor pagination using a template
-     *
-     * @param  string  $template  Template name
-     * @param  string|null  $basePath  Base path for next page URL
-     * @return string Rendered HTML
+     * 
+     * @param  string  $template  Template name (cursor-simple, cursor-bootstrap, cursor-tailwind)
+     * @param  string|null  $basePath  Base path for pagination links. If null, uses current path
      */
     public function render(string $template = 'cursor-simple', ?string $basePath = null): string
     {
@@ -86,7 +112,6 @@ class CursorPaginator
 
         $engine = self::getTemplateEngine();
 
-        // Temporarily set base path if provided
         if ($basePath !== null) {
             $this->path = $basePath;
         }
@@ -95,11 +120,20 @@ class CursorPaginator
     }
 
     /**
+     * Render cursor pagination links (alias for render, Laravel-style convenience method)
+     * 
+     * @param  string|null  $view  Template name (cursor-simple, cursor-bootstrap, cursor-tailwind). If null, uses 'cursor-simple'
+     * @param  string|null  $basePath  Base path for pagination links. If null, uses current path
+     */
+    public function links(?string $view = null, ?string $basePath = null): string
+    {
+        return $this->render($view ?? 'cursor-simple', $basePath);
+    }
+
+    /**
      * Return cursor pagination metadata as JSON
-     *
      * @param  bool  $includeItems  Include items in JSON response
      * @param  string|null  $basePath  Base path for next page URL
-     * @return string JSON string
      */
     public function toJson(bool $includeItems = true, ?string $basePath = null): string
     {
@@ -114,12 +148,17 @@ class CursorPaginator
             ],
         ];
 
-        return json_encode($data, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
+        $json = json_encode($data, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
+
+        if ($json === false) {
+            return '{}';
+        }
+
+        return $json;
     }
 
     /**
      * Return cursor pagination metadata as array
-     *
      * @param  bool  $includeItems  Include items in array response
      * @param  string|null  $basePath  Base path for next page URL
      * @return array<string, mixed>
@@ -141,11 +180,6 @@ class CursorPaginator
     /**
      * Return cursor pagination as JSON response
      * Useful for API responses
-     *
-     * @param  int  $statusCode  HTTP status code
-     * @param  bool  $includeItems  Include items in response
-     * @param  string|null  $basePath  Base path for next page URL
-     * @return void
      */
     public function respondJson(int $statusCode = 200, bool $includeItems = true, ?string $basePath = null): void
     {
@@ -153,5 +187,13 @@ class CursorPaginator
         http_response_code($statusCode);
         echo $this->toJson($includeItems, $basePath);
         exit;
+    }
+
+    /**
+     * Get the cursor column name
+     */
+    public function getCursorColumn(): string
+    {
+        return $this->cursorColumn;
     }
 }

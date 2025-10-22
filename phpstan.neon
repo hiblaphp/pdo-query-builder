@@ -5,4 +5,6 @@ parameters:
     level: 10
     paths:
         - src
+    excludePaths:
+        - src/Pagination/templates
     treatPhpDocTypesAsCertain: false

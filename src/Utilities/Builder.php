@@ -32,6 +32,11 @@ class Builder extends QueryBuilderBase
     private static bool $driverDetected = false;
 
     /**
+     * @var bool Whether templates have been configured
+     */
+    private static bool $templatesConfigured = false;
+
+    /**
      * @var bool Whether to return results as objects
      */
     private bool $returnAsObject = false;
@@ -53,59 +58,11 @@ class Builder extends QueryBuilderBase
         } else {
             $this->driver = self::$cachedDriver;
         }
-    }
 
-    /**
-     * Auto-detect the database driver from the current AsyncPDO connection.
-     * This runs only once and caches the result.
-     */
-    private function autoDetectDriver(): void
-    {
-        try {
-            $driver = $this->getDriverFromConfig();
-            if ($driver !== null) {
-                $detectedDriver = strtolower($driver);
-                $this->driver = $detectedDriver;
-                self::$cachedDriver = $detectedDriver;
-            } else {
-                $this->driver = 'mysql';
-                self::$cachedDriver = 'mysql';
-            }
-        } catch (\Throwable $e) {
-            $this->driver = 'mysql';
-            self::$cachedDriver = 'mysql';
+        if (! self::$templatesConfigured) {
+            $this->configureTemplates();
+            self::$templatesConfigured = true;
         }
-    }
-
-    /**
-     * Get the driver from the loaded configuration.
-     */
-    private function getDriverFromConfig(): ?string
-    {
-        $dbConfig = Config::get('pdo-query-builder');
-
-        if (! is_array($dbConfig)) {
-            return null;
-        }
-
-        $defaultConnection = $dbConfig['default'] ?? null;
-        if (! is_string($defaultConnection)) {
-            return null;
-        }
-
-        $connections = $dbConfig['connections'] ?? [];
-        if (! is_array($connections)) {
-            return null;
-        }
-
-        $connectionConfig = $connections[$defaultConnection] ?? null;
-        if (! is_array($connectionConfig)) {
-            return null;
-        }
-
-        $driver = $connectionConfig['driver'] ?? null;
-
-        return is_string($driver) ? $driver : null;
     }
 
     /**
@@ -115,6 +72,7 @@ class Builder extends QueryBuilderBase
     {
         self::$cachedDriver = null;
         self::$driverDetected = false;
+        self::$templatesConfigured = false;
     }
 
     /**
@@ -443,7 +401,8 @@ class Builder extends QueryBuilderBase
      */
     public function paginate(int $perPage = 15, ?string $path = null): PromiseInterface
     {
-        $page = max(1, (int) ($_GET['page'] ?? 1));
+        $pageParam = $_GET['page'] ?? 1;
+        $page = max(1, is_numeric($pageParam) ? (int) $pageParam : 1);
 
         if ($path === null) {
             $path = $this->getCurrentPath();
@@ -484,26 +443,16 @@ class Builder extends QueryBuilderBase
         }
 
         return async(function () use ($perPage, $cursor, $cursorColumn, $path): CursorPaginator {
-            $query = $this;
-
-            if ($cursor !== null) {
-                $cursorValue = base64_decode($cursor, true);
-                $query = $query->where($cursorColumn, '>', $cursorValue);
-            }
-
+            /** @var string|null $cursor */
+            $query = $this->applyDecodedCursor($cursor, $cursorColumn);
             $results = await($query->limit($perPage + 1)->get());
-            $hasMore = count($results) > $perPage;
 
+            $hasMore = count($results) > $perPage;
             if ($hasMore) {
                 array_pop($results);
             }
 
-            $nextCursor = null;
-            if ($hasMore && !empty($results)) {
-                $lastItem = end($results);
-                $cursorValue = is_array($lastItem) ? $lastItem[$cursorColumn] : $lastItem->$cursorColumn;
-                $nextCursor = base64_encode((string) $cursorValue);
-            }
+            $nextCursor = $this->resolveNextCursor($results, $cursorColumn, $hasMore);
 
             return new CursorPaginator(
                 items: $results,
@@ -516,14 +465,176 @@ class Builder extends QueryBuilderBase
     }
 
     /**
+     * @param string|null $cursor
+     * @param string $cursorColumn
+     * @return self
+     */
+    private function applyDecodedCursor(
+        ?string $cursor,
+        string $cursorColumn,
+    ): self {
+        if (!is_string($cursor) || $cursor === '') {
+            return $this;
+        }
+
+        $cursorValue = base64_decode($cursor, true);
+        if ($cursorValue === false) {
+            return $this;
+        }
+
+        return $this->where($cursorColumn, '>', $cursorValue);
+    }
+
+    /**
+     * @param array<mixed> $results
+     * @param string $cursorColumn
+     * @param bool $hasMore
+     * @return string|null
+     */
+    private function resolveNextCursor(
+        array $results,
+        string $cursorColumn,
+        bool $hasMore,
+    ): ?string {
+        if (!$hasMore || count($results) === 0) {
+            return null;
+        }
+
+        /** @var array<mixed>|object $lastItem */
+        $lastItem = end($results);
+        $cursorValue = $this->extractColumnValue($lastItem, $cursorColumn);
+
+        return $this->encodeCursorValue($cursorValue);
+    }
+
+    /**
+     * @param array<mixed>|object $item
+     * @param string $column
+     * @return mixed
+     */
+    private function extractColumnValue(
+        array|object $item,
+        string $column,
+    ): mixed {
+        if (is_array($item)) {
+            return $item[$column] ?? null;
+        }
+
+        $vars = get_object_vars($item);
+        return $vars[$column] ?? null;
+    }
+
+    /**
+     * @param mixed $value
+     * @return string|null
+     */
+    private function encodeCursorValue(
+        mixed $value,
+    ): ?string {
+        if ($value === null) {
+            return null;
+        }
+
+        if (!is_scalar($value) && !(is_object($value) && method_exists($value, '__toString'))) {
+            return null;
+        }
+
+        return base64_encode((string) $value);
+    }
+
+    /**
      * Get current request path for pagination links
      */
     private function getCurrentPath(): string
     {
-        $scheme = isset($_SERVER['HTTPS']) ? 'https' : 'http';
-        $host = $_SERVER['HTTP_HOST'];
-        $path = parse_url($_SERVER['REQUEST_URI'], PHP_URL_PATH);
+        $scheme = isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off' ? 'https' : 'http';
+        $host = is_string($_SERVER['HTTP_HOST'] ?? null) ? $_SERVER['HTTP_HOST'] : 'localhost';
+        $requestUri = is_string($_SERVER['REQUEST_URI'] ?? null) ? $_SERVER['REQUEST_URI'] : '/';
+
+        $parsedPath = parse_url($requestUri, PHP_URL_PATH);
+        $path = is_string($parsedPath) ? $parsedPath : '/';
 
         return $scheme . '://' . $host . $path;
+    }
+
+    /**
+     * Auto-detect the database driver from the current AsyncPDO connection.
+     * This runs only once and caches the result.
+     */
+    private function autoDetectDriver(): void
+    {
+        try {
+            $driver = $this->getDriverFromConfig();
+            if ($driver !== null) {
+                $detectedDriver = strtolower($driver);
+                $this->driver = $detectedDriver;
+                self::$cachedDriver = $detectedDriver;
+            } else {
+                $this->driver = 'mysql';
+                self::$cachedDriver = 'mysql';
+            }
+        } catch (\Throwable $e) {
+            $this->driver = 'mysql';
+            self::$cachedDriver = 'mysql';
+        }
+    }
+
+    /**
+     * Get the driver from the loaded configuration.
+     */
+    private function getDriverFromConfig(): ?string
+    {
+        $dbConfig = Config::get('pdo-query-builder');
+
+        if (! is_array($dbConfig)) {
+            return null;
+        }
+
+        $defaultConnection = $dbConfig['default'] ?? null;
+        if (! is_string($defaultConnection)) {
+            return null;
+        }
+
+        $connections = $dbConfig['connections'] ?? [];
+        if (! is_array($connections)) {
+            return null;
+        }
+
+        $connectionConfig = $connections[$defaultConnection] ?? null;
+        if (! is_array($connectionConfig)) {
+            return null;
+        }
+
+        $driver = $connectionConfig['driver'] ?? null;
+
+        return is_string($driver) ? $driver : null;
+    }
+
+    /**
+     * Configure custom pagination templates path from config
+     */
+    private function configureTemplates(): void
+    {
+        try {
+            $dbConfig = Config::get('pdo-query-builder');
+
+            if (! is_array($dbConfig)) {
+                return;
+            }
+
+            $paginationConfig = $dbConfig['pagination'] ?? [];
+            if (! is_array($paginationConfig)) {
+                return;
+            }
+
+            $templatesPath = $paginationConfig['templates_path'] ?? null;
+
+            if (is_string($templatesPath) && trim($templatesPath) !== '' && is_dir($templatesPath)) {
+                Paginator::setTemplatesPath($templatesPath);
+                CursorPaginator::setTemplatesPath($templatesPath);
+            }
+        } catch (\Throwable $e) {
+            error_log('Failed to configure pagination templates: ' . $e->getMessage());
+        }
     }
 }

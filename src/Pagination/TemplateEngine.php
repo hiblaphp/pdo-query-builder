@@ -8,7 +8,7 @@ class TemplateEngine
 
     public function __construct(?string $templatesPath = null)
     {
-        $this->templatesPath = $templatesPath ?? __DIR__ . '/templates';
+        $this->templatesPath = $templatesPath ?? __DIR__ . DIRECTORY_SEPARATOR . 'templates';
     }
 
     /**
@@ -24,7 +24,7 @@ class TemplateEngine
     /**
      * Render a template with variables
      *
-     * @param  string  $template  Template name
+     * @param  string  $template  Template name (supports dot notation: 'folder.template' or 'bootstrap')
      * @param  array<string, mixed>  $data  Variables to pass to template
      * @return string Rendered HTML
      */
@@ -45,15 +45,19 @@ class TemplateEngine
         ob_start();
         include $templatePath;
 
-        return ob_get_clean() ?: '';
+        $content = ob_get_clean();
+        return $content !== false ? $content : '';
     }
 
     /**
      * Get full path to template file
+     * Supports dot notation for nested directories (e.g., 'custom.bootstrap' -> 'custom/bootstrap.php')
      */
     private function getTemplatePath(string $template): string
     {
-        $path = $this->templatesPath . '/' . $template . '.php';
+        $templatePath = str_replace('.', DIRECTORY_SEPARATOR, $template);
+        
+        $path = $this->templatesPath . DIRECTORY_SEPARATOR . $templatePath . '.php';
 
         return $path;
     }

@@ -117,7 +117,6 @@ class InitCommand extends Command
 
     private function createAsyncPdoExecutable(): void
     {
-        // This check is now safe.
         $asyncPdoPath = $this->projectRoot.'/async-pdo';
 
         if (file_exists($asyncPdoPath) && ! $this->force) {
@@ -141,6 +140,8 @@ class InitCommand extends Command
         $this->io->success('✓ Created async-pdo executable');
         $this->io->section('Usage:');
         $this->io->listing([
+            'php async-pdo init',
+            'php async-pdo publish:templates',
             'php async-pdo migrate',
             'php async-pdo make:migration create_users_table',
             'php async-pdo migrate:rollback',
@@ -158,6 +159,7 @@ require_once __DIR__ . '/vendor/autoload.php';
 
 use Symfony\Component\Console\Application;
 use Hibla\PdoQueryBuilder\Console\InitCommand;
+use Hibla\PdoQueryBuilder\Console\PublishTemplatesCommand;
 use Hibla\PdoQueryBuilder\Console\MakeMigrationCommand;
 use Hibla\PdoQueryBuilder\Console\MigrateCommand;
 use Hibla\PdoQueryBuilder\Console\MigrateRollbackCommand;
@@ -171,6 +173,7 @@ $application = new Application('Async PDO Query Builder', '1.0.0');
 
 // Register all commands
 $application->add(new InitCommand());
+$application->add(new PublishTemplatesCommand());
 $application->add(new MakeMigrationCommand());
 $application->add(new MigrateCommand());
 $application->add(new MigrateRollbackCommand());

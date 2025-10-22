@@ -1,48 +1,32 @@
 #!/usr/bin/env php
 <?php
 
-declare(strict_types=1);
+require_once __DIR__ . '/vendor/autoload.php';
 
-$autoloadPaths = [
-    __DIR__ . '/../../../autoload.php',     
-    __DIR__ . '/../vendor/autoload.php',  
-    __DIR__ . '/../../../vendor/autoload.php', 
-];
-
-foreach ($autoloadPaths as $file) {
-    if (file_exists($file)) {
-        require $file;
-        break;
-    }
-}
-
-if (!class_exists('Symfony\Component\Console\Application')) {
-    fwrite(STDERR, 'Error: Symfony Console not found. Run "composer require symfony/console"' . PHP_EOL);
-    exit(1);
-}
-
+use Symfony\Component\Console\Application;
 use Hibla\PdoQueryBuilder\Console\InitCommand;
-use Hibla\PdoQueryBuilder\Console\StatusCommand;
+use Hibla\PdoQueryBuilder\Console\PublishTemplatesCommand;
 use Hibla\PdoQueryBuilder\Console\MakeMigrationCommand;
 use Hibla\PdoQueryBuilder\Console\MigrateCommand;
 use Hibla\PdoQueryBuilder\Console\MigrateRollbackCommand;
 use Hibla\PdoQueryBuilder\Console\MigrateResetCommand;
 use Hibla\PdoQueryBuilder\Console\MigrateRefreshCommand;
+use Hibla\PdoQueryBuilder\Console\MigrateFreshCommand;
 use Hibla\PdoQueryBuilder\Console\MigrateStatusCommand;
-use Symfony\Component\Console\Application;
+use Hibla\PdoQueryBuilder\Console\StatusCommand;
 
-$app = new Application('PDO Query Builder', '1.0.0');
+$application = new Application('Async PDO Query Builder', '1.0.0');
 
-// Configuration commands
-$app->add(new InitCommand());
-$app->add(new StatusCommand());
+// Register all commands
+$application->add(new InitCommand());
+$application->add(new PublishTemplatesCommand());
+$application->add(new MakeMigrationCommand());
+$application->add(new MigrateCommand());
+$application->add(new MigrateRollbackCommand());
+$application->add(new MigrateResetCommand());
+$application->add(new MigrateRefreshCommand());
+$application->add(new MigrateFreshCommand());
+$application->add(new MigrateStatusCommand());
+$application->add(new StatusCommand());
 
-// Migration commands
-$app->add(new MakeMigrationCommand());
-$app->add(new MigrateCommand());
-$app->add(new MigrateRollbackCommand());
-$app->add(new MigrateResetCommand());
-$app->add(new MigrateRefreshCommand());
-$app->add(new MigrateStatusCommand());
-
-$app->run();
+$application->run();
