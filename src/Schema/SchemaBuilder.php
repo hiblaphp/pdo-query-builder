@@ -6,8 +6,6 @@ namespace Hibla\PdoQueryBuilder\Schema;
 
 use function Hibla\async;
 
-use Hibla\AsyncPDO\AsyncPDO;
-
 use function Hibla\await;
 
 use Hibla\Promise\Interfaces\PromiseInterface;
@@ -79,7 +77,7 @@ class SchemaBuilder
         }
 
         /** @phpstan-ignore-next-line */
-        return AsyncPDO::execute($sql, []);
+        return \Hibla\PdoQueryBuilder\DB::rawExecute($sql, []);
     }
 
     /**
@@ -92,7 +90,7 @@ class SchemaBuilder
         $compiler = $this->getCompiler();
         $sql = $compiler->compileDropIfExists($table);
 
-        return AsyncPDO::execute($sql, []);
+        return \Hibla\PdoQueryBuilder\DB::rawExecute($sql, []);
     }
 
     /**
@@ -105,7 +103,7 @@ class SchemaBuilder
         $compiler = $this->getCompiler();
         $sql = $compiler->compileDrop($table);
 
-        return AsyncPDO::execute($sql, []);
+        return \Hibla\PdoQueryBuilder\DB::rawExecute($sql, []);
     }
 
     /**
@@ -118,7 +116,7 @@ class SchemaBuilder
         $compiler = $this->getCompiler();
         $sql = $compiler->compileTableExists($table);
 
-        return AsyncPDO::fetchValue($sql, []);
+        return \Hibla\PdoQueryBuilder\DB::rawValue($sql, []);
     }
 
     /**
@@ -149,7 +147,7 @@ class SchemaBuilder
         }
 
         /** @phpstan-ignore-next-line */
-        return AsyncPDO::execute($sql, []);
+        return \Hibla\PdoQueryBuilder\DB::rawExecute($sql, []);
     }
 
     /**
@@ -162,7 +160,7 @@ class SchemaBuilder
         $compiler = $this->getCompiler();
         $sql = $compiler->compileRename($from, $to);
 
-        return AsyncPDO::execute($sql, []);
+        return \Hibla\PdoQueryBuilder\DB::rawExecute($sql, []);
     }
 
     /**
@@ -195,7 +193,7 @@ class SchemaBuilder
         }
 
         /** @phpstan-ignore-next-line */
-        return AsyncPDO::execute($sql, []);
+        return \Hibla\PdoQueryBuilder\DB::rawExecute($sql, []);
     }
 
     /**
@@ -218,7 +216,7 @@ class SchemaBuilder
         }
 
         /** @phpstan-ignore-next-line */
-        return AsyncPDO::execute($sql, []);
+        return \Hibla\PdoQueryBuilder\DB::rawExecute($sql, []);
     }
 
     /**
@@ -251,7 +249,7 @@ class SchemaBuilder
         }
 
         /** @phpstan-ignore-next-line */
-        return AsyncPDO::execute($sql, []);
+        return \Hibla\PdoQueryBuilder\DB::rawExecute($sql, []);
     }
 
     /**
@@ -284,7 +282,7 @@ class SchemaBuilder
         }
 
         /** @phpstan-ignore-next-line */
-        return AsyncPDO::execute($sql, []);
+        return \Hibla\PdoQueryBuilder\DB::rawExecute($sql, []);
     }
 
     /**
@@ -322,7 +320,7 @@ class SchemaBuilder
         return async(function () use ($statements) {
             $results = [];
             foreach ($statements as $sql) {
-                $result = await(AsyncPDO::execute($sql, []));
+                $result = await(\Hibla\PdoQueryBuilder\DB::rawExecute($sql, []));
                 $results[] = $result;
             }
 
@@ -342,7 +340,7 @@ class SchemaBuilder
         return async(function () use ($statements) {
             $results = [];
             foreach ($statements as $sql) {
-                $result = await(AsyncPDO::execute($sql, []));
+                $result = await(\Hibla\PdoQueryBuilder\DB::rawExecute($sql, []));
                 $results[] = $result;
             }
 

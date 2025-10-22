@@ -17,7 +17,8 @@ class CursorPaginator
         private ?string $nextCursor,
         private string $cursorColumn,
         private ?string $path = null,
-    ) {}
+    ) {
+    }
 
     /**
      * Set a custom templates path
@@ -63,7 +64,6 @@ class CursorPaginator
         return $this->perPage;
     }
 
-
     /**
      * Get the cursor value for the next page
      */
@@ -85,7 +85,7 @@ class CursorPaginator
      */
     public function nextPageUrl(?string $basePath = null): ?string
     {
-        if (!$this->hasMore()) {
+        if (! $this->hasMore()) {
             return null;
         }
 
@@ -102,7 +102,7 @@ class CursorPaginator
 
     /**
      * Render cursor pagination using a template
-     * 
+     *
      * @param  string  $template  Template name (cursor-simple, cursor-bootstrap, cursor-tailwind)
      * @param  string|null  $basePath  Base path for pagination links. If null, uses current path
      */
@@ -113,7 +113,7 @@ class CursorPaginator
             $template = Config::get('pdo-schema.pagination.default_cursor_template') ?? 'cursor-simple';
         }
 
-        if (!$this->hasMore()) {
+        if (! $this->hasMore()) {
             return '';
         }
 
@@ -128,7 +128,7 @@ class CursorPaginator
 
     /**
      * Render cursor pagination links (alias for render, Laravel-style convenience method)
-     * 
+     *
      * @param  string|null  $view  Template name (cursor-simple, cursor-bootstrap, cursor-tailwind). If null, uses 'cursor-simple'
      * @param  string|null  $basePath  Base path for pagination links. If null, uses current path
      */
