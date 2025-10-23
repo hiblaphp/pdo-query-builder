@@ -67,8 +67,14 @@ class MigrateResetCommand extends Command
             $this->repository = new MigrationRepository($this->getMigrationsTable($this->connection), $this->connection);
             $this->schema = new SchemaBuilder(null, $this->connection);
 
-            if (! $this->performReset($path)) {
+            $result = $this->performReset($path);
+
+            if ($result === false) {
                 return Command::FAILURE;
+            }
+
+            if ($result === 0) {
+                return Command::SUCCESS;
             }
 
             $this->io->success('All migrations have been reset!');
@@ -102,7 +108,7 @@ class MigrateResetCommand extends Command
         return true;
     }
 
-    private function performReset(?string $path): bool
+    private function performReset(?string $path): int|false
     {
         /** @var list<array<string, mixed>> $allMigrations */
         $allMigrations = await($this->repository->getRan());
@@ -110,10 +116,9 @@ class MigrateResetCommand extends Command
         if (count($allMigrations) === 0) {
             $this->io->warning('Nothing to reset');
 
-            return true;
+            return 0;
         }
 
-        // Filter by path if specified
         if ($path !== null) {
             $normalizedPath = trim($path, '/') . '/';
             $allMigrations = array_filter($allMigrations, function ($migration) use ($normalizedPath) {
@@ -123,10 +128,21 @@ class MigrateResetCommand extends Command
 
             if (count($allMigrations) === 0) {
                 $this->io->warning("No migrations found in path: {$path}");
-                return true;
+                return 0;
             }
 
             $this->io->note("Resetting migrations from path: {$path}");
+        }
+
+        if ($this->connection !== null) {
+            $allMigrations = array_filter($allMigrations, function ($migration) {
+                return $this->migrationBelongsToConnection($migration, $this->connection);
+            });
+
+            if (count($allMigrations) === 0) {
+                $this->io->warning("No migrations found for connection: {$this->connection}");
+                return 0;
+            }
         }
 
         $this->io->section('Resetting all migrations');
@@ -137,8 +153,48 @@ class MigrateResetCommand extends Command
             $this->resetMigration($migrationData);
         }
 
-        return true;
+        return count($allMigrations);
     }
+
+    /**
+     * Check if a migration belongs to the specified connection.
+     *
+     * @param array<string, mixed> $migrationData
+     */
+    private function migrationBelongsToConnection(array $migrationData, ?string $connection): bool
+    {
+        $relativePath = $migrationData['migration'] ?? null;
+        if (!is_string($relativePath)) {
+            return false;
+        }
+
+        $file = $this->getFullMigrationPath($relativePath, null);
+
+        if (!file_exists($file)) {
+            return false;
+        }
+
+        try {
+            $migration = require $file;
+            if (!is_object($migration)) {
+                return false;
+            }
+
+            $migrationConnection = null;
+            if (method_exists($migration, 'getConnection')) {
+                $migrationConnection = $migration->getConnection();
+            }
+
+            if ($migrationConnection === null) {
+                return $connection === null;
+            }
+
+            return $migrationConnection === $connection;
+        } catch (\Throwable $e) {
+            return false;
+        }
+    }
+
 
     /**
      * @param array<string, mixed> $migrationData

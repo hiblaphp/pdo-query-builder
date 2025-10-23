@@ -316,16 +316,20 @@ class MigrateCommand extends Command
         foreach ($files as $file) {
             $relativePath = $this->getRelativeMigrationPath($file, $this->connection);
 
-            // Determine which connection this migration uses
             $migrationConnection = $this->getMigrationConnectionFromFile($file);
 
-            // Get ran migrations for this specific connection
+            // Filter by connection if specified
+            if ($this->connection !== null) {
+                if ($migrationConnection !== $this->connection) {
+                    continue;
+                }
+            }
+
             $repository = $this->getRepository($migrationConnection);
             await($repository->createRepository());
             $ranMigrations = await($repository->getRan());
             $ranMigrationPaths = array_column($ranMigrations, 'migration');
 
-            // Check if this migration has been run on its connection
             if (!in_array($relativePath, $ranMigrationPaths, true)) {
                 $pending[] = $file;
             }
