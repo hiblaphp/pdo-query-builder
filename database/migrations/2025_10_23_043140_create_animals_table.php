@@ -16,6 +16,7 @@ return new class extends Migration
         return $this->create('animals', function (Blueprint $table) {
             $table->id();
             $table->string('name');
+            $table->string('species');
             $table->timestamps();
         });
     }

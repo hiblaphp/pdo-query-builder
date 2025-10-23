@@ -302,9 +302,9 @@ class MigrateCommand extends Command
     {
         if ($path !== null) {
             $pattern = rtrim($path, '/') . '/*.php';
-            $files = $this->getFilteredMigrationFiles($pattern, $this->connection);
+            $files = $this->getFilteredMigrationFiles($pattern, null);
         } else {
-            $files = $this->getAllMigrationFiles($this->connection);
+            $files = $this->getAllMigrationFiles(null);
         }
 
         if (count($files) === 0) {
@@ -314,18 +314,22 @@ class MigrateCommand extends Command
         $pending = [];
 
         foreach ($files as $file) {
-            $relativePath = $this->getRelativeMigrationPath($file, $this->connection);
-
             $migrationConnection = $this->getMigrationConnectionFromFile($file);
 
-            // Filter by connection if specified
+            $effectiveConnection = $migrationConnection;
+
             if ($this->connection !== null) {
                 if ($migrationConnection !== $this->connection) {
                     continue;
                 }
+            } else {
+                if ($migrationConnection !== null) {
+                    continue;
+                }
             }
 
-            $repository = $this->getRepository($migrationConnection);
+            $relativePath = $this->getRelativeMigrationPath($file, $effectiveConnection);
+            $repository = $this->getRepository($effectiveConnection);
             await($repository->createRepository());
             $ranMigrations = await($repository->getRan());
             $ranMigrationPaths = array_column($ranMigrations, 'migration');
@@ -340,28 +344,35 @@ class MigrateCommand extends Command
 
     /**
      * Get the connection from a migration file.
+     * Returns the explicit connection if set, or null if not specified.
      */
     private function getMigrationConnectionFromFile(string $file): ?string
     {
         try {
             if (!file_exists($file)) {
-                return $this->connection;
+                return null;
             }
 
             $migration = require $file;
 
             if (!is_object($migration)) {
-                return $this->connection;
+                return null;
             }
 
             if (method_exists($migration, 'getConnection')) {
-                $declaredConnection = $migration->getConnection();
-                return $declaredConnection ?? $this->connection;
+                return $migration->getConnection();
             }
 
-            return $this->connection;
+            $reflection = new \ReflectionObject($migration);
+            if ($reflection->hasProperty('connection')) {
+                $property = $reflection->getProperty('connection');
+                $property->setAccessible(true);
+                return $property->getValue($migration);
+            }
+
+            return null;
         } catch (\Throwable $e) {
-            return $this->connection;
+            return null;
         }
     }
 

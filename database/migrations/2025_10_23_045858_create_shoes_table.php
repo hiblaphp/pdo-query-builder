@@ -17,6 +17,8 @@ return new class extends Migration
     {
         return $this->create('shoes', function (Blueprint $table) {
             $table->id();
+            $table->string('name');
+            $table->string('brand');
             $table->timestamps();
         });
     }
