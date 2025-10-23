@@ -62,8 +62,9 @@ class MigrateFreshCommand extends Command
         }
 
         try {
-            $this->initializeDatabase();
             $this->driver = $this->detectDriver();
+          
+            $this->initializeDatabase();
 
             $this->io->section('Dropping all tables...');
             if (! $this->dropAllTables()) {
@@ -85,7 +86,6 @@ class MigrateFreshCommand extends Command
 
             $this->io->success('Database refreshed successfully!');
 
-            // Run seeders if requested
             if ($input->getOption('seed')) {
                 $this->io->section('Running seeders...');
                 if ($this->runSeeders()) {
@@ -131,10 +131,12 @@ class MigrateFreshCommand extends Command
             $tables = $this->getAllTables();
 
             if (count($tables) === 0) {
-                $this->io->note('No tables to drop');
+                $this->io->note('No tables found in database');
 
                 return true;
             }
+
+            $this->io->writeln(sprintf('Found %d table(s) to drop', count($tables)));
 
             $this->disableForeignKeyChecks();
 
@@ -179,30 +181,86 @@ class MigrateFreshCommand extends Command
      */
     private function getAllTables(): array
     {
+        $databaseName = $this->getCurrentDatabase();
+        
         $sql = match ($this->driver) {
-            'mysql' => "SELECT table_name FROM information_schema.tables 
-                       WHERE table_schema = DATABASE() AND table_type = 'BASE TABLE'",
+            'mysql' => $databaseName !== null 
+                ? "SELECT table_name FROM information_schema.tables 
+                   WHERE table_schema = '{$databaseName}' AND table_type = 'BASE TABLE'"
+                : "SELECT table_name FROM information_schema.tables 
+                   WHERE table_schema = DATABASE() AND table_type = 'BASE TABLE'",
             'pgsql' => "SELECT tablename FROM pg_tables 
                        WHERE schemaname = 'public'",
             'sqlite' => "SELECT name FROM sqlite_master 
                         WHERE type='table' AND name NOT LIKE 'sqlite_%'",
             'sqlsrv' => "SELECT TABLE_NAME FROM INFORMATION_SCHEMA.TABLES 
                         WHERE TABLE_TYPE = 'BASE TABLE'",
-            default => 'SELECT table_name FROM information_schema.tables 
-                       WHERE table_schema = DATABASE()',
+            default => "SELECT table_name FROM information_schema.tables 
+                       WHERE table_schema = DATABASE() AND table_type = 'BASE TABLE'",
         };
 
-        /** @var list<array<string, mixed>> $result */
-        $result = await(DB::connection($this->connection)->raw($sql));
+        try {
+            /** @var list<array<string, mixed>> $result */
+            $result = await(DB::connection($this->connection)->raw($sql));
 
-        $columnName = match ($this->driver) {
-            'pgsql' => 'tablename',
-            'sqlite' => 'name',
-            default => 'table_name',
-        };
+            $columnName = match ($this->driver) {
+                'pgsql' => 'tablename',
+                'sqlite' => 'name',
+                'sqlsrv' => 'TABLE_NAME',
+                default => 'table_name',
+            };
 
-        /** @var list<string> */
-        return array_column($result, $columnName);
+            $tables = [];
+            foreach ($result as $row) {
+                if (isset($row[$columnName]) && is_string($row[$columnName])) {
+                    $tables[] = $row[$columnName];
+                } elseif (isset($row[strtoupper($columnName)]) && is_string($row[strtoupper($columnName)])) {
+                    $tables[] = $row[strtoupper($columnName)];
+                }
+            }
+
+            return $tables;
+        } catch (\Throwable $e) {
+            if ($this->output->isVerbose()) {
+                $this->io->writeln("Error fetching tables: " . $e->getMessage());
+            }
+            return [];
+        }
+    }
+
+    /**
+     * Get the current database name
+     */
+    private function getCurrentDatabase(): ?string
+    {
+        try {
+            $dbConfig = Config::get('pdo-query-builder');
+
+            if (! is_array($dbConfig)) {
+                return null;
+            }
+
+            $connectionName = $this->connection ?? ($dbConfig['default'] ?? 'mysql');
+            if (! is_string($connectionName)) {
+                return null;
+            }
+
+            $connections = $dbConfig['connections'] ?? [];
+            if (! is_array($connections)) {
+                return null;
+            }
+
+            $connectionConfig = $connections[$connectionName] ?? [];
+            if (! is_array($connectionConfig)) {
+                return null;
+            }
+
+            $database = $connectionConfig['database'] ?? null;
+
+            return is_string($database) ? $database : null;
+        } catch (\Throwable $e) {
+            return null;
+        }
     }
 
     private function disableForeignKeyChecks(): void
@@ -220,7 +278,9 @@ class MigrateFreshCommand extends Command
                 $promise = DB::connection($this->connection)->raw($sql);
                 await($promise);
             } catch (\Throwable $e) {
-                // Some drivers might not support this, continue anyway
+                if ($this->output->isVerbose()) {
+                    $this->io->writeln("Warning: Could not disable foreign key checks: " . $e->getMessage());
+                }
             }
         }
     }
@@ -240,7 +300,9 @@ class MigrateFreshCommand extends Command
                 $promise = DB::connection($this->connection)->raw($sql);
                 await($promise);
             } catch (\Throwable $e) {
-                // Some drivers might not support this, continue anyway
+                if ($this->output->isVerbose()) {
+                    $this->io->writeln("Warning: Could not enable foreign key checks: " . $e->getMessage());
+                }
             }
         }
     }
@@ -255,7 +317,8 @@ class MigrateFreshCommand extends Command
         }
 
         $command = $application->find('migrate');
-        $arguments = ['--force' => true];
+        
+        $arguments = [];
         
         if ($this->connection !== null) {
             $arguments['--connection'] = $this->connection;
@@ -291,7 +354,6 @@ class MigrateFreshCommand extends Command
 
             return $code === Command::SUCCESS;
         } catch (\Throwable $e) {
-            // Seeder command might not exist
             return false;
         }
     }
@@ -331,10 +393,12 @@ class MigrateFreshCommand extends Command
     private function initializeDatabase(): void
     {
         try {
-            DB::connection($this->connection)->table('_test_init');
+            $testQuery = 'SELECT 1';
+            
+            await(DB::connection($this->connection)->raw($testQuery));
         } catch (\Throwable $e) {
-            if (! str_contains($e->getMessage(), 'not found')) {
-                throw $e;
+            if ($this->output->isVerbose()) {
+                $this->io->writeln("Database initialization: " . $e->getMessage());
             }
         }
     }
