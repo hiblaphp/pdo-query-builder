@@ -24,7 +24,6 @@ class MigrateCommand extends Command
     private SymfonyStyle $io;
     private OutputInterface $output;
     private ?string $projectRoot = null;
-    private string $migrationsPath;
     private MigrationRepository $repository;
     private SchemaBuilder $schema;
     private ?string $connection = null;
@@ -37,6 +36,7 @@ class MigrateCommand extends Command
             ->addOption('step', null, InputOption::VALUE_OPTIONAL, 'Number of migrations to run', 0)
             ->addOption('force', 'f', InputOption::VALUE_NONE, 'Force the operation to run without prompts')
             ->addOption('connection', null, InputOption::VALUE_OPTIONAL, 'The database connection to use')
+            ->addOption('path', null, InputOption::VALUE_OPTIONAL, 'The path to migrations files (relative to migrations directory)')
         ;
     }
 
@@ -54,10 +54,6 @@ class MigrateCommand extends Command
         }
 
         if (! $this->initializeProjectRoot()) {
-            return Command::FAILURE;
-        }
-
-        if (! $this->validateMigrationsDirectory()) {
             return Command::FAILURE;
         }
 
@@ -86,7 +82,10 @@ class MigrateCommand extends Command
             $stepOption = $input->getOption('step');
             $step = is_numeric($stepOption) ? (int) $stepOption : 0;
 
-            if (! $this->performMigration($step)) {
+            $pathOption = $input->getOption('path');
+            $path = is_string($pathOption) && $pathOption !== '' ? $pathOption : null;
+
+            if (! $this->performMigration($step, $path)) {
                 return Command::FAILURE;
             }
 
@@ -231,22 +230,10 @@ class MigrateCommand extends Command
         return true;
     }
 
-    private function validateMigrationsDirectory(): bool
-    {
-        $this->migrationsPath = $this->getMigrationsPath($this->connection);
-        if (! is_dir($this->migrationsPath)) {
-            $this->io->error('Migrations directory not found. Run make:migration first.');
-
-            return false;
-        }
-
-        return true;
-    }
-
-    private function performMigration(int $step): bool
+    private function performMigration(int $step, ?string $path): bool
     {
         $ranMigrations = await($this->repository->getRan());
-        $pendingMigrations = $this->getPendingMigrations($ranMigrations);
+        $pendingMigrations = $this->getPendingMigrations($ranMigrations, $path);
 
         if (count($pendingMigrations) === 0) {
             $this->io->success('Nothing to migrate');
@@ -261,6 +248,10 @@ class MigrateCommand extends Command
         $batchNumber = $this->getNextBatchNumber();
 
         $this->io->section('Running migrations');
+        
+        if ($path !== null) {
+            $this->io->note("Running migrations from path: {$path}");
+        }
 
         foreach ($pendingMigrations as $file) {
             if (! $this->runMigration($file, $batchNumber)) {
@@ -275,19 +266,25 @@ class MigrateCommand extends Command
      * @param array<int, array<string, mixed>> $ranMigrations
      * @return list<string>
      */
-    private function getPendingMigrations(array $ranMigrations): array
+    private function getPendingMigrations(array $ranMigrations, ?string $path): array
     {
-        $files = glob($this->migrationsPath.'/*.php');
-        if ($files === false) {
+        if ($path !== null) {
+            $pattern = rtrim($path, '/') . '/*.php';
+            $files = $this->getFilteredMigrationFiles($pattern, $this->connection);
+        } else {
+            $files = $this->getAllMigrationFiles($this->connection);
+        }
+
+        if (count($files) === 0) {
             return [];
         }
 
-        sort($files);
+        $ranMigrationPaths = array_column($ranMigrations, 'migration');
 
-        $ranMigrationNames = array_column($ranMigrations, 'migration');
-
-        return array_values(array_filter($files, function ($file) use ($ranMigrationNames) {
-            return ! in_array(basename($file), $ranMigrationNames, true);
+        // Filter out migrations that have already been run
+        return array_values(array_filter($files, function ($file) use ($ranMigrationPaths) {
+            $relativePath = $this->getRelativeMigrationPath($file, $this->connection);
+            return ! in_array($relativePath, $ranMigrationPaths, true);
         }));
     }
 
@@ -300,12 +297,18 @@ class MigrateCommand extends Command
 
     private function runMigration(string $file, int $batchNumber): bool
     {
-        $migrationName = basename($file);
+        $relativePath = $this->getRelativeMigrationPath($file, $this->connection);
+        $displayName = $relativePath;
 
         try {
+            if (!file_exists($file)) {
+                $this->io->error("Migration file not found: {$displayName}");
+                return false;
+            }
+
             $migration = require $file;
 
-            if (! is_object($migration) || ! $this->validateMigrationClass($migration, $migrationName)) {
+            if (! is_object($migration) || ! $this->validateMigrationClass($migration, $displayName)) {
                 return false;
             }
 
@@ -317,7 +320,7 @@ class MigrateCommand extends Command
                 }
             }
 
-            $this->io->write("Migrating: {$migrationName}");
+            $this->io->write("Migrating: {$displayName}");
             if ($migrationConnection !== null && $migrationConnection !== $this->connection) {
                 $this->io->write(" <comment>[{$migrationConnection}]</comment>");
             }
@@ -328,14 +331,14 @@ class MigrateCommand extends Command
             $promise = $upMethod();
             await($promise);
 
-            await($this->repository->log($migrationName, $batchNumber));
+            await($this->repository->log($relativePath, $batchNumber));
 
             $this->io->writeln(' <info>✓</info>');
 
             return true;
         } catch (\Throwable $e) {
             $this->io->newLine();
-            $this->io->error("Failed to run migration {$migrationName}: ".$e->getMessage());
+            $this->io->error("Failed to run migration {$displayName}: ".$e->getMessage());
             if ($this->output->isVerbose()) {
                 $this->io->writeln($e->getTraceAsString());
             }

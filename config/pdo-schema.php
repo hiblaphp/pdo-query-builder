@@ -11,6 +11,7 @@ return [
     |--------------------------------------------------------------------------
     |
     | The directory where migration files are stored and loaded from.
+    | You can use nested directories to organize migrations.
     |
     */
     'migrations_path' => __DIR__ . '/../database/migrations',
@@ -45,6 +46,35 @@ return [
     |
     */
     'timezone' => env('TIMEZONE', 'UTC'),
+
+    /*
+    |--------------------------------------------------------------------------
+    | Recursive Migration Discovery
+    |--------------------------------------------------------------------------
+    |
+    | When enabled, the migration system will scan subdirectories recursively
+    | for migration files. This allows you to organize migrations into folders.
+    |
+    */
+    'recursive' => true,
+
+    /*
+    |--------------------------------------------------------------------------
+    | Connection-Specific Migration Paths
+    |--------------------------------------------------------------------------
+    |
+    | Define specific subdirectories for different database connections.
+    | When a migration is created with --connection flag, it will be placed
+    | in the corresponding subdirectory if defined here.
+    |
+    | Example: 'mysql' => 'mysql', 'pgsql' => 'postgres'
+    |
+    */
+    'connection_paths' => [
+        // 'mysql' => 'mysql',
+        // 'pgsql' => 'postgres',
+        // 'sqlite' => 'sqlite',
+    ],
 
     /*
     |--------------------------------------------------------------------------

@@ -22,7 +22,6 @@ class MigrateRollbackCommand extends Command
     private SymfonyStyle $io;
     private OutputInterface $output;
     private ?string $projectRoot = null;
-    private string $migrationsPath;
     private MigrationRepository $repository;
     private SchemaBuilder $schema;
     private ?string $connection = null;
@@ -34,6 +33,7 @@ class MigrateRollbackCommand extends Command
             ->setDescription('Rollback the last database migration')
             ->addOption('step', null, InputOption::VALUE_OPTIONAL, 'Number of migrations to rollback', 1)
             ->addOption('connection', null, InputOption::VALUE_OPTIONAL, 'The database connection to use')
+            ->addOption('path', null, InputOption::VALUE_OPTIONAL, 'Only rollback migrations from this path')
         ;
     }
 
@@ -54,18 +54,18 @@ class MigrateRollbackCommand extends Command
             return Command::FAILURE;
         }
 
-        if (! $this->validateMigrationsDirectory()) {
-            return Command::FAILURE;
-        }
-
         try {
             $this->initializeDatabase();
             $this->repository = new MigrationRepository($this->getMigrationsTable($this->connection), $this->connection);
             $this->schema = new SchemaBuilder(null, $this->connection);
+            
             $stepOption = $input->getOption('step');
             $step = is_numeric($stepOption) ? (int) $stepOption : 1;
 
-            if (! $this->performRollback($step)) {
+            $pathOption = $input->getOption('path');
+            $path = is_string($pathOption) && $pathOption !== '' ? $pathOption : null;
+
+            if (! $this->performRollback($step, $path)) {
                 return Command::FAILURE;
             }
 
@@ -91,19 +91,7 @@ class MigrateRollbackCommand extends Command
         return true;
     }
 
-    private function validateMigrationsDirectory(): bool
-    {
-        $this->migrationsPath = $this->getMigrationsPath($this->connection);
-        if (! is_dir($this->migrationsPath)) {
-            $this->io->error('Migrations directory not found');
-
-            return false;
-        }
-
-        return true;
-    }
-
-    private function performRollback(int $step): bool
+    private function performRollback(int $step, ?string $path): bool
     {
         /** @var list<array<string, mixed>> $lastBatchMigrations */
         $lastBatchMigrations = await($this->repository->getLast());
@@ -112,6 +100,21 @@ class MigrateRollbackCommand extends Command
             $this->io->warning('Nothing to rollback');
 
             return true;
+        }
+
+        if ($path !== null) {
+            $normalizedPath = trim($path, '/') . '/';
+            $lastBatchMigrations = array_filter($lastBatchMigrations, function ($migration) use ($normalizedPath) {
+                $migrationPath = $migration['migration'] ?? '';
+                return is_string($migrationPath) && str_starts_with($migrationPath, $normalizedPath);
+            });
+            
+            if (count($lastBatchMigrations) === 0) {
+                $this->io->warning("No migrations found in path: {$path}");
+                return true;
+            }
+            
+            $this->io->note("Rolling back migrations from path: {$path}");
         }
 
         if ($step > 0) {
@@ -136,17 +139,20 @@ class MigrateRollbackCommand extends Command
      */
     private function rollbackMigration(array $migrationData): bool
     {
-        $migrationName = $migrationData['migration'] ?? null;
-        if (! is_string($migrationName)) {
+        $relativePath = $migrationData['migration'] ?? null;
+        if (! is_string($relativePath)) {
             $this->io->warning('Skipping invalid migration record.');
 
             return false;
         }
 
-        $file = $this->migrationsPath . '/' . $migrationName;
+        // Get full path from relative path
+        $file = $this->getFullMigrationPath($relativePath, $this->connection);
 
-        if (! $this->validateMigrationFile($file, $migrationName)) {
-            await($this->repository->delete($migrationName));
+        if (! $this->validateMigrationFile($file, $relativePath)) {
+            // Delete from repository even if file doesn't exist
+            await($this->repository->delete($relativePath));
+            $this->io->warning("Migration file not found but removed from repository: {$relativePath}");
 
             return true;
         }
@@ -154,12 +160,12 @@ class MigrateRollbackCommand extends Command
         try {
             $migration = require $file;
             if (! is_object($migration)) {
-                $this->io->error("Migration file {$migrationName} did not return an object.");
+                $this->io->error("Migration file {$relativePath} did not return an object.");
 
                 return false;
             }
 
-            if (! $this->validateMigrationClass($migration, $migrationName)) {
+            if (! $this->validateMigrationClass($migration, $relativePath)) {
                 return false;
             }
 
@@ -172,7 +178,7 @@ class MigrateRollbackCommand extends Command
                 }
             }
 
-            $this->io->write("Rolling back: {$migrationName}");
+            $this->io->write("Rolling back: {$relativePath}");
             if ($migrationConnection !== null && $migrationConnection !== $this->connection) {
                 $this->io->write(" <comment>[{$migrationConnection}]</comment>");
             }
@@ -183,14 +189,14 @@ class MigrateRollbackCommand extends Command
             $promise = $downMethod();
             await($promise);
 
-            await($this->repository->delete($migrationName));
+            await($this->repository->delete($relativePath));
 
             $this->io->writeln(' <info>✓</info>');
 
             return true;
         } catch (\Throwable $e) {
             $this->io->newLine();
-            $this->io->error("Failed to rollback migration {$migrationName}: " . $e->getMessage());
+            $this->io->error("Failed to rollback migration {$relativePath}: " . $e->getMessage());
             if ($this->output->isVerbose()) {
                 $this->io->writeln($e->getTraceAsString());
             }
@@ -201,13 +207,7 @@ class MigrateRollbackCommand extends Command
 
     private function validateMigrationFile(string $file, string $migrationName): bool
     {
-        if (! file_exists($file)) {
-            $this->io->warning("Migration file not found: {$migrationName}");
-
-            return false;
-        }
-
-        return true;
+        return file_exists($file);
     }
 
     private function validateMigrationClass(object $migration, string $migrationName): bool

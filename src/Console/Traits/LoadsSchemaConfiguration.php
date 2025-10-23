@@ -13,7 +13,9 @@ trait LoadsSchemaConfiguration
      *     migrations_path: string,
      *     migrations_table: string,
      *     naming_convention: string,
-     *     timezone: string
+     *     timezone: string,
+     *     recursive: bool,
+     *     connection_paths: array<string, string>
      * }
      */
     private function getSchemaConfig(?string $connection = null): array
@@ -45,6 +47,8 @@ trait LoadsSchemaConfiguration
             'migrations_table' => is_string($finalConfig['migrations_table']) ? $finalConfig['migrations_table'] : $defaults['migrations_table'],
             'naming_convention' => is_string($finalConfig['naming_convention']) ? $finalConfig['naming_convention'] : $defaults['naming_convention'],
             'timezone' => is_string($finalConfig['timezone'] ?? null) ? $finalConfig['timezone'] : $defaults['timezone'],
+            'recursive' => isset($finalConfig['recursive']) ? (bool) $finalConfig['recursive'] : $defaults['recursive'],
+            'connection_paths' => is_array($finalConfig['connection_paths'] ?? null) ? $finalConfig['connection_paths'] : $defaults['connection_paths'],
         ];
     }
 
@@ -55,7 +59,9 @@ trait LoadsSchemaConfiguration
      *     migrations_table: string,
      *     naming_convention: string,
      *     timezone: string,
-     *     auto_migrate: bool
+     *     auto_migrate: bool,
+     *     recursive: bool,
+     *     connection_paths: array<string, string>
      * }
      */
     private function getDefaultSchemaConfig(): array
@@ -70,22 +76,41 @@ trait LoadsSchemaConfiguration
             'naming_convention' => 'timestamp',
             'timezone' => 'UTC',
             'auto_migrate' => false,
+            'recursive' => true,
+            'connection_paths' => [],
         ];
     }
 
+    /**
+     * Get the migrations path for a specific connection.
+     * Supports subdirectories for connection-specific organization.
+     */
     private function getMigrationsPath(?string $connection = null): string
     {
         $config = $this->getSchemaConfig($connection);
-        $path = $config['migrations_path'];
+        $basePath = $config['migrations_path'];
 
         // @phpstan-ignore-next-line
         $projectRoot = $this->projectRoot ?? '.';
 
-        if (! $this->isAbsolutePath($path)) {
-            $path = $projectRoot . '/' . ltrim($path, '/');
+        if (! $this->isAbsolutePath($basePath)) {
+            $basePath = $projectRoot . '/' . ltrim($basePath, '/');
         }
 
-        return $path;
+        if ($connection === null) {
+            return $basePath;
+        }
+
+        $connectionPaths = $config['connection_paths'];
+        
+        if (isset($connectionPaths[$connection])) {
+            $subPath = $connectionPaths[$connection];
+            if (is_string($subPath) && $subPath !== '') {
+                return rtrim($basePath, '/\\') . DIRECTORY_SEPARATOR . trim($subPath, '/\\');
+            }
+        }
+
+        return $basePath;
     }
 
     private function getMigrationsTable(?string $connection = null): string
@@ -109,12 +134,237 @@ trait LoadsSchemaConfiguration
         return $config['timezone'];
     }
 
+    /**
+     * Check if recursive migration discovery is enabled.
+     */
+    private function isRecursiveEnabled(?string $connection = null): bool
+    {
+        $config = $this->getSchemaConfig($connection);
+
+        return $config['recursive'];
+    }
+
+    /**
+     * Get all migration files recursively or non-recursively based on configuration.
+     *
+     * @return list<string>
+     */
+    private function getAllMigrationFiles(?string $connection = null): array
+    {
+        $migrationsPath = $this->getMigrationsPath($connection);
+        
+        if (!is_dir($migrationsPath)) {
+            return [];
+        }
+
+        if ($this->isRecursiveEnabled($connection)) {
+            return $this->getMigrationFilesRecursive($migrationsPath);
+        }
+
+        return $this->getMigrationFilesFlat($migrationsPath);
+    }
+
+    /**
+     * Get migration files from a single directory (non-recursive).
+     *
+     * @return list<string>
+     */
+    private function getMigrationFilesFlat(string $directory): array
+    {
+        $files = glob($directory . '/*.php');
+        
+        if ($files === false) {
+            return [];
+        }
+
+        sort($files);
+        
+        return array_values($files);
+    }
+
+    /**
+     * Get migration files recursively from all subdirectories.
+     *
+     * @return list<string>
+     */
+    private function getMigrationFilesRecursive(string $directory): array
+    {
+        $files = [];
+        
+        try {
+            $iterator = new \RecursiveIteratorIterator(
+                new \RecursiveDirectoryIterator($directory, \RecursiveDirectoryIterator::SKIP_DOTS),
+                \RecursiveIteratorIterator::SELF_FIRST
+            );
+
+            foreach ($iterator as $file) {
+                if ($file->isFile() && $file->getExtension() === 'php') {
+                    $files[] = $file->getPathname();
+                }
+            }
+        } catch (\Throwable $e) {
+            return $this->getMigrationFilesFlat($directory);
+        }
+
+        sort($files);
+        
+        return array_values($files);
+    }
+
+    /**
+     * Get the relative path of a migration file from the base migrations directory.
+     * This is used for storing migration paths in the database.
+     */
+    private function getRelativeMigrationPath(string $filePath, ?string $connection = null): string
+    {
+        $basePath = $this->getMigrationsPath($connection);
+        
+        $normalizedBasePath = $this->normalizePath($basePath);
+        $normalizedFilePath = $this->normalizePath($filePath);
+        
+        if (str_starts_with($normalizedFilePath, $normalizedBasePath)) {
+            $relativePath = substr($normalizedFilePath, strlen($normalizedBasePath));
+            $relativePath = ltrim($relativePath, '/\\');
+        } else {
+            $relativePath = basename($filePath);
+        }
+        
+        return str_replace('\\', '/', $relativePath);
+    }
+
+    /**
+     * Get the full path of a migration file from its relative path.
+     * This is used for loading migration files from the database.
+     */
+    private function getFullMigrationPath(string $relativePath, ?string $connection = null): string
+    {
+        $basePath = $this->getMigrationsPath($connection);
+        
+        $normalizedPath = str_replace(['/', '\\'], DIRECTORY_SEPARATOR, $relativePath);
+        
+        return $basePath . DIRECTORY_SEPARATOR . $normalizedPath;
+    }
+
+    /**
+     * Normalize a file path for consistent comparison across platforms.
+     */
+    private function normalizePath(string $path): string
+    {
+        $path = str_replace('\\', '/', $path);
+        $path = rtrim($path, '/');
+        
+        return $path;
+    }
+
+    /**
+     * Check if a path is absolute.
+     */
     private function isAbsolutePath(string $path): bool
     {
         if ($path === '') {
             return false;
         }
+        if ($path[0] === '/') {
+            return true;
+        }
 
-        return $path[0] === '/' || preg_match('/^[a-zA-Z]:[\\\\\/]/', $path) === 1;
+        if (preg_match('/^[a-zA-Z]:[\\\\\/]/', $path) === 1) {
+            return true;
+        }
+
+        return false;
+    }
+
+    /**
+     * Ensure a directory exists, creating it if necessary.
+     */
+    private function ensureDirectoryExists(string $directory): bool
+    {
+        if (is_dir($directory)) {
+            return true;
+        }
+
+        try {
+            return mkdir($directory, 0755, true);
+        } catch (\Throwable $e) {
+            return false;
+        }
+    }
+
+    /**
+     * Get migration files that match a specific pattern.
+     * Useful for filtering migrations by prefix or subdirectory.
+     *
+     * @return list<string>
+     */
+    private function getFilteredMigrationFiles(string $pattern, ?string $connection = null): array
+    {
+        $allFiles = $this->getAllMigrationFiles($connection);
+        $basePath = $this->getMigrationsPath($connection);
+        
+        return array_values(array_filter($allFiles, function ($file) use ($pattern, $basePath) {
+            $relativePath = $this->getRelativeMigrationPath($file, null);
+            return fnmatch($pattern, $relativePath);
+        }));
+    }
+
+    /**
+     * Get migrations organized by subdirectory.
+     *
+     * @return array<string, list<string>>
+     */
+    private function getMigrationsByDirectory(?string $connection = null): array
+    {
+        $allFiles = $this->getAllMigrationFiles($connection);
+        $organized = [];
+        
+        foreach ($allFiles as $file) {
+            $relativePath = $this->getRelativeMigrationPath($file, $connection);
+            $directory = dirname($relativePath);
+            
+            // Normalize '.' to represent root directory
+            if ($directory === '.') {
+                $directory = 'root';
+            }
+            
+            if (!isset($organized[$directory])) {
+                $organized[$directory] = [];
+            }
+            
+            $organized[$directory][] = $file;
+        }
+        
+        return $organized;
+    }
+
+    /**
+     * Check if a migration file exists by its relative path.
+     */
+    private function migrationExists(string $relativePath, ?string $connection = null): bool
+    {
+        $fullPath = $this->getFullMigrationPath($relativePath, $connection);
+        return file_exists($fullPath);
+    }
+
+    /**
+     * Get the subdirectory path for a connection if configured.
+     */
+    private function getConnectionSubdirectory(?string $connection = null): ?string
+    {
+        if ($connection === null) {
+            return null;
+        }
+
+        $config = $this->getSchemaConfig($connection);
+        $connectionPaths = $config['connection_paths'];
+        
+        if (isset($connectionPaths[$connection])) {
+            $subPath = $connectionPaths[$connection];
+            if (is_string($subPath) && $subPath !== '') {
+                return $subPath;
+            }
+        }
+
+        return null;
     }
 }

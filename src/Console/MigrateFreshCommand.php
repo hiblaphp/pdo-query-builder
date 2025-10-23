@@ -31,6 +31,8 @@ class MigrateFreshCommand extends Command
             ->setDescription('Drop all tables and re-run all migrations')
             ->addOption('force', 'f', InputOption::VALUE_NONE, 'Force the operation without confirmation')
             ->addOption('connection', null, InputOption::VALUE_OPTIONAL, 'The database connection to use')
+            ->addOption('path', null, InputOption::VALUE_OPTIONAL, 'The path to migrations files')
+            ->addOption('seed', null, InputOption::VALUE_NONE, 'Run seeders after migrations')
         ;
     }
 
@@ -71,13 +73,27 @@ class MigrateFreshCommand extends Command
             $this->io->success('All tables dropped successfully!');
 
             $this->io->section('Running migrations...');
-            if (! $this->runMigrations()) {
+            
+            $pathOption = $input->getOption('path');
+            $path = is_string($pathOption) && $pathOption !== '' ? $pathOption : null;
+            
+            if (! $this->runMigrations($path)) {
                 $this->io->error('Migration failed');
 
                 return Command::FAILURE;
             }
 
             $this->io->success('Database refreshed successfully!');
+
+            // Run seeders if requested
+            if ($input->getOption('seed')) {
+                $this->io->section('Running seeders...');
+                if ($this->runSeeders()) {
+                    $this->io->success('Seeders completed!');
+                } else {
+                    $this->io->warning('Seeders not available or failed');
+                }
+            }
 
             return Command::SUCCESS;
         } catch (\Throwable $e) {
@@ -229,7 +245,7 @@ class MigrateFreshCommand extends Command
         }
     }
 
-    private function runMigrations(): bool
+    private function runMigrations(?string $path): bool
     {
         $application = $this->getApplication();
         if ($application === null) {
@@ -245,10 +261,39 @@ class MigrateFreshCommand extends Command
             $arguments['--connection'] = $this->connection;
         }
         
+        if ($path !== null) {
+            $arguments['--path'] = $path;
+        }
+        
         $input = new ArrayInput($arguments);
         $code = $command->run($input, $this->output);
 
         return $code === Command::SUCCESS;
+    }
+
+    private function runSeeders(): bool
+    {
+        $application = $this->getApplication();
+        if ($application === null) {
+            return false;
+        }
+
+        try {
+            $command = $application->find('db:seed');
+            $arguments = [];
+            
+            if ($this->connection !== null) {
+                $arguments['--connection'] = $this->connection;
+            }
+            
+            $input = new ArrayInput($arguments);
+            $code = $command->run($input, $this->output);
+
+            return $code === Command::SUCCESS;
+        } catch (\Throwable $e) {
+            // Seeder command might not exist
+            return false;
+        }
     }
 
     private function detectDriver(): string

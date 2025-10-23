@@ -24,16 +24,19 @@ class MakeMigrationCommand extends Command
     private ?string $table;
     private ?string $alter;
     private ?string $connection = null;
+    private ?string $subdirectory = null;
 
     protected function configure(): void
     {
         $this
             ->setName('make:migration')
             ->setDescription('Create a new migration file')
-            ->addArgument('name', InputArgument::REQUIRED, 'Migration name')
+            ->addArgument('name', InputArgument::REQUIRED, 'Migration name (supports subdirectories, e.g., backup/create_users_table)')
             ->addOption('table', null, InputOption::VALUE_OPTIONAL, 'Table to create')
             ->addOption('alter', null, InputOption::VALUE_OPTIONAL, 'Table to alter')
             ->addOption('connection', null, InputOption::VALUE_OPTIONAL, 'The database connection to use')
+            ->addOption('path', null, InputOption::VALUE_OPTIONAL, 'Custom subdirectory path for the migration')
+            ->addOption('create', null, InputOption::VALUE_OPTIONAL, 'Alias for --table option')
         ;
     }
 
@@ -55,12 +58,20 @@ class MakeMigrationCommand extends Command
 
             return Command::FAILURE;
         }
-        $this->migrationName = $migrationNameValue;
+
+        $this->parseMigrationName($migrationNameValue);
 
         $tableOption = $input->getOption('table');
-        $this->table = is_string($tableOption) ? $tableOption : null;
+        $createOption = $input->getOption('create');
+        $this->table = is_string($tableOption) ? $tableOption : (is_string($createOption) ? $createOption : null);
+        
         $alterOption = $input->getOption('alter');
         $this->alter = is_string($alterOption) ? $alterOption : null;
+
+        $pathOption = $input->getOption('path');
+        if (is_string($pathOption) && $pathOption !== '') {
+            $this->subdirectory = trim($pathOption, '/\\');
+        }
 
         if (! $this->initializeProjectRoot()) {
             return Command::FAILURE;
@@ -77,6 +88,42 @@ class MakeMigrationCommand extends Command
         return Command::SUCCESS;
     }
 
+    /**
+     * Parse migration name to extract subdirectory and actual name.
+     */
+    private function parseMigrationName(string $input): void
+    {
+        $normalized = str_replace('\\', '/', $input);
+        
+        if (str_contains($normalized, '/')) {
+            $parts = explode('/', $normalized);
+            $this->migrationName = array_pop($parts);
+            
+            if ($this->subdirectory === null) {
+                $this->subdirectory = implode(DIRECTORY_SEPARATOR, $parts);
+            }
+        } else {
+            $this->migrationName = $input;
+        }
+        
+        $this->migrationName = $this->sanitizeMigrationName($this->migrationName);
+    }
+
+    /**
+     * Sanitize migration name to ensure it's valid.
+     */
+    private function sanitizeMigrationName(string $name): string
+    {
+        $name = str_replace(['/', '\\'], '', $name);
+        
+        $name = preg_replace('/([a-z])([A-Z])/', '$1_$2', $name);
+        $name = strtolower($name ?? '');
+        $name = preg_replace('/[^a-z0-9_]/', '_', $name ?? '');
+        $name = preg_replace('/_+/', '_', $name ?? '');
+        
+        return trim($name ?? '', '_');
+    }
+
     private function initializeProjectRoot(): bool
     {
         $this->projectRoot = $this->findProjectRoot();
@@ -91,9 +138,17 @@ class MakeMigrationCommand extends Command
 
     private function ensureMigrationsDirectory(): bool
     {
-        $this->migrationsPath = $this->getMigrationsPath($this->connection);
+        $basePath = $this->getMigrationsPath($this->connection);
+        
+        // Add subdirectory if specified
+        if ($this->subdirectory !== null) {
+            $this->migrationsPath = $basePath . DIRECTORY_SEPARATOR . $this->subdirectory;
+        } else {
+            $this->migrationsPath = $basePath;
+        }
 
-        if (! is_dir($this->migrationsPath) && ! mkdir($this->migrationsPath, 0755, true)) {
+        // Ensure the directory exists
+        if (! $this->ensureDirectoryExists($this->migrationsPath)) {
             $this->io->error("Failed to create migrations directory: {$this->migrationsPath}");
 
             return false;
@@ -105,7 +160,14 @@ class MakeMigrationCommand extends Command
     private function createMigrationFile(): bool
     {
         $fileName = $this->generateFileName();
-        $filePath = $this->migrationsPath . '/' . $fileName;
+        $filePath = $this->migrationsPath . DIRECTORY_SEPARATOR . $fileName;
+        
+        // Check if file already exists
+        if (file_exists($filePath)) {
+            $this->io->error("Migration file already exists: {$fileName}");
+            return false;
+        }
+        
         $stub = $this->generateMigrationStub();
 
         if (file_put_contents($filePath, $stub) === false) {
@@ -114,8 +176,16 @@ class MakeMigrationCommand extends Command
             return false;
         }
 
-        $relativePath = str_replace($this->projectRoot . '/', '', $this->migrationsPath);
-        $this->io->success("Migration created: {$relativePath}/{$fileName}");
+        // Display relative path from project root
+        $relativePath = str_replace($this->projectRoot . DIRECTORY_SEPARATOR, '', $filePath);
+        $relativePath = str_replace('\\', '/', $relativePath);
+        
+        $this->io->success("Migration created: {$relativePath}");
+        
+        // Show additional info if in subdirectory
+        if ($this->subdirectory !== null) {
+            $this->io->note("Migration organized in subdirectory: {$this->subdirectory}");
+        }
 
         return true;
     }
@@ -267,6 +337,7 @@ return new class extends Migration
     public function up(): PromiseInterface
     {
         // Write your migration here
+        return \$this->raw('-- Add your SQL here');
     }
 
     /**
@@ -277,6 +348,7 @@ return new class extends Migration
     public function down(): PromiseInterface
     {
         // Reverse your migration here
+        return \$this->raw('-- Add your rollback SQL here');
     }
 };
 ";
