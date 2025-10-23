@@ -51,13 +51,13 @@ class MigrateStatusCommand extends Command
 
         try {
             $this->initializeDatabase();
-            
+
             $pathOption = $input->getOption('path');
             $path = is_string($pathOption) && $pathOption !== '' ? $pathOption : null;
-            
+
             $pendingOnly = (bool) $input->getOption('pending');
             $ranOnly = (bool) $input->getOption('ran');
-            
+
             $this->displayMigrationStatus($path, $pendingOnly, $ranOnly);
 
             return Command::SUCCESS;
@@ -85,21 +85,20 @@ class MigrateStatusCommand extends Command
         $repository = new MigrationRepository($this->getMigrationsTable($this->connection), $this->connection);
         await($repository->createRepository());
 
-        // Get migration files
         if ($path !== null) {
             $pattern = rtrim($path, '/') . '/*.php';
             $migrationFiles = $this->getFilteredMigrationFiles($pattern, $this->connection);
-            
+
             if (count($migrationFiles) === 0) {
                 $this->io->warning("No migration files found in path: {$path}");
                 return;
             }
-            
+
             $this->io->note("Showing migrations from path: {$path}");
         } else {
             $migrationFiles = $this->getAllMigrationFiles($this->connection);
         }
-        
+
         if (count($migrationFiles) === 0) {
             $this->io->warning('No migration files found');
             return;
@@ -118,16 +117,14 @@ class MigrateStatusCommand extends Command
             return;
         }
 
-        // Check if we're using nested structure
         $hasNestedMigrations = $this->hasNestedStructure($migrationFiles);
-        
+
         if ($hasNestedMigrations) {
             $this->displayGroupedStatus($rows);
         } else {
             $this->io->table(['Migration', 'Status', 'Batch'], $rows);
         }
 
-        // Show summary
         $this->displaySummary($rows);
     }
 
@@ -155,19 +152,19 @@ class MigrateStatusCommand extends Command
     private function displayGroupedStatus(array $rows): void
     {
         $grouped = [];
-        
+
         foreach ($rows as $row) {
             $path = $row[0];
             $directory = dirname($path);
-            
+
             if ($directory === '.') {
                 $directory = '(root)';
             }
-            
+
             if (!isset($grouped[$directory])) {
                 $grouped[$directory] = [];
             }
-            
+
             $grouped[$directory][] = [
                 basename($path),
                 $row[1],
@@ -175,7 +172,6 @@ class MigrateStatusCommand extends Command
             ];
         }
 
-        // Sort directories
         ksort($grouped);
 
         foreach ($grouped as $directory => $migrations) {
@@ -191,13 +187,13 @@ class MigrateStatusCommand extends Command
      */
     private function buildStatusRows(array $migrationFiles, array $ranMigrations, bool $pendingOnly, bool $ranOnly): array
     {
-        // Create a map of migration path to batch number
         $ranMigrationMap = [];
         foreach ($ranMigrations as $migration) {
             $path = $migration['migration'] ?? null;
             $batch = $migration['batch'] ?? null;
             if (is_string($path)) {
-                $ranMigrationMap[$path] = $batch;
+                $normalizedPath = str_replace('\\', '/', trim($path, '/\\'));
+                $ranMigrationMap[$normalizedPath] = $batch;
             }
         }
 
@@ -205,19 +201,20 @@ class MigrateStatusCommand extends Command
 
         foreach ($migrationFiles as $file) {
             $relativePath = $this->getRelativeMigrationPath($file, $this->connection);
-            
-            $isRan = isset($ranMigrationMap[$relativePath]);
-            
-            // Apply filters
+
+            $normalizedRelativePath = str_replace('\\', '/', trim($relativePath, '/\\'));
+
+            $isRan = array_key_exists($normalizedRelativePath, $ranMigrationMap);
+
             if ($pendingOnly && $isRan) {
                 continue;
             }
             if ($ranOnly && !$isRan) {
                 continue;
             }
-            
+
             if ($isRan) {
-                $batch = $ranMigrationMap[$relativePath];
+                $batch = $ranMigrationMap[$normalizedRelativePath];
                 $batchStr = is_int($batch) ? (string) $batch : 'N/A';
                 $rows[] = [$relativePath, '<info>✓ Ran</info>', $batchStr];
             } else {
