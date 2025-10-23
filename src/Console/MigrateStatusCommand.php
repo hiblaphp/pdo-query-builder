@@ -51,13 +51,13 @@ class MigrateStatusCommand extends Command
 
         try {
             $this->initializeDatabase();
-
+            
             $pathOption = $input->getOption('path');
             $path = is_string($pathOption) && $pathOption !== '' ? $pathOption : null;
-
+            
             $pendingOnly = (bool) $input->getOption('pending');
             $ranOnly = (bool) $input->getOption('ran');
-
+            
             $this->displayMigrationStatus($path, $pendingOnly, $ranOnly);
 
             return Command::SUCCESS;
@@ -85,20 +85,21 @@ class MigrateStatusCommand extends Command
         $repository = new MigrationRepository($this->getMigrationsTable($this->connection), $this->connection);
         await($repository->createRepository());
 
+        // Get migration files
         if ($path !== null) {
             $pattern = rtrim($path, '/') . '/*.php';
             $migrationFiles = $this->getFilteredMigrationFiles($pattern, $this->connection);
-
+            
             if (count($migrationFiles) === 0) {
                 $this->io->warning("No migration files found in path: {$path}");
                 return;
             }
-
+            
             $this->io->note("Showing migrations from path: {$path}");
         } else {
             $migrationFiles = $this->getAllMigrationFiles($this->connection);
         }
-
+        
         if (count($migrationFiles) === 0) {
             $this->io->warning('No migration files found');
             return;
@@ -117,14 +118,16 @@ class MigrateStatusCommand extends Command
             return;
         }
 
+        // Check if we're using nested structure
         $hasNestedMigrations = $this->hasNestedStructure($migrationFiles);
-
+        
         if ($hasNestedMigrations) {
             $this->displayGroupedStatus($rows);
         } else {
-            $this->io->table(['Migration', 'Status', 'Batch'], $rows);
+            $this->io->table(['Migration', 'Status', 'Batch', 'Connection'], $rows);
         }
 
+        // Show summary
         $this->displaySummary($rows);
     }
 
@@ -147,28 +150,29 @@ class MigrateStatusCommand extends Command
     /**
      * Display migrations grouped by directory.
      *
-     * @param list<array{0: string, 1: string, 2: string}> $rows
+     * @param list<array{0: string, 1: string, 2: string, 3: string}> $rows
      */
     private function displayGroupedStatus(array $rows): void
     {
         $grouped = [];
-
+        
         foreach ($rows as $row) {
             $path = $row[0];
             $directory = dirname($path);
-
+            
             if ($directory === '.') {
                 $directory = '(root)';
             }
-
+            
             if (!isset($grouped[$directory])) {
                 $grouped[$directory] = [];
             }
-
+            
             $grouped[$directory][] = [
                 basename($path),
                 $row[1],
-                $row[2]
+                $row[2],
+                $row[3]
             ];
         }
 
@@ -176,14 +180,14 @@ class MigrateStatusCommand extends Command
 
         foreach ($grouped as $directory => $migrations) {
             $this->io->section($directory);
-            $this->io->table(['Migration', 'Status', 'Batch'], $migrations);
+            $this->io->table(['Migration', 'Status', 'Batch', 'Connection'], $migrations);
         }
     }
 
     /**
      * @param list<string> $migrationFiles
      * @param list<array<string, mixed>> $ranMigrations
-     * @return list<array{0: string, 1: string, 2: string}>
+     * @return list<array{0: string, 1: string, 2: string, 3: string}>
      */
     private function buildStatusRows(array $migrationFiles, array $ranMigrations, bool $pendingOnly, bool $ranOnly): array
     {
@@ -201,24 +205,27 @@ class MigrateStatusCommand extends Command
 
         foreach ($migrationFiles as $file) {
             $relativePath = $this->getRelativeMigrationPath($file, $this->connection);
-
+            
             $normalizedRelativePath = str_replace('\\', '/', trim($relativePath, '/\\'));
-
+            
             $isRan = array_key_exists($normalizedRelativePath, $ranMigrationMap);
-
+        
             if ($pendingOnly && $isRan) {
                 continue;
             }
             if ($ranOnly && !$isRan) {
                 continue;
             }
-
+            
+            $migrationConnection = $this->getMigrationConnection($file);
+            $connectionDisplay = $migrationConnection ?? '<comment>default</comment>';
+            
             if ($isRan) {
                 $batch = $ranMigrationMap[$normalizedRelativePath];
                 $batchStr = is_int($batch) ? (string) $batch : 'N/A';
-                $rows[] = [$relativePath, '<info>✓ Ran</info>', $batchStr];
+                $rows[] = [$relativePath, '<info>✓ Ran</info>', $batchStr, $connectionDisplay];
             } else {
-                $rows[] = [$relativePath, '<comment>Pending</comment>', '-'];
+                $rows[] = [$relativePath, '<comment>Pending</comment>', '-', $connectionDisplay];
             }
         }
 
@@ -226,15 +233,42 @@ class MigrateStatusCommand extends Command
     }
 
     /**
+     * Get the connection name from a migration file.
+     */
+    private function getMigrationConnection(string $file): ?string
+    {
+        try {
+            if (!file_exists($file)) {
+                return null;
+            }
+            
+            $migration = require $file;
+            
+            if (!is_object($migration)) {
+                return null;
+            }
+            
+            if (method_exists($migration, 'getConnection')) {
+                return $migration->getConnection();
+            }
+            
+            return null;
+        } catch (\Throwable $e) {
+            return null;
+        }
+    }
+
+    /**
      * Display summary statistics.
      *
-     * @param list<array{0: string, 1: string, 2: string}> $rows
+     * @param list<array{0: string, 1: string, 2: string, 3: string}> $rows
      */
     private function displaySummary(array $rows): void
     {
         $total = count($rows);
         $ran = 0;
         $pending = 0;
+        $connectionCounts = [];
 
         foreach ($rows as $row) {
             if (str_contains($row[1], 'Ran')) {
@@ -242,6 +276,12 @@ class MigrateStatusCommand extends Command
             } else {
                 $pending++;
             }
+            
+            $connection = strip_tags($row[3]);
+            if (!isset($connectionCounts[$connection])) {
+                $connectionCounts[$connection] = 0;
+            }
+            $connectionCounts[$connection]++;
         }
 
         $this->io->newLine();
@@ -250,6 +290,14 @@ class MigrateStatusCommand extends Command
             "Completed: <info>{$ran}</info>",
             "Pending: <comment>{$pending}</comment>",
         ]);
+        
+        if (count($connectionCounts) > 1) {
+            $this->io->newLine();
+            $this->io->writeln('<comment>By connection:</comment>');
+            foreach ($connectionCounts as $conn => $count) {
+                $this->io->writeln("  {$conn}: <info>{$count}</info>");
+            }
+        }
     }
 
     private function initializeDatabase(): void
