@@ -30,7 +30,7 @@ class MigrateFreshCommand extends Command
             ->setName('migrate:fresh')
             ->setDescription('Drop all tables and re-run all migrations')
             ->addOption('force', 'f', InputOption::VALUE_NONE, 'Force the operation without confirmation')
-            ->addOption('database', null, InputOption::VALUE_OPTIONAL, 'The database connection to use')
+            ->addOption('connection', null, InputOption::VALUE_OPTIONAL, 'The database connection to use')
         ;
     }
 
@@ -40,7 +40,7 @@ class MigrateFreshCommand extends Command
         $this->output = $output;
         $this->io->title('Fresh Migration');
 
-        $connectionOption = $input->getOption('database');
+        $connectionOption = $input->getOption('connection');
         $this->connection = (is_string($connectionOption) && $connectionOption !== '') ? $connectionOption : null;
 
         if ($this->connection !== null) {
@@ -242,7 +242,7 @@ class MigrateFreshCommand extends Command
         $arguments = ['--force' => true];
         
         if ($this->connection !== null) {
-            $arguments['--database'] = $this->connection;
+            $arguments['--connection'] = $this->connection;
         }
         
         $input = new ArrayInput($arguments);

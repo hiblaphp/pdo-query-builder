@@ -36,7 +36,7 @@ class MigrateCommand extends Command
             ->setDescription('Run pending database migrations')
             ->addOption('step', null, InputOption::VALUE_OPTIONAL, 'Number of migrations to run', 0)
             ->addOption('force', 'f', InputOption::VALUE_NONE, 'Force the operation to run without prompts')
-            ->addOption('database', null, InputOption::VALUE_OPTIONAL, 'The database connection to use')
+            ->addOption('connection', null, InputOption::VALUE_OPTIONAL, 'The database connection to use')
         ;
     }
 
@@ -46,7 +46,7 @@ class MigrateCommand extends Command
         $this->output = $output;
         $this->io->title('Database Migrations');
 
-        $connectionOption = $input->getOption('database');
+        $connectionOption = $input->getOption('connection');
         $this->connection = (is_string($connectionOption) && $connectionOption !== '') ? $connectionOption : null;
 
         if ($this->connection !== null) {
@@ -317,17 +317,15 @@ class MigrateCommand extends Command
                 }
             }
 
-            $schema = new SchemaBuilder(null, $migrationConnection);
-
             $this->io->write("Migrating: {$migrationName}");
             if ($migrationConnection !== null && $migrationConnection !== $this->connection) {
                 $this->io->write(" <comment>[{$migrationConnection}]</comment>");
             }
             $this->io->write("...");
 
-            /** @var callable(SchemaBuilder): PromiseInterface<mixed> $upMethod */
+            /** @var callable(): PromiseInterface<mixed> $upMethod */
             $upMethod = [$migration, 'up'];
-            $promise = $upMethod($schema);
+            $promise = $upMethod();
             await($promise);
 
             await($this->repository->log($migrationName, $batchNumber));

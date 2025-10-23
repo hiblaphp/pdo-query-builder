@@ -33,7 +33,7 @@ class MigrateRollbackCommand extends Command
             ->setName('migrate:rollback')
             ->setDescription('Rollback the last database migration')
             ->addOption('step', null, InputOption::VALUE_OPTIONAL, 'Number of migrations to rollback', 1)
-            ->addOption('database', null, InputOption::VALUE_OPTIONAL, 'The database connection to use')
+            ->addOption('connection', null, InputOption::VALUE_OPTIONAL, 'The database connection to use')
         ;
     }
 
@@ -43,7 +43,7 @@ class MigrateRollbackCommand extends Command
         $this->output = $output;
         $this->io->title('Rollback Migrations');
 
-        $connectionOption = $input->getOption('database');
+        $connectionOption = $input->getOption('connection');
         $this->connection = (is_string($connectionOption) && $connectionOption !== '') ? $connectionOption : null;
 
         if ($this->connection !== null) {
@@ -172,17 +172,15 @@ class MigrateRollbackCommand extends Command
                 }
             }
 
-            $schema = new SchemaBuilder(null, $migrationConnection);
-
             $this->io->write("Rolling back: {$migrationName}");
             if ($migrationConnection !== null && $migrationConnection !== $this->connection) {
                 $this->io->write(" <comment>[{$migrationConnection}]</comment>");
             }
             $this->io->write("...");
 
-            /** @var callable(SchemaBuilder): PromiseInterface<mixed> $downMethod */
+            /** @var callable(): PromiseInterface<mixed> $downMethod */
             $downMethod = [$migration, 'down'];
-            $promise = $downMethod($schema);
+            $promise = $downMethod();
             await($promise);
 
             await($this->repository->delete($migrationName));

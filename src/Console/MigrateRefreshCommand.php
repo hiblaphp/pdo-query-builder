@@ -14,12 +14,13 @@ class MigrateRefreshCommand extends Command
     private SymfonyStyle $io;
     private OutputInterface $output;
     private InputInterface $input;
+    
     protected function configure(): void
     {
         $this
             ->setName('migrate:refresh')
             ->setDescription('Reset and re-run all migrations')
-            ->addOption('database', null, InputOption::VALUE_OPTIONAL, 'The database connection to use')
+            ->addOption('connection', null, InputOption::VALUE_OPTIONAL, 'The database connection to use')
         ;
     }
 
@@ -30,7 +31,7 @@ class MigrateRefreshCommand extends Command
         $this->input = $input;
         $this->io->title('Refresh Migrations');
 
-        $connectionOption = $input->getOption('database');
+        $connectionOption = $input->getOption('connection');
         $connection = (is_string($connectionOption) && $connectionOption !== '') ? $connectionOption : null;
 
         if ($connection !== null) {
@@ -77,9 +78,9 @@ class MigrateRefreshCommand extends Command
             $command = $application->find($commandName);
             $arguments = [];
 
-            $databaseOption = $this->input->getOption('database');
-            if (is_string($databaseOption) && $databaseOption !== '') {
-                $arguments['--database'] = $databaseOption;
+            $connectionOption = $this->input->getOption('connection');
+            if (is_string($connectionOption) && $connectionOption !== '') {
+                $arguments['--connection'] = $connectionOption;
             }
 
             $input = new ArrayInput($arguments);

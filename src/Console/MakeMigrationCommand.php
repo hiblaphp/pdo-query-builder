@@ -33,7 +33,7 @@ class MakeMigrationCommand extends Command
             ->addArgument('name', InputArgument::REQUIRED, 'Migration name')
             ->addOption('table', null, InputOption::VALUE_OPTIONAL, 'Table to create')
             ->addOption('alter', null, InputOption::VALUE_OPTIONAL, 'Table to alter')
-            ->addOption('database', null, InputOption::VALUE_OPTIONAL, 'The database connection to use')
+            ->addOption('connection', null, InputOption::VALUE_OPTIONAL, 'The database connection to use')
         ;
     }
 
@@ -42,7 +42,7 @@ class MakeMigrationCommand extends Command
         $this->io = new SymfonyStyle($input, $output);
         $this->io->title('Create Migration');
 
-        $connectionOption = $input->getOption('database');
+        $connectionOption = $input->getOption('connection');
         $this->connection = (is_string($connectionOption) && $connectionOption !== '') ? $connectionOption : null;
 
         if ($this->connection !== null) {
@@ -174,7 +174,6 @@ class MakeMigrationCommand extends Command
 
 use Hibla\PdoQueryBuilder\Schema\Blueprint;
 use Hibla\PdoQueryBuilder\Schema\Migration;
-use Hibla\PdoQueryBuilder\Schema\SchemaBuilder;
 use Hibla\Promise\Interfaces\PromiseInterface;
 
 return new class extends Migration
@@ -184,7 +183,7 @@ return new class extends Migration
      *
      * @return PromiseInterface<int|null>
      */
-    public function up(SchemaBuilder \$schema): PromiseInterface
+    public function up(): PromiseInterface
     {
         return \$this->create('{$this->table}', function (Blueprint \$table) {
             \$table->id();
@@ -197,7 +196,7 @@ return new class extends Migration
      *
      * @return PromiseInterface<int>
      */
-    public function down(SchemaBuilder \$schema): PromiseInterface
+    public function down(): PromiseInterface
     {
         return \$this->dropIfExists('{$this->table}');
     }
@@ -215,7 +214,6 @@ return new class extends Migration
 
 use Hibla\PdoQueryBuilder\Schema\Blueprint;
 use Hibla\PdoQueryBuilder\Schema\Migration;
-use Hibla\PdoQueryBuilder\Schema\SchemaBuilder;
 use Hibla\Promise\Interfaces\PromiseInterface;
 
 return new class extends Migration
@@ -225,7 +223,7 @@ return new class extends Migration
      *
      * @return PromiseInterface<int|null>
      */
-    public function up(SchemaBuilder \$schema): PromiseInterface
+    public function up(): PromiseInterface
     {
         return \$this->table('{$this->alter}', function (Blueprint \$table) {
             // Add columns, indexes, etc.
@@ -237,7 +235,7 @@ return new class extends Migration
      *
      * @return PromiseInterface<int|null>
      */
-    public function down(SchemaBuilder \$schema): PromiseInterface
+    public function down(): PromiseInterface
     {
         return \$this->table('{$this->alter}', function (Blueprint \$table) {
             // Reverse the changes
@@ -257,7 +255,6 @@ return new class extends Migration
 
 use Hibla\PdoQueryBuilder\Schema\Blueprint;
 use Hibla\PdoQueryBuilder\Schema\Migration;
-use Hibla\PdoQueryBuilder\Schema\SchemaBuilder;
 use Hibla\Promise\Interfaces\PromiseInterface;
 
 return new class extends Migration
@@ -267,7 +264,7 @@ return new class extends Migration
      *
      * @return PromiseInterface<mixed>
      */
-    public function up(SchemaBuilder \$schema): PromiseInterface
+    public function up(): PromiseInterface
     {
         // Write your migration here
     }
@@ -277,7 +274,7 @@ return new class extends Migration
      *
      * @return PromiseInterface<mixed>
      */
-    public function down(SchemaBuilder \$schema): PromiseInterface
+    public function down(): PromiseInterface
     {
         // Reverse your migration here
     }

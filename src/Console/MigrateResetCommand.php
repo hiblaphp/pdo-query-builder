@@ -32,7 +32,7 @@ class MigrateResetCommand extends Command
         $this
             ->setName('migrate:reset')
             ->setDescription('Rollback all database migrations')
-            ->addOption('database', null, InputOption::VALUE_OPTIONAL, 'The database connection to use')
+            ->addOption('connection', null, InputOption::VALUE_OPTIONAL, 'The database connection to use')
         ;
     }
 
@@ -42,7 +42,7 @@ class MigrateResetCommand extends Command
         $this->output = $output;
         $this->io->title('Reset All Migrations');
 
-        $connectionOption = $input->getOption('database');
+        $connectionOption = $input->getOption('connection');
         $this->connection = (is_string($connectionOption) && $connectionOption !== '') ? $connectionOption : null;
 
         if ($this->connection !== null) {
@@ -155,33 +155,28 @@ class MigrateResetCommand extends Command
                 }
             }
 
-            $schema = new SchemaBuilder(null, $migrationConnection);
-
-            $this->executeMigrationDown($migration, $migrationName, $schema);
+            $this->executeMigrationDown($migration, $migrationName, $migrationConnection);
             await($this->repository->delete($migrationName));
         } catch (\Throwable $e) {
             $this->handleMigrationError($migrationName, $e);
         }
     }
 
-    private function executeMigrationDown(object $migration, string $migrationName, SchemaBuilder $schema): void
+    private function executeMigrationDown(object $migration, string $migrationName, ?string $migrationConnection): void
     {
         if (method_exists($migration, 'down')) {
             $this->io->write("Rolling back: {$migrationName}");
             
             // Show connection if different from command connection
-            if (method_exists($migration, 'getConnection')) {
-                $migrationConnection = $migration->getConnection();
-                if ($migrationConnection !== null && $migrationConnection !== $this->connection) {
-                    $this->io->write(" <comment>[{$migrationConnection}]</comment>");
-                }
+            if ($migrationConnection !== null && $migrationConnection !== $this->connection) {
+                $this->io->write(" <comment>[{$migrationConnection}]</comment>");
             }
             
             $this->io->write("...");
 
-            /** @var callable(SchemaBuilder): PromiseInterface<mixed> $downMethod */
+            /** @var callable(): PromiseInterface<mixed> $downMethod */
             $downMethod = [$migration, 'down'];
-            $promise = $downMethod($schema);
+            $promise = $downMethod();
             await($promise);
 
             $this->io->writeln(' <info>✓</info>');
