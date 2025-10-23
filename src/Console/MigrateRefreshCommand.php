@@ -8,6 +8,7 @@ use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Input\ArrayInput;
 use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Input\InputOption;
+use Symfony\Component\Console\Output\BufferedOutput;
 use Symfony\Component\Console\Output\OutputInterface;
 use Symfony\Component\Console\Style\SymfonyStyle;
 
@@ -53,42 +54,123 @@ class MigrateRefreshCommand extends Command
         $stepOption = $input->getOption('step');
         $step = is_numeric($stepOption) ? (int) $stepOption : null;
 
-        if (! $this->resetMigrations($step, $path)) {
+        $resetResult = $this->resetMigrations($step, $path);
+        
+        if ($resetResult === false) {
             $this->io->error('Reset failed');
-
             return Command::FAILURE;
         }
 
-        if (! $this->runMigrations($path)) {
+        if ($resetResult === 0) {
+            $this->io->warning('No migrations to reset');
+            return Command::SUCCESS;
+        }
+
+        $migrateResult = $this->runMigrations($path);
+        
+        if ($migrateResult === false) {
             $this->io->error('Migration failed');
-
             return Command::FAILURE;
         }
 
-        // Run seeders if requested
+        if ($migrateResult === 0) {
+            $this->io->warning('No migrations to run');
+            return Command::SUCCESS;
+        }
+
         if ($input->getOption('seed')) {
-            $this->io->section('Running seeders...');
+            $this->io->newLine();
+            $this->io->section('Running seeders');
+            
             if ($this->runSeeders()) {
-                $this->io->success('Seeders completed!');
+                $this->io->writeln('<info>✓ Seeders completed</info>');
             } else {
                 $this->io->warning('Seeders not available or failed');
             }
         }
 
+        $this->io->newLine();
         $this->io->success('Database refreshed successfully!');
 
         return Command::SUCCESS;
     }
 
-    private function resetMigrations(?int $step, ?string $path): bool
+    /**
+     * @return int|false Number of migrations reset, or false on failure
+     */
+    private function resetMigrations(?int $step, ?string $path): int|false
     {
         $commandName = $step !== null ? 'migrate:rollback' : 'migrate:reset';
-        return $this->executeCommand($commandName, $step, $path);
+        
+        $bufferedOutput = new BufferedOutput();
+        $result = $this->executeCommand($commandName, $step, $path, $bufferedOutput, true);
+        
+        $content = $bufferedOutput->fetch();
+        
+        $lines = explode("\n", $content);
+        $inRollbackSection = false;
+        $rollbackCount = 0;
+        
+        foreach ($lines as $line) {
+            $trimmedLine = trim($line);
+            
+            if (str_contains($trimmedLine, 'Resetting all migrations') || 
+                str_contains($trimmedLine, 'Rolling back migrations')) {
+                $this->io->section('Resetting migrations');
+                $inRollbackSection = true;
+                continue;
+            }
+            
+            if ($inRollbackSection && str_contains($line, 'Rolling back:')) {
+                $this->output->writeln($line);
+                $rollbackCount++;
+            }
+            
+            if (str_contains($trimmedLine, '[WARNING]') || str_contains($trimmedLine, 'Nothing to reset')) {
+                if (str_contains($trimmedLine, 'Nothing to reset')) {
+                    return 0;
+                }
+            }
+        }
+        
+        return $result ? $rollbackCount : false;
     }
 
-    private function runMigrations(?string $path): bool
+    /**
+     * @return int|false Number of migrations run, or false on failure
+     */
+    private function runMigrations(?string $path): int|false
     {
-        return $this->executeCommand('migrate', null, $path);
+        $bufferedOutput = new BufferedOutput();
+        $result = $this->executeCommand('migrate', null, $path, $bufferedOutput);
+        
+        $content = $bufferedOutput->fetch();
+        
+        $lines = explode("\n", $content);
+        $inMigrationSection = false;
+        $migrationCount = 0;
+        
+        foreach ($lines as $line) {
+            $trimmedLine = trim($line);
+            
+            if (str_contains($trimmedLine, 'Running migrations')) {
+                $this->io->newLine();
+                $this->io->section('Running migrations');
+                $inMigrationSection = true;
+                continue;
+            }
+            
+            if ($inMigrationSection && str_contains($line, 'Migrating:')) {
+                $this->output->writeln($line);
+                $migrationCount++;
+            }
+            
+            if (str_contains($trimmedLine, 'Nothing to migrate')) {
+                return 0;
+            }
+        }
+        
+        return $result ? $migrationCount : false;
     }
 
     private function runSeeders(): bool
@@ -116,12 +198,16 @@ class MigrateRefreshCommand extends Command
         }
     }
 
-    private function executeCommand(string $commandName, ?int $step = null, ?string $path = null): bool
-    {
+    private function executeCommand(
+        string $commandName, 
+        ?int $step = null, 
+        ?string $path = null,
+        ?OutputInterface $customOutput = null,
+        bool $autoConfirm = false
+    ): bool {
         $application = $this->getApplication();
         if ($application === null) {
             $this->io->error('Application instance not found.');
-
             return false;
         }
 
@@ -143,13 +229,34 @@ class MigrateRefreshCommand extends Command
             }
 
             $input = new ArrayInput($arguments);
-            $code = $command->run($input, $this->output);
+            
+            if ($autoConfirm) {
+                $input->setInteractive(true);
+                $input->setStream($this->createYesInputStream());
+            }
+            
+            $outputToUse = $customOutput ?? $this->output;
+            $code = $command->run($input, $outputToUse);
 
             return $code === Command::SUCCESS;
         } catch (\Throwable $e) {
             $this->io->error("Failed to execute command '{$commandName}': " . $e->getMessage());
-
             return false;
         }
+    }
+
+    /** 
+     * @return resource
+     */
+    private function createYesInputStream()
+    {
+        $stream = fopen('php://memory', 'r+');
+        if ($stream === false) {
+            throw new \RuntimeException('Failed to create input stream');
+        }
+        
+        fwrite($stream, "yes\n");
+        rewind($stream);
+        return $stream;
     }
 }
