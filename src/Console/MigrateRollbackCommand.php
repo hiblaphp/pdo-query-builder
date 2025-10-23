@@ -58,18 +58,18 @@ class MigrateRollbackCommand extends Command
             $this->initializeDatabase();
             $this->repository = new MigrationRepository($this->getMigrationsTable($this->connection), $this->connection);
             $this->schema = new SchemaBuilder(null, $this->connection);
-            
+
             $stepOption = $input->getOption('step');
             $step = is_numeric($stepOption) ? (int) $stepOption : 1;
 
             $pathOption = $input->getOption('path');
             $path = is_string($pathOption) && $pathOption !== '' ? $pathOption : null;
 
-            if (! $this->performRollback($step, $path)) {
+            $rolledBack = $this->performRollback($step, $path);
+
+            if (! $rolledBack) {
                 return Command::FAILURE;
             }
-
-            $this->io->success('Rollback completed successfully!');
 
             return Command::SUCCESS;
         } catch (\Throwable $e) {
@@ -93,43 +93,42 @@ class MigrateRollbackCommand extends Command
 
     private function performRollback(int $step, ?string $path): bool
     {
-        /** @var list<array<string, mixed>> $lastBatchMigrations */
-        $lastBatchMigrations = await($this->repository->getLast());
+        /** @var list<array<string, mixed>> $ranMigrations */
+        $ranMigrations = await($this->repository->getRan());
 
-        if (count($lastBatchMigrations) === 0) {
-            $this->io->warning('Nothing to rollback');
-
+        if (count($ranMigrations) === 0) {
+            $this->io->info('Nothing to rollback.');
             return true;
         }
 
         if ($path !== null) {
             $normalizedPath = trim($path, '/') . '/';
-            $lastBatchMigrations = array_filter($lastBatchMigrations, function ($migration) use ($normalizedPath) {
+            $ranMigrations = array_filter($ranMigrations, function ($migration) use ($normalizedPath) {
                 $migrationPath = $migration['migration'] ?? '';
                 return is_string($migrationPath) && str_starts_with($migrationPath, $normalizedPath);
             });
-            
-            if (count($lastBatchMigrations) === 0) {
-                $this->io->warning("No migrations found in path: {$path}");
+
+            if (count($ranMigrations) === 0) {
+                $this->io->info("No migrations to rollback in path: {$path}");
                 return true;
             }
-            
+
             $this->io->note("Rolling back migrations from path: {$path}");
         }
 
         if ($step > 0) {
-            $lastBatchMigrations = array_slice($lastBatchMigrations, 0, $step);
+            $ranMigrations = array_slice($ranMigrations, 0, $step);
         }
 
         $this->io->section('Rolling back migrations');
 
-        $lastBatchMigrations = array_reverse($lastBatchMigrations);
-
-        foreach ($lastBatchMigrations as $migrationData) {
+        foreach ($ranMigrations as $migrationData) {
             if (! $this->rollbackMigration($migrationData)) {
                 return false;
             }
         }
+
+        $this->io->success('Rollback completed successfully!');
 
         return true;
     }
@@ -146,11 +145,9 @@ class MigrateRollbackCommand extends Command
             return false;
         }
 
-        // Get full path from relative path
         $file = $this->getFullMigrationPath($relativePath, $this->connection);
 
         if (! $this->validateMigrationFile($file, $relativePath)) {
-            // Delete from repository even if file doesn't exist
             await($this->repository->delete($relativePath));
             $this->io->warning("Migration file not found but removed from repository: {$relativePath}");
 
@@ -169,7 +166,6 @@ class MigrateRollbackCommand extends Command
                 return false;
             }
 
-            // Check if migration has its own connection preference
             $migrationConnection = $this->connection;
             if (method_exists($migration, 'getConnection')) {
                 $declaredConnection = $migration->getConnection();

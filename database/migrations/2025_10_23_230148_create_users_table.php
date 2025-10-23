@@ -13,8 +13,10 @@ return new class extends Migration
      */
     public function up(): PromiseInterface
     {
-        return $this->create('dogs', function (Blueprint $table) {
+        return $this->create('users', function (Blueprint $table) {
             $table->id();
+            $table->string('name');
+            $table->string('email')->unique();
             $table->timestamps();
         });
     }
@@ -26,6 +28,6 @@ return new class extends Migration
      */
     public function down(): PromiseInterface
     {
-        return $this->dropIfExists('dogs');
+        return $this->dropIfExists('users');
     }
 };

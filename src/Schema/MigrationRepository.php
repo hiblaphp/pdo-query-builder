@@ -126,7 +126,7 @@ class MigrationRepository
         $table = $this->quoteIdentifier($this->table);
 
         return $this->getConnection()->raw(
-            "SELECT migration FROM {$table} ORDER BY batch, migration",
+            "SELECT id, migration, batch, executed_at FROM {$table} ORDER BY batch DESC, id DESC",
             []
         );
     }
@@ -159,7 +159,7 @@ class MigrationRepository
         $table = $this->quoteIdentifier($this->table);
 
         return $this->getConnection()->raw(
-            "SELECT migration FROM {$table} WHERE batch = (SELECT MAX(batch) FROM {$table})",
+            "SELECT id, migration, batch, executed_at FROM {$table} WHERE batch = (SELECT MAX(batch) FROM {$table}) ORDER BY id DESC",
             []
         );
     }
