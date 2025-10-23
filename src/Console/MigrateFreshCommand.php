@@ -63,7 +63,7 @@ class MigrateFreshCommand extends Command
 
         try {
             $this->driver = $this->detectDriver();
-          
+
             $this->initializeDatabase();
 
             $this->io->section('Dropping all tables...');
@@ -74,10 +74,10 @@ class MigrateFreshCommand extends Command
             $this->io->success('All tables dropped successfully!');
 
             $this->io->section('Running migrations...');
-            
+
             $pathOption = $input->getOption('path');
             $path = is_string($pathOption) && $pathOption !== '' ? $pathOption : null;
-            
+
             if (! $this->runMigrations($path)) {
                 $this->io->error('Migration failed');
 
@@ -105,8 +105,10 @@ class MigrateFreshCommand extends Command
 
     private function confirmFresh(): bool
     {
+        $connectionName = $this->connection ?? $this->getDefaultConnection();
+        
         $this->io->warning([
-            'This will DROP ALL TABLES in your database!',
+            "This will DROP ALL TABLES for connection '{$connectionName}'!",
             'All data will be permanently lost.',
         ]);
 
@@ -128,37 +130,122 @@ class MigrateFreshCommand extends Command
     private function dropAllTables(): bool
     {
         try {
-            $tables = $this->getAllTables();
+            $migratedTables = $this->getMigratedTables();
 
-            if (count($tables) === 0) {
-                $this->io->note('No tables found in database');
-
+            if (count($migratedTables) === 0) {
+                $connectionName = $this->connection ?? $this->getDefaultConnection();
+                $this->io->note("No migrated tables found for connection '{$connectionName}'");
                 return true;
             }
 
-            $this->io->writeln(sprintf('Found %d table(s) to drop', count($tables)));
+            $connectionName = $this->connection ?? $this->getDefaultConnection();
+            $this->io->writeln(sprintf('Found %d migrated table(s) to drop for connection: %s', 
+                count($migratedTables), 
+                $connectionName
+            ));
 
             $this->disableForeignKeyChecks();
 
-            foreach ($tables as $table) {
-                if (! is_string($table)) {
-                    continue;
-                }
+            foreach ($migratedTables as $table) {
                 $this->io->write("Dropping table: {$table}...");
                 $this->dropTable($table);
                 $this->io->writeln(' <info>✓</info>');
             }
 
+            $migrationsTable = $this->getMigrationsTable($this->connection);
+            $this->io->write("Dropping migrations table: {$migrationsTable}...");
+            $this->dropTable($migrationsTable);
+            $this->io->writeln(' <info>✓</info>');
+
             $this->enableForeignKeyChecks();
 
             return true;
         } catch (\Throwable $e) {
-            $this->io->error('Failed to drop tables: '.$e->getMessage());
+            $this->io->error('Failed to drop tables: ' . $e->getMessage());
             if ($this->output->isVerbose()) {
                 $this->io->writeln($e->getTraceAsString());
             }
 
             return false;
+        }
+    }
+
+    /**
+     * Get list of tables that were created by migrations
+     * by parsing the migration files for the specific connection
+     * 
+     * @return list<string>
+     */
+    private function getMigratedTables(): array
+    {
+        $tables = [];
+        $migrationFiles = $this->getAllMigrationFiles($this->connection);
+        
+        $defaultConnection = $this->getDefaultConnection();
+        $targetConnection = $this->connection ?? $defaultConnection;
+
+        foreach ($migrationFiles as $file) {
+            $content = file_get_contents($file);
+            if ($content === false) {
+                continue;
+            }
+
+            $migrationConnection = $this->extractMigrationConnection($content);
+            
+            if ($migrationConnection === null) {
+                $migrationConnection = $defaultConnection;
+            }
+
+            if ($migrationConnection !== $targetConnection) {
+                continue;
+            }
+
+            if (preg_match_all('/->create\([\'"]([^\'"]+)[\'"]\s*,/i', $content, $matches)) {
+                foreach ($matches[1] as $tableName) {
+                    if (!in_array($tableName, $tables, true)) {
+                        $tables[] = $tableName;
+                    }
+                }
+            }
+        }
+
+        sort($tables);
+        return $tables;
+    }
+
+    /**
+     * Extract the connection property from a migration file content
+     */
+    private function extractMigrationConnection(string $content): ?string
+    {
+        if (preg_match('/protected\s+\??string\s+\$connection\s*=\s*[\'"]([^\'"]+)[\'"]/', $content, $matches)) {
+            return $matches[1];
+        }
+        
+        if (preg_match('/protected\s+\$connection\s*=\s*[\'"]([^\'"]+)[\'"]/', $content, $matches)) {
+            return $matches[1];
+        }
+    
+        return null;
+    }
+
+    /**
+     * Get the default database connection name
+     */
+    private function getDefaultConnection(): string
+    {
+        try {
+            $dbConfig = Config::get('pdo-query-builder');
+
+            if (!is_array($dbConfig)) {
+                return 'mysql';
+            }
+
+            $default = $dbConfig['default'] ?? 'mysql';
+            
+            return is_string($default) ? $default : 'mysql';
+        } catch (\Throwable $e) {
+            return 'mysql';
         }
     }
 
@@ -182,9 +269,9 @@ class MigrateFreshCommand extends Command
     private function getAllTables(): array
     {
         $databaseName = $this->getCurrentDatabase();
-        
+
         $sql = match ($this->driver) {
-            'mysql' => $databaseName !== null 
+            'mysql' => $databaseName !== null
                 ? "SELECT table_name FROM information_schema.tables 
                    WHERE table_schema = '{$databaseName}' AND table_type = 'BASE TABLE'"
                 : "SELECT table_name FROM information_schema.tables 
@@ -317,17 +404,17 @@ class MigrateFreshCommand extends Command
         }
 
         $command = $application->find('migrate');
-        
+
         $arguments = [];
-        
+
         if ($this->connection !== null) {
             $arguments['--connection'] = $this->connection;
         }
-        
+
         if ($path !== null) {
             $arguments['--path'] = $path;
         }
-        
+
         $input = new ArrayInput($arguments);
         $code = $command->run($input, $this->output);
 
@@ -344,11 +431,11 @@ class MigrateFreshCommand extends Command
         try {
             $command = $application->find('db:seed');
             $arguments = [];
-            
+
             if ($this->connection !== null) {
                 $arguments['--connection'] = $this->connection;
             }
-            
+
             $input = new ArrayInput($arguments);
             $code = $command->run($input, $this->output);
 
@@ -394,7 +481,7 @@ class MigrateFreshCommand extends Command
     {
         try {
             $testQuery = 'SELECT 1';
-            
+
             await(DB::connection($this->connection)->raw($testQuery));
         } catch (\Throwable $e) {
             if ($this->output->isVerbose()) {
@@ -405,7 +492,7 @@ class MigrateFreshCommand extends Command
 
     private function handleCriticalError(\Throwable $e): void
     {
-        $this->io->error('Fresh migration failed: '.$e->getMessage());
+        $this->io->error('Fresh migration failed: ' . $e->getMessage());
         if ($this->output->isVerbose()) {
             $this->io->writeln($e->getTraceAsString());
         }
@@ -417,7 +504,7 @@ class MigrateFreshCommand extends Command
         $dir = ($currentDir !== false) ? $currentDir : __DIR__;
 
         for ($i = 0; $i < 10; $i++) {
-            if (file_exists($dir.'/composer.json')) {
+            if (file_exists($dir . '/composer.json')) {
                 return $dir;
             }
             $parent = dirname($dir);
