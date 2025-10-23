@@ -25,6 +25,7 @@ class MigrateRollbackCommand extends Command
     private string $migrationsPath;
     private MigrationRepository $repository;
     private SchemaBuilder $schema;
+    private ?string $connection = null;
 
     protected function configure(): void
     {
@@ -32,6 +33,7 @@ class MigrateRollbackCommand extends Command
             ->setName('migrate:rollback')
             ->setDescription('Rollback the last database migration')
             ->addOption('step', null, InputOption::VALUE_OPTIONAL, 'Number of migrations to rollback', 1)
+            ->addOption('database', null, InputOption::VALUE_OPTIONAL, 'The database connection to use')
         ;
     }
 
@@ -40,6 +42,13 @@ class MigrateRollbackCommand extends Command
         $this->io = new SymfonyStyle($input, $output);
         $this->output = $output;
         $this->io->title('Rollback Migrations');
+
+        $connectionOption = $input->getOption('database');
+        $this->connection = (is_string($connectionOption) && $connectionOption !== '') ? $connectionOption : null;
+
+        if ($this->connection !== null) {
+            $this->io->note("Using database connection: {$this->connection}");
+        }
 
         if (! $this->initializeProjectRoot()) {
             return Command::FAILURE;
@@ -51,9 +60,8 @@ class MigrateRollbackCommand extends Command
 
         try {
             $this->initializeDatabase();
-            $this->repository = new MigrationRepository($this->getMigrationsTable());
-            $this->schema = new SchemaBuilder();
-
+            $this->repository = new MigrationRepository($this->getMigrationsTable($this->connection), $this->connection);
+            $this->schema = new SchemaBuilder(null, $this->connection);
             $stepOption = $input->getOption('step');
             $step = is_numeric($stepOption) ? (int) $stepOption : 1;
 
@@ -85,7 +93,7 @@ class MigrateRollbackCommand extends Command
 
     private function validateMigrationsDirectory(): bool
     {
-        $this->migrationsPath = $this->getMigrationsPath();
+        $this->migrationsPath = $this->getMigrationsPath($this->connection);
         if (! is_dir($this->migrationsPath)) {
             $this->io->error('Migrations directory not found');
 
@@ -135,7 +143,7 @@ class MigrateRollbackCommand extends Command
             return false;
         }
 
-        $file = $this->migrationsPath.'/'.$migrationName;
+        $file = $this->migrationsPath . '/' . $migrationName;
 
         if (! $this->validateMigrationFile($file, $migrationName)) {
             await($this->repository->delete($migrationName));
@@ -155,11 +163,26 @@ class MigrateRollbackCommand extends Command
                 return false;
             }
 
-            $this->io->write("Rolling back: {$migrationName}...");
+            // Check if migration has its own connection preference
+            $migrationConnection = $this->connection;
+            if (method_exists($migration, 'getConnection')) {
+                $declaredConnection = $migration->getConnection();
+                if ($declaredConnection !== null) {
+                    $migrationConnection = $declaredConnection;
+                }
+            }
+
+            $schema = new SchemaBuilder(null, $migrationConnection);
+
+            $this->io->write("Rolling back: {$migrationName}");
+            if ($migrationConnection !== null && $migrationConnection !== $this->connection) {
+                $this->io->write(" <comment>[{$migrationConnection}]</comment>");
+            }
+            $this->io->write("...");
 
             /** @var callable(SchemaBuilder): PromiseInterface<mixed> $downMethod */
             $downMethod = [$migration, 'down'];
-            $promise = $downMethod($this->schema);
+            $promise = $downMethod($schema);
             await($promise);
 
             await($this->repository->delete($migrationName));
@@ -169,7 +192,7 @@ class MigrateRollbackCommand extends Command
             return true;
         } catch (\Throwable $e) {
             $this->io->newLine();
-            $this->io->error("Failed to rollback migration {$migrationName}: ".$e->getMessage());
+            $this->io->error("Failed to rollback migration {$migrationName}: " . $e->getMessage());
             if ($this->output->isVerbose()) {
                 $this->io->writeln($e->getTraceAsString());
             }
@@ -203,7 +226,7 @@ class MigrateRollbackCommand extends Command
     private function initializeDatabase(): void
     {
         try {
-            DB::table('_test_init');
+            DB::connection($this->connection)->table('_test_init');
         } catch (\Throwable $e) {
             if (! str_contains($e->getMessage(), 'not found')) {
                 throw $e;
@@ -213,7 +236,7 @@ class MigrateRollbackCommand extends Command
 
     private function handleCriticalError(\Throwable $e): void
     {
-        $this->io->error('Rollback failed: '.$e->getMessage());
+        $this->io->error('Rollback failed: ' . $e->getMessage());
         if ($this->output->isVerbose()) {
             $this->io->writeln($e->getTraceAsString());
         }
@@ -224,7 +247,7 @@ class MigrateRollbackCommand extends Command
         $currentDir = getcwd();
         $dir = ($currentDir !== false) ? $currentDir : __DIR__;
         for ($i = 0; $i < 10; $i++) {
-            if (file_exists($dir.'/composer.json')) {
+            if (file_exists($dir . '/composer.json')) {
                 return $dir;
             }
             $parent = dirname($dir);

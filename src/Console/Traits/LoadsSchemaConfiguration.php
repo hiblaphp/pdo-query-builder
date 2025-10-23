@@ -16,7 +16,7 @@ trait LoadsSchemaConfiguration
      *     timezone: string
      * }
      */
-    private function getSchemaConfig(): array
+    private function getSchemaConfig(?string $connection = null): array
     {
         $defaults = $this->getDefaultSchemaConfig();
         $loadedConfig = [];
@@ -26,6 +26,13 @@ trait LoadsSchemaConfiguration
 
             if (is_array($config)) {
                 $loadedConfig = $config;
+                
+                if ($connection !== null && isset($config['connections'][$connection])) {
+                    $connectionConfig = $config['connections'][$connection];
+                    if (is_array($connectionConfig)) {
+                        $loadedConfig = array_merge($loadedConfig, $connectionConfig);
+                    }
+                }
             }
         } catch (\Throwable $e) {
             // Ignore exceptions and use defaults
@@ -66,9 +73,9 @@ trait LoadsSchemaConfiguration
         ];
     }
 
-    private function getMigrationsPath(): string
+    private function getMigrationsPath(?string $connection = null): string
     {
-        $config = $this->getSchemaConfig();
+        $config = $this->getSchemaConfig($connection);
         $path = $config['migrations_path'];
 
         // @phpstan-ignore-next-line
@@ -81,23 +88,23 @@ trait LoadsSchemaConfiguration
         return $path;
     }
 
-    private function getMigrationsTable(): string
+    private function getMigrationsTable(?string $connection = null): string
     {
-        $config = $this->getSchemaConfig();
+        $config = $this->getSchemaConfig($connection);
 
         return $config['migrations_table'];
     }
 
-    private function getNamingConvention(): string
+    private function getNamingConvention(?string $connection = null): string
     {
-        $config = $this->getSchemaConfig();
+        $config = $this->getSchemaConfig($connection);
 
         return $config['naming_convention'];
     }
 
-    private function getTimezone(): string
+    private function getTimezone(?string $connection = null): string
     {
-        $config = $this->getSchemaConfig();
+        $config = $this->getSchemaConfig($connection);
 
         return $config['timezone'];
     }

@@ -11,6 +11,7 @@ use Hibla\PdoQueryBuilder\Schema\SchemaBuilder;
 use Hibla\Promise\Interfaces\PromiseInterface;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Input\InputInterface;
+use Symfony\Component\Console\Input\InputOption;
 use Symfony\Component\Console\Output\OutputInterface;
 use Symfony\Component\Console\Style\SymfonyStyle;
 
@@ -24,12 +25,14 @@ class MigrateResetCommand extends Command
     private string $migrationsPath;
     private MigrationRepository $repository;
     private SchemaBuilder $schema;
+    private ?string $connection = null;
 
     protected function configure(): void
     {
         $this
             ->setName('migrate:reset')
             ->setDescription('Rollback all database migrations')
+            ->addOption('database', null, InputOption::VALUE_OPTIONAL, 'The database connection to use')
         ;
     }
 
@@ -38,6 +41,13 @@ class MigrateResetCommand extends Command
         $this->io = new SymfonyStyle($input, $output);
         $this->output = $output;
         $this->io->title('Reset All Migrations');
+
+        $connectionOption = $input->getOption('database');
+        $this->connection = (is_string($connectionOption) && $connectionOption !== '') ? $connectionOption : null;
+
+        if ($this->connection !== null) {
+            $this->io->note("Using database connection: {$this->connection}");
+        }
 
         if (! $this->confirmReset()) {
             $this->io->warning('Reset cancelled');
@@ -49,12 +59,12 @@ class MigrateResetCommand extends Command
             return Command::FAILURE;
         }
 
-        $this->migrationsPath = $this->getMigrationsPath();
+        $this->migrationsPath = $this->getMigrationsPath($this->connection);
 
         try {
             $this->initializeDatabase();
-            $this->repository = new MigrationRepository($this->getMigrationsTable());
-            $this->schema = new SchemaBuilder();
+            $this->repository = new MigrationRepository($this->getMigrationsTable($this->connection), $this->connection);
+            $this->schema = new SchemaBuilder(null, $this->connection);
 
             if (! $this->performReset()) {
                 return Command::FAILURE;
@@ -137,21 +147,41 @@ class MigrateResetCommand extends Command
                 return;
             }
 
-            $this->executeMigrationDown($migration, $migrationName);
+            $migrationConnection = $this->connection;
+            if (method_exists($migration, 'getConnection')) {
+                $declaredConnection = $migration->getConnection();
+                if ($declaredConnection !== null) {
+                    $migrationConnection = $declaredConnection;
+                }
+            }
+
+            $schema = new SchemaBuilder(null, $migrationConnection);
+
+            $this->executeMigrationDown($migration, $migrationName, $schema);
             await($this->repository->delete($migrationName));
         } catch (\Throwable $e) {
             $this->handleMigrationError($migrationName, $e);
         }
     }
 
-    private function executeMigrationDown(object $migration, string $migrationName): void
+    private function executeMigrationDown(object $migration, string $migrationName, SchemaBuilder $schema): void
     {
         if (method_exists($migration, 'down')) {
-            $this->io->write("Rolling back: {$migrationName}...");
+            $this->io->write("Rolling back: {$migrationName}");
+            
+            // Show connection if different from command connection
+            if (method_exists($migration, 'getConnection')) {
+                $migrationConnection = $migration->getConnection();
+                if ($migrationConnection !== null && $migrationConnection !== $this->connection) {
+                    $this->io->write(" <comment>[{$migrationConnection}]</comment>");
+                }
+            }
+            
+            $this->io->write("...");
 
             /** @var callable(SchemaBuilder): PromiseInterface<mixed> $downMethod */
             $downMethod = [$migration, 'down'];
-            $promise = $downMethod($this->schema);
+            $promise = $downMethod($schema);
             await($promise);
 
             $this->io->writeln(' <info>✓</info>');
@@ -189,7 +219,7 @@ class MigrateResetCommand extends Command
     private function initializeDatabase(): void
     {
         try {
-            DB::table('_test_init');
+            DB::connection($this->connection)->table('_test_init');
         } catch (\Throwable $e) {
             if (! str_contains($e->getMessage(), 'not found')) {
                 throw $e;

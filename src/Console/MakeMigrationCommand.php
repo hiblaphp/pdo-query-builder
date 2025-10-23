@@ -23,6 +23,7 @@ class MakeMigrationCommand extends Command
     private string $migrationName;
     private ?string $table;
     private ?string $alter;
+    private ?string $connection = null;
 
     protected function configure(): void
     {
@@ -32,6 +33,7 @@ class MakeMigrationCommand extends Command
             ->addArgument('name', InputArgument::REQUIRED, 'Migration name')
             ->addOption('table', null, InputOption::VALUE_OPTIONAL, 'Table to create')
             ->addOption('alter', null, InputOption::VALUE_OPTIONAL, 'Table to alter')
+            ->addOption('database', null, InputOption::VALUE_OPTIONAL, 'The database connection to use')
         ;
     }
 
@@ -39,6 +41,13 @@ class MakeMigrationCommand extends Command
     {
         $this->io = new SymfonyStyle($input, $output);
         $this->io->title('Create Migration');
+
+        $connectionOption = $input->getOption('database');
+        $this->connection = (is_string($connectionOption) && $connectionOption !== '') ? $connectionOption : null;
+
+        if ($this->connection !== null) {
+            $this->io->note("Using database connection: {$this->connection}");
+        }
 
         $migrationNameValue = $input->getArgument('name');
         if (! is_string($migrationNameValue) || trim($migrationNameValue) === '') {
@@ -82,7 +91,7 @@ class MakeMigrationCommand extends Command
 
     private function ensureMigrationsDirectory(): bool
     {
-        $this->migrationsPath = $this->getMigrationsPath();
+        $this->migrationsPath = $this->getMigrationsPath($this->connection);
 
         if (! is_dir($this->migrationsPath) && ! mkdir($this->migrationsPath, 0755, true)) {
             $this->io->error("Failed to create migrations directory: {$this->migrationsPath}");
@@ -96,7 +105,7 @@ class MakeMigrationCommand extends Command
     private function createMigrationFile(): bool
     {
         $fileName = $this->generateFileName();
-        $filePath = $this->migrationsPath.'/'.$fileName;
+        $filePath = $this->migrationsPath . '/' . $fileName;
         $stub = $this->generateMigrationStub();
 
         if (file_put_contents($filePath, $stub) === false) {
@@ -105,7 +114,7 @@ class MakeMigrationCommand extends Command
             return false;
         }
 
-        $relativePath = str_replace($this->projectRoot.'/', '', $this->migrationsPath);
+        $relativePath = str_replace($this->projectRoot . '/', '', $this->migrationsPath);
         $this->io->success("Migration created: {$relativePath}/{$fileName}");
 
         return true;
@@ -113,7 +122,7 @@ class MakeMigrationCommand extends Command
 
     private function generateFileName(): string
     {
-        $convention = $this->getNamingConvention();
+        $convention = $this->getNamingConvention($this->connection);
 
         return match ($convention) {
             'sequential' => $this->generateSequentialFileName(),
@@ -124,7 +133,7 @@ class MakeMigrationCommand extends Command
 
     private function generateTimestampFileName(): string
     {
-        $timezone = $this->getTimezone();
+        $timezone = $this->getTimezone($this->connection);
         $timestamp = Carbon::now($timezone)->format('Y_m_d_His');
 
         return "{$timestamp}_{$this->migrationName}.php";
@@ -132,9 +141,9 @@ class MakeMigrationCommand extends Command
 
     private function generateSequentialFileName(): string
     {
-        $files = glob($this->migrationsPath.'/*.php');
+        $files = glob($this->migrationsPath . '/*.php');
         if ($files === false) {
-            $files = []; // Default to empty array on error
+            $files = [];
         }
         $nextNumber = count($files) + 1;
         $paddedNumber = str_pad((string) $nextNumber, 4, '0', STR_PAD_LEFT);
@@ -157,30 +166,40 @@ class MakeMigrationCommand extends Command
 
     private function getCreateStub(): string
     {
+        $connectionLine = $this->connection !== null
+            ? "    protected ?string \$connection = '{$this->connection}';\n\n"
+            : '';
+
         return "<?php
 
 use Hibla\PdoQueryBuilder\Schema\Blueprint;
+use Hibla\PdoQueryBuilder\Schema\Migration;
 use Hibla\PdoQueryBuilder\Schema\SchemaBuilder;
 use Hibla\Promise\Interfaces\PromiseInterface;
 
-return new class() {
-    /**
+return new class extends Migration
+{
+{$connectionLine}    /**
+     * Run the migration.
+     *
      * @return PromiseInterface<int|null>
      */
     public function up(SchemaBuilder \$schema): PromiseInterface
     {
-        return \$schema->create('{$this->table}', function (Blueprint \$table) {
+        return \$this->create('{$this->table}', function (Blueprint \$table) {
             \$table->id();
             \$table->timestamps();
         });
     }
     
     /**
+     * Reverse the migration.
+     *
      * @return PromiseInterface<int>
      */
     public function down(SchemaBuilder \$schema): PromiseInterface
     {
-        return \$schema->dropIfExists('{$this->table}');
+        return \$this->dropIfExists('{$this->table}');
     }
 };
 ";
@@ -188,29 +207,39 @@ return new class() {
 
     private function getAlterStub(): string
     {
+        $connectionLine = $this->connection !== null
+            ? "    protected ?string \$connection = '{$this->connection}';\n\n"
+            : '';
+
         return "<?php
 
 use Hibla\PdoQueryBuilder\Schema\Blueprint;
+use Hibla\PdoQueryBuilder\Schema\Migration;
 use Hibla\PdoQueryBuilder\Schema\SchemaBuilder;
 use Hibla\Promise\Interfaces\PromiseInterface;
 
-return new class () {
-    /**
+return new class extends Migration
+{
+{$connectionLine}    /**
+     * Run the migration.
+     *
      * @return PromiseInterface<int|null>
      */
     public function up(SchemaBuilder \$schema): PromiseInterface
     {
-        return \$schema->table('{$this->alter}', function (Blueprint \$table) {
+        return \$this->table('{$this->alter}', function (Blueprint \$table) {
             // Add columns, indexes, etc.
         });
     }
 
     /**
-     * @return PromiseInterface<int>
+     * Reverse the migration.
+     *
+     * @return PromiseInterface<int|null>
      */
     public function down(SchemaBuilder \$schema): PromiseInterface
     {
-        return \$schema->table('{$this->alter}', function (Blueprint \$table) {
+        return \$this->table('{$this->alter}', function (Blueprint \$table) {
             // Reverse the changes
         });
     }
@@ -220,22 +249,37 @@ return new class () {
 
     private function getBlankStub(): string
     {
+        $connectionLine = $this->connection !== null
+            ? "    protected ?string \$connection = '{$this->connection}';\n\n"
+            : '';
+
         return "<?php
 
 use Hibla\PdoQueryBuilder\Schema\Blueprint;
+use Hibla\PdoQueryBuilder\Schema\Migration;
 use Hibla\PdoQueryBuilder\Schema\SchemaBuilder;
 use Hibla\Promise\Interfaces\PromiseInterface;
-use Hibla\Promise\Promise;
 
-return new class () {
+return new class extends Migration
+{
+{$connectionLine}    /**
+     * Run the migration.
+     *
+     * @return PromiseInterface<mixed>
+     */
     public function up(SchemaBuilder \$schema): PromiseInterface
     {
-        // Write your migration here and return a promise
+        // Write your migration here
     }
 
+    /**
+     * Reverse the migration.
+     *
+     * @return PromiseInterface<mixed>
+     */
     public function down(SchemaBuilder \$schema): PromiseInterface
     {
-        // Reverse your migration here and return a promise
+        // Reverse your migration here
     }
 };
 ";
@@ -247,7 +291,7 @@ return new class () {
         $dir = ($currentDir !== false) ? $currentDir : __DIR__;
 
         for ($i = 0; $i < 10; $i++) {
-            if (file_exists($dir.'/composer.json')) {
+            if (file_exists($dir . '/composer.json')) {
                 return $dir;
             }
             $parent = dirname($dir);

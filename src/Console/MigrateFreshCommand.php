@@ -22,6 +22,7 @@ class MigrateFreshCommand extends Command
     private OutputInterface $output;
     private ?string $projectRoot = null;
     private string $driver;
+    private ?string $connection = null;
 
     protected function configure(): void
     {
@@ -29,6 +30,7 @@ class MigrateFreshCommand extends Command
             ->setName('migrate:fresh')
             ->setDescription('Drop all tables and re-run all migrations')
             ->addOption('force', 'f', InputOption::VALUE_NONE, 'Force the operation without confirmation')
+            ->addOption('database', null, InputOption::VALUE_OPTIONAL, 'The database connection to use')
         ;
     }
 
@@ -37,6 +39,13 @@ class MigrateFreshCommand extends Command
         $this->io = new SymfonyStyle($input, $output);
         $this->output = $output;
         $this->io->title('Fresh Migration');
+
+        $connectionOption = $input->getOption('database');
+        $this->connection = (is_string($connectionOption) && $connectionOption !== '') ? $connectionOption : null;
+
+        if ($this->connection !== null) {
+            $this->io->note("Using database connection: {$this->connection}");
+        }
 
         $force = (bool) $input->getOption('force');
 
@@ -145,7 +154,7 @@ class MigrateFreshCommand extends Command
             default => "DROP TABLE IF EXISTS `{$table}`",
         };
 
-        $promise = DB::raw($sql);
+        $promise = DB::connection($this->connection)->raw($sql);
         await($promise);
     }
 
@@ -168,7 +177,7 @@ class MigrateFreshCommand extends Command
         };
 
         /** @var list<array<string, mixed>> $result */
-        $result = await(DB::raw($sql));
+        $result = await(DB::connection($this->connection)->raw($sql));
 
         $columnName = match ($this->driver) {
             'pgsql' => 'tablename',
@@ -192,7 +201,7 @@ class MigrateFreshCommand extends Command
 
         if ($sql !== null) {
             try {
-                $promise = DB::raw($sql);
+                $promise = DB::connection($this->connection)->raw($sql);
                 await($promise);
             } catch (\Throwable $e) {
                 // Some drivers might not support this, continue anyway
@@ -212,7 +221,7 @@ class MigrateFreshCommand extends Command
 
         if ($sql !== null) {
             try {
-                $promise = DB::raw($sql);
+                $promise = DB::connection($this->connection)->raw($sql);
                 await($promise);
             } catch (\Throwable $e) {
                 // Some drivers might not support this, continue anyway
@@ -230,7 +239,13 @@ class MigrateFreshCommand extends Command
         }
 
         $command = $application->find('migrate');
-        $input = new ArrayInput(['--force' => true]);
+        $arguments = ['--force' => true];
+        
+        if ($this->connection !== null) {
+            $arguments['--database'] = $this->connection;
+        }
+        
+        $input = new ArrayInput($arguments);
         $code = $command->run($input, $this->output);
 
         return $code === Command::SUCCESS;
@@ -245,8 +260,8 @@ class MigrateFreshCommand extends Command
                 return 'mysql';
             }
 
-            $defaultConnection = $dbConfig['default'] ?? 'mysql';
-            if (! is_string($defaultConnection)) {
+            $connectionName = $this->connection ?? ($dbConfig['default'] ?? 'mysql');
+            if (! is_string($connectionName)) {
                 return 'mysql';
             }
 
@@ -255,7 +270,7 @@ class MigrateFreshCommand extends Command
                 return 'mysql';
             }
 
-            $connectionConfig = $connections[$defaultConnection] ?? [];
+            $connectionConfig = $connections[$connectionName] ?? [];
             if (! is_array($connectionConfig)) {
                 return 'mysql';
             }
@@ -271,7 +286,7 @@ class MigrateFreshCommand extends Command
     private function initializeDatabase(): void
     {
         try {
-            DB::table('_test_init');
+            DB::connection($this->connection)->table('_test_init');
         } catch (\Throwable $e) {
             if (! str_contains($e->getMessage(), 'not found')) {
                 throw $e;

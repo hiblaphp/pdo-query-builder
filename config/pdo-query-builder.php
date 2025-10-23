@@ -79,6 +79,15 @@ return [
             ],
         ],
 
+        'postgres' => [
+            'driver' => 'pgsql',
+            'host' => '127.0.0.1',
+            'port' => 5432,
+            'database' => 'test_db',
+            'username' => 'postgres',
+            'password' => 'root',
+        ],
+
         'sqlsrv' => [
             'driver' => 'sqlsrv',
             'host' => env('DB_HOST', '127.0.0.1'),

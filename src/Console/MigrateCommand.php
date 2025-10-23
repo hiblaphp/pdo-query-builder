@@ -27,6 +27,7 @@ class MigrateCommand extends Command
     private string $migrationsPath;
     private MigrationRepository $repository;
     private SchemaBuilder $schema;
+    private ?string $connection = null;
 
     protected function configure(): void
     {
@@ -35,6 +36,7 @@ class MigrateCommand extends Command
             ->setDescription('Run pending database migrations')
             ->addOption('step', null, InputOption::VALUE_OPTIONAL, 'Number of migrations to run', 0)
             ->addOption('force', 'f', InputOption::VALUE_NONE, 'Force the operation to run without prompts')
+            ->addOption('database', null, InputOption::VALUE_OPTIONAL, 'The database connection to use')
         ;
     }
 
@@ -43,6 +45,13 @@ class MigrateCommand extends Command
         $this->io = new SymfonyStyle($input, $output);
         $this->output = $output;
         $this->io->title('Database Migrations');
+
+        $connectionOption = $input->getOption('database');
+        $this->connection = (is_string($connectionOption) && $connectionOption !== '') ? $connectionOption : null;
+
+        if ($this->connection !== null) {
+            $this->io->note("Using database connection: {$this->connection}");
+        }
 
         if (! $this->initializeProjectRoot()) {
             return Command::FAILURE;
@@ -68,8 +77,8 @@ class MigrateCommand extends Command
             }
 
             $this->initializeDatabase();
-            $this->repository = new MigrationRepository($this->getMigrationsTable());
-            $this->schema = new SchemaBuilder();
+            $this->repository = new MigrationRepository($this->getMigrationsTable($this->connection), $this->connection);
+            $this->schema = new SchemaBuilder(null, $this->connection);
 
             $this->io->writeln('Preparing migration repository...');
             await($this->repository->createRepository());
@@ -99,7 +108,7 @@ class MigrateCommand extends Command
     private function ensureDatabaseExists(bool $force): ?bool
     {
         try {
-            $dbManager = new DatabaseManager();
+            $dbManager = new DatabaseManager($this->connection);
 
             if (! $dbManager->databaseExists()) {
                 $dbName = $this->getDatabaseName();
@@ -143,7 +152,7 @@ class MigrateCommand extends Command
                     }
 
                     $this->io->writeln('<comment>Creating database...</comment>');
-                    $dbManager = new DatabaseManager();
+                    $dbManager = new DatabaseManager($this->connection);
                     $dbManager->createDatabaseIfNotExists();
                     $this->io->writeln('<info>✓ Database created successfully!</info>');
                     $this->io->newLine();
@@ -177,8 +186,8 @@ class MigrateCommand extends Command
                 return 'unknown';
             }
 
-            $defaultConnection = $dbConfig['default'] ?? 'mysql';
-            if (! is_string($defaultConnection)) {
+            $connectionName = $this->connection ?? ($dbConfig['default'] ?? 'mysql');
+            if (! is_string($connectionName)) {
                 return 'unknown';
             }
 
@@ -187,7 +196,7 @@ class MigrateCommand extends Command
                 return 'unknown';
             }
 
-            $config = $connections[$defaultConnection] ?? [];
+            $config = $connections[$connectionName] ?? [];
             if (! is_array($config)) {
                 return 'unknown';
             }
@@ -224,7 +233,7 @@ class MigrateCommand extends Command
 
     private function validateMigrationsDirectory(): bool
     {
-        $this->migrationsPath = $this->getMigrationsPath();
+        $this->migrationsPath = $this->getMigrationsPath($this->connection);
         if (! is_dir($this->migrationsPath)) {
             $this->io->error('Migrations directory not found. Run make:migration first.');
 
@@ -300,11 +309,25 @@ class MigrateCommand extends Command
                 return false;
             }
 
-            $this->io->write("Migrating: {$migrationName}...");
+            $migrationConnection = $this->connection;
+            if (method_exists($migration, 'getConnection')) {
+                $declaredConnection = $migration->getConnection();
+                if ($declaredConnection !== null) {
+                    $migrationConnection = $declaredConnection;
+                }
+            }
+
+            $schema = new SchemaBuilder(null, $migrationConnection);
+
+            $this->io->write("Migrating: {$migrationName}");
+            if ($migrationConnection !== null && $migrationConnection !== $this->connection) {
+                $this->io->write(" <comment>[{$migrationConnection}]</comment>");
+            }
+            $this->io->write("...");
 
             /** @var callable(SchemaBuilder): PromiseInterface<mixed> $upMethod */
             $upMethod = [$migration, 'up'];
-            $promise = $upMethod($this->schema);
+            $promise = $upMethod($schema);
             await($promise);
 
             await($this->repository->log($migrationName, $batchNumber));
@@ -345,7 +368,7 @@ class MigrateCommand extends Command
     private function initializeDatabase(): void
     {
         try {
-            DB::table('_test_init');
+            DB::connection($this->connection)->table('_test_init');
         } catch (\Throwable $e) {
             if (! str_contains($e->getMessage(), 'not found')) {
                 throw $e;

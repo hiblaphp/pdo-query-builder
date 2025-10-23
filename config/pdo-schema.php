@@ -45,4 +45,16 @@ return [
     |
     */
     'timezone' => env('TIMEZONE', 'UTC'),
+
+    /*
+    |--------------------------------------------------------------------------
+    | Database Connections
+    |--------------------------------------------------------------------------
+    |
+    | The database connections to use for migrations.
+    |
+    | Connection-specific overrides (optional)
+    |
+    */
+    'connections' => []
 ];
