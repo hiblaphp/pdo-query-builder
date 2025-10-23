@@ -17,7 +17,7 @@ class MigrateRefreshCommand extends Command
     private SymfonyStyle $io;
     private OutputInterface $output;
     private InputInterface $input;
-    
+
     protected function configure(): void
     {
         $this
@@ -27,6 +27,7 @@ class MigrateRefreshCommand extends Command
             ->addOption('path', null, InputOption::VALUE_OPTIONAL, 'The path to migrations files')
             ->addOption('step', null, InputOption::VALUE_OPTIONAL, 'Number of migrations to rollback')
             ->addOption('seed', null, InputOption::VALUE_NONE, 'Run seeders after migrations')
+            ->addOption('force', null, InputOption::VALUE_NONE, 'Force the operation without confirmation')
         ;
     }
 
@@ -55,7 +56,7 @@ class MigrateRefreshCommand extends Command
         $step = is_numeric($stepOption) ? (int) $stepOption : null;
 
         $resetResult = $this->resetMigrations($step, $path);
-        
+
         if ($resetResult === false) {
             $this->io->error('Reset failed');
             return Command::FAILURE;
@@ -67,7 +68,7 @@ class MigrateRefreshCommand extends Command
         }
 
         $migrateResult = $this->runMigrations($path);
-        
+
         if ($migrateResult === false) {
             $this->io->error('Migration failed');
             return Command::FAILURE;
@@ -81,7 +82,7 @@ class MigrateRefreshCommand extends Command
         if ($input->getOption('seed')) {
             $this->io->newLine();
             $this->io->section('Running seeders');
-            
+
             if ($this->runSeeders()) {
                 $this->io->writeln('<info>✓ Seeders completed</info>');
             } else {
@@ -101,39 +102,43 @@ class MigrateRefreshCommand extends Command
     private function resetMigrations(?int $step, ?string $path): int|false
     {
         $commandName = $step !== null ? 'migrate:rollback' : 'migrate:reset';
-        
-        $bufferedOutput = new BufferedOutput();
-        $result = $this->executeCommand($commandName, $step, $path, $bufferedOutput, true);
-        
-        $content = $bufferedOutput->fetch();
-        
-        $lines = explode("\n", $content);
-        $inRollbackSection = false;
-        $rollbackCount = 0;
-        
-        foreach ($lines as $line) {
-            $trimmedLine = trim($line);
-            
-            if (str_contains($trimmedLine, 'Resetting all migrations') || 
-                str_contains($trimmedLine, 'Rolling back migrations')) {
-                $this->io->section('Resetting migrations');
-                $inRollbackSection = true;
-                continue;
-            }
-            
-            if ($inRollbackSection && str_contains($line, 'Rolling back:')) {
-                $this->output->writeln($line);
-                $rollbackCount++;
-            }
-            
-            if (str_contains($trimmedLine, '[WARNING]') || str_contains($trimmedLine, 'Nothing to reset')) {
+
+        $autoConfirm = $this->input->getOption('force') === true;
+
+        if ($autoConfirm) {
+            $this->io->section('Resetting migrations');
+
+            $bufferedOutput = new BufferedOutput();
+            $result = $this->executeCommand($commandName, $step, $path, $bufferedOutput, true);
+
+            $content = $bufferedOutput->fetch();
+
+            $lines = explode("\n", $content);
+            $rollbackCount = 0;
+
+            foreach ($lines as $line) {
+                $trimmedLine = trim($line);
+
+                if (str_contains($line, 'Rolling back:')) {
+                    $this->output->writeln($line);
+                    $rollbackCount++;
+                }
+
                 if (str_contains($trimmedLine, 'Nothing to reset')) {
                     return 0;
                 }
             }
+
+            return $result ? $rollbackCount : false;
+        } else {
+            $result = $this->executeCommand($commandName, $step, $path, $this->output, false);
+
+            if (!$result) {
+                return false;
+            }
+
+            return 1;
         }
-        
-        return $result ? $rollbackCount : false;
     }
 
     /**
@@ -143,33 +148,33 @@ class MigrateRefreshCommand extends Command
     {
         $bufferedOutput = new BufferedOutput();
         $result = $this->executeCommand('migrate', null, $path, $bufferedOutput);
-        
+
         $content = $bufferedOutput->fetch();
-        
+
         $lines = explode("\n", $content);
         $inMigrationSection = false;
         $migrationCount = 0;
-        
+
         foreach ($lines as $line) {
             $trimmedLine = trim($line);
-            
+
             if (str_contains($trimmedLine, 'Running migrations')) {
                 $this->io->newLine();
                 $this->io->section('Running migrations');
                 $inMigrationSection = true;
                 continue;
             }
-            
+
             if ($inMigrationSection && str_contains($line, 'Migrating:')) {
                 $this->output->writeln($line);
                 $migrationCount++;
             }
-            
+
             if (str_contains($trimmedLine, 'Nothing to migrate')) {
                 return 0;
             }
         }
-        
+
         return $result ? $migrationCount : false;
     }
 
@@ -183,12 +188,12 @@ class MigrateRefreshCommand extends Command
         try {
             $command = $application->find('db:seed');
             $arguments = [];
-            
+
             $connectionOption = $this->input->getOption('connection');
             if (is_string($connectionOption) && $connectionOption !== '') {
                 $arguments['--connection'] = $connectionOption;
             }
-            
+
             $input = new ArrayInput($arguments);
             $code = $command->run($input, $this->output);
 
@@ -199,8 +204,8 @@ class MigrateRefreshCommand extends Command
     }
 
     private function executeCommand(
-        string $commandName, 
-        ?int $step = null, 
+        string $commandName,
+        ?int $step = null,
         ?string $path = null,
         ?OutputInterface $customOutput = null,
         bool $autoConfirm = false
@@ -229,12 +234,12 @@ class MigrateRefreshCommand extends Command
             }
 
             $input = new ArrayInput($arguments);
-            
+
             if ($autoConfirm) {
                 $input->setInteractive(true);
                 $input->setStream($this->createYesInputStream());
             }
-            
+
             $outputToUse = $customOutput ?? $this->output;
             $code = $command->run($input, $outputToUse);
 
@@ -254,7 +259,7 @@ class MigrateRefreshCommand extends Command
         if ($stream === false) {
             throw new \RuntimeException('Failed to create input stream');
         }
-        
+
         fwrite($stream, "yes\n");
         rewind($stream);
         return $stream;
