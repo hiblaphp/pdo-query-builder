@@ -40,74 +40,128 @@ class MigrateFreshCommand extends Command
 
     protected function execute(InputInterface $input, OutputInterface $output): int
     {
-        $this->io = new SymfonyStyle($input, $output);
-        $this->output = $output;
+        $this->initializeIo($input, $output);
         $this->io->title('Fresh Migration');
 
+        $this->setConnectionFromInput($input);
+
+        if (!$this->shouldProceed($input)) {
+            $this->io->warning('Fresh migration cancelled');
+            return Command::SUCCESS;
+        }
+
+        if (!$this->initializeProjectRoot()) {
+            return Command::FAILURE;
+        }
+
+        try {
+            return $this->performFreshMigration($input);
+        } catch (\Throwable $e) {
+            $this->handleCriticalError($e);
+            return Command::FAILURE;
+        }
+    }
+
+    private function initializeIo(InputInterface $input, OutputInterface $output): void
+    {
+        $this->io = new SymfonyStyle($input, $output);
+        $this->output = $output;
+    }
+
+    private function setConnectionFromInput(InputInterface $input): void
+    {
         $connectionOption = $input->getOption('connection');
         $this->connection = (is_string($connectionOption) && $connectionOption !== '') ? $connectionOption : null;
 
         if ($this->connection !== null) {
             $this->io->note("Using database connection: {$this->connection}");
         }
+    }
 
+    private function shouldProceed(InputInterface $input): bool
+    {
         $force = (bool) $input->getOption('force');
 
-        if (! $force && ! $this->confirmFresh()) {
-            $this->io->warning('Fresh migration cancelled');
-
-            return Command::SUCCESS;
+        if ($force) {
+            return true;
         }
 
-        if (! $this->initializeProjectRoot()) {
+        return $this->confirmFresh();
+    }
+
+    private function performFreshMigration(InputInterface $input): int
+    {
+        $this->driver = $this->detectDriver();
+        $this->initializeDatabase();
+
+        if (!$this->dropAllTablesWithFeedback()) {
             return Command::FAILURE;
         }
 
-        try {
-            $this->driver = $this->detectDriver();
+        $path = $this->getPathOption($input);
 
-            $this->initializeDatabase();
-
-            $this->io->section('Dropping all tables...');
-            if (! $this->dropAllTables()) {
-                return Command::FAILURE;
-            }
-
-            $this->io->success('All tables dropped successfully!');
-
-            $this->io->section('Running migrations...');
-
-            $pathOption = $input->getOption('path');
-            $path = is_string($pathOption) && $pathOption !== '' ? $pathOption : null;
-
-            if (! $this->runMigrations($path)) {
-                $this->io->error('Migration failed');
-
-                return Command::FAILURE;
-            }
-
-            $this->io->success('Database refreshed successfully!');
-
-            if ($input->getOption('seed')) {
-                $this->io->section('Running seeders...');
-                if ($this->runSeeders()) {
-                    $this->io->success('Seeders completed!');
-                } else {
-                    $this->io->warning('Seeders not available or failed');
-                }
-            }
-
-            return Command::SUCCESS;
-        } catch (\Throwable $e) {
-            $this->handleCriticalError($e);
-
+        if (!$this->runMigrationsWithFeedback($path)) {
             return Command::FAILURE;
+        }
+
+        $this->io->success('Database refreshed successfully!');
+
+        if ($this->shouldRunSeeders($input)) {
+            $this->runSeedersWithFeedback();
+        }
+
+        return Command::SUCCESS;
+    }
+
+    private function getPathOption(InputInterface $input): ?string
+    {
+        $pathOption = $input->getOption('path');
+        return is_string($pathOption) && $pathOption !== '' ? $pathOption : null;
+    }
+
+    private function shouldRunSeeders(InputInterface $input): bool
+    {
+        return (bool) $input->getOption('seed');
+    }
+
+    private function dropAllTablesWithFeedback(): bool
+    {
+        $this->io->section('Dropping all tables...');
+
+        if (!$this->dropAllTables()) {
+            return false;
+        }
+
+        $this->io->success('All tables dropped successfully!');
+        return true;
+    }
+
+    private function runMigrationsWithFeedback(?string $path): bool
+    {
+        $this->io->section('Running migrations...');
+
+        if (!$this->runMigrations($path)) {
+            $this->io->error('Migration failed');
+            return false;
+        }
+
+        return true;
+    }
+
+    private function runSeedersWithFeedback(): void
+    {
+        $this->io->section('Running seeders...');
+
+        if ($this->runSeeders()) {
+            $this->io->success('Seeders completed!');
+        } else {
+            $this->io->warning('Seeders not available or failed');
         }
     }
 
     private function confirmFresh(): bool
     {
-        $connectionName = $this->connection ?? $this->getDefaultConnection();
+        $connectionName = $this->getConnectionDisplayName();
         
         $this->io->warning([
             "This will DROP ALL TABLES for connection '{$connectionName}'!",
@@ -117,46 +171,94 @@ class MigrateFreshCommand extends Command
         return $this->io->confirm('Are you absolutely sure you want to continue?', false);
     }
 
+    private function getConnectionDisplayName(): string
+    {
+        return $this->connection ?? $this->getDefaultConnection();
+    }
+
     private function dropAllTables(): bool
     {
         try {
             $migratedTables = $this->getMigratedTables();
 
-            if (count($migratedTables) === 0) {
-                $connectionName = $this->connection ?? $this->getDefaultConnection();
-                $this->io->note("No migrated tables found for connection '{$connectionName}'");
+            if ($this->noTablesToDrop($migratedTables)) {
                 return true;
             }
 
-            $connectionName = $this->connection ?? $this->getDefaultConnection();
-            $this->io->writeln(sprintf('Found %d migrated table(s) to drop for connection: %s', 
-                count($migratedTables), 
-                $connectionName
-            ));
+            $this->displayTablesCount($migratedTables);
 
             $this->disableForeignKeyChecks();
 
-            foreach ($migratedTables as $table) {
-                $this->io->write("Dropping table: {$table}...");
-                $this->dropTable($table);
-                $this->io->writeln(' <info>✓</info>');
-            }
-
-            $migrationsTable = $this->getMigrationsTable($this->connection);
-            $this->io->write("Dropping migrations table: {$migrationsTable}...");
-            $this->dropTable($migrationsTable);
-            $this->io->writeln(' <info>✓</info>');
+            $this->dropMigratedTables($migratedTables);
+            $this->dropMigrationsTable();
 
             $this->enableForeignKeyChecks();
 
             return true;
         } catch (\Throwable $e) {
-            $this->io->error('Failed to drop tables: ' . $e->getMessage());
-            if ($this->output->isVerbose()) {
-                $this->io->writeln($e->getTraceAsString());
-            }
-
+            $this->displayDropTablesError($e);
             return false;
+        }
+    }
+
+    /**
+     * @param list<string> $tables
+     */
+    private function noTablesToDrop(array $tables): bool
+    {
+        if (count($tables) === 0) {
+            $connectionName = $this->getConnectionDisplayName();
+            $this->io->note("No migrated tables found for connection '{$connectionName}'");
+            return true;
+        }
+
+        return false;
+    }
+
+    /**
+     * @param list<string> $tables
+     */
+    private function displayTablesCount(array $tables): void
+    {
+        $connectionName = $this->getConnectionDisplayName();
+        $this->io->writeln(sprintf(
+            'Found %d migrated table(s) to drop for connection: %s',
+            count($tables),
+            $connectionName
+        ));
+    }
+
+    /**
+     * @param list<string> $tables
+     */
+    private function dropMigratedTables(array $tables): void
+    {
+        foreach ($tables as $table) {
+            $this->dropTableWithFeedback($table);
+        }
+    }
+
+    private function dropMigrationsTable(): void
+    {
+        $migrationsTable = $this->getMigrationsTable($this->connection);
+        $this->io->write("Dropping migrations table: {$migrationsTable}...");
+        $this->dropTable($migrationsTable);
+        $this->io->writeln(' <info>✓</info>');
+    }
+
+    private function dropTableWithFeedback(string $table): void
+    {
+        $this->io->write("Dropping table: {$table}...");
+        $this->dropTable($table);
+        $this->io->writeln(' <info>✓</info>');
+    }
+
+    private function displayDropTablesError(\Throwable $e): void
+    {
+        $this->io->error('Failed to drop tables: ' . $e->getMessage());
+        
+        if ($this->output->isVerbose()) {
+            $this->io->writeln($e->getTraceAsString());
         }
     }
 
@@ -168,38 +270,84 @@ class MigrateFreshCommand extends Command
      */
     private function getMigratedTables(): array
     {
-        $tables = [];
         $migrationFiles = $this->getAllMigrationFiles($this->connection);
-        
-        $defaultConnection = $this->getDefaultConnection();
-        $targetConnection = $this->connection ?? $defaultConnection;
+        $targetConnection = $this->getTargetConnection();
 
-        foreach ($migrationFiles as $file) {
-            $content = file_get_contents($file);
-            if ($content === false) {
-                continue;
-            }
-
-            $migrationConnection = $this->extractMigrationConnection($content);
-            
-            if ($migrationConnection === null) {
-                $migrationConnection = $defaultConnection;
-            }
-
-            if ($migrationConnection !== $targetConnection) {
-                continue;
-            }
-
-            if (preg_match_all('/->create\([\'"]([^\'"]+)[\'"]\s*,/i', $content, $matches)) {
-                foreach ($matches[1] as $tableName) {
-                    if (!in_array($tableName, $tables, true)) {
-                        $tables[] = $tableName;
-                    }
-                }
-            }
-        }
+        $tables = $this->extractTablesFromMigrations($migrationFiles, $targetConnection);
 
         sort($tables);
+        return $tables;
+    }
+
+    private function getTargetConnection(): string
+    {
+        $defaultConnection = $this->getDefaultConnection();
+        return $this->connection ?? $defaultConnection;
+    }
+
+    /**
+     * @param list<string> $migrationFiles
+     * @return list<string>
+     */
+    private function extractTablesFromMigrations(array $migrationFiles, string $targetConnection): array
+    {
+        $tables = [];
+        $defaultConnection = $this->getDefaultConnection();
+
+        foreach ($migrationFiles as $file) {
+            $tablesInFile = $this->extractTablesFromMigrationFile($file, $targetConnection, $defaultConnection);
+            $tables = array_merge($tables, $tablesInFile);
+        }
+
+        return array_unique($tables);
+    }
+
+    /**
+     * @return list<string>
+     */
+    private function extractTablesFromMigrationFile(
+        string $file,
+        string $targetConnection,
+        string $defaultConnection
+    ): array {
+        $content = file_get_contents($file);
+        
+        if ($content === false) {
+            return [];
+        }
+
+        if (!$this->isMigrationForTargetConnection($content, $targetConnection, $defaultConnection)) {
+            return [];
+        }
+
+        return $this->parseTableNamesFromContent($content);
+    }
+
+    private function isMigrationForTargetConnection(
+        string $content,
+        string $targetConnection,
+        string $defaultConnection
+    ): bool {
+        $migrationConnection = $this->extractMigrationConnection($content);
+
+        if ($migrationConnection === null) {
+            $migrationConnection = $defaultConnection;
+        }
+
+        return $migrationConnection === $targetConnection;
+    }
+
+    /**
+     * @return list<string>
+     */
+    private function parseTableNamesFromContent(string $content): array
+    {
+        $tables = [];
+
+        if (preg_match_all('/->create\([\'"]([^\'"]+)[\'"]\s*,/i', $content, $matches)) {
+            $tables = array_values($matches[1]);
+        }
+
         return $tables;
     }
 
@@ -208,10 +356,12 @@ class MigrateFreshCommand extends Command
      */
     private function extractMigrationConnection(string $content): ?string
     {
+        // Try with type hint
         if (preg_match('/protected\s+\??string\s+\$connection\s*=\s*[\'"]([^\'"]+)[\'"]/', $content, $matches)) {
             return $matches[1];
         }
         
+        // Try without type hint
         if (preg_match('/protected\s+\$connection\s*=\s*[\'"]([^\'"]+)[\'"]/', $content, $matches)) {
             return $matches[1];
         }
@@ -225,9 +375,9 @@ class MigrateFreshCommand extends Command
     private function getDefaultConnection(): string
     {
         try {
-            $dbConfig = Config::get('pdo-query-builder');
+            $dbConfig = $this->getDatabaseConfig();
 
-            if (!is_array($dbConfig)) {
+            if ($dbConfig === null) {
                 return 'mysql';
             }
 
@@ -241,16 +391,20 @@ class MigrateFreshCommand extends Command
 
     private function dropTable(string $table): void
     {
-        $sql = match ($this->driver) {
+        $sql = $this->getDropTableSql($table);
+        $promise = DB::connection($this->connection)->raw($sql);
+        await($promise);
+    }
+
+    private function getDropTableSql(string $table): string
+    {
+        return match ($this->driver) {
             'pgsql' => "DROP TABLE IF EXISTS \"{$table}\" CASCADE",
             'mysql' => "DROP TABLE IF EXISTS `{$table}`",
             'sqlite' => "DROP TABLE IF EXISTS `{$table}`",
             'sqlsrv' => "IF OBJECT_ID('{$table}', 'U') IS NOT NULL DROP TABLE [{$table}]",
             default => "DROP TABLE IF EXISTS `{$table}`",
         };
-
-        $promise = DB::connection($this->connection)->raw($sql);
-        await($promise);
     }
 
     /**
@@ -259,50 +413,86 @@ class MigrateFreshCommand extends Command
     private function getAllTables(): array
     {
         $databaseName = $this->getCurrentDatabase();
-
-        $sql = match ($this->driver) {
-            'mysql' => $databaseName !== null
-                ? "SELECT table_name FROM information_schema.tables 
-                   WHERE table_schema = '{$databaseName}' AND table_type = 'BASE TABLE'"
-                : "SELECT table_name FROM information_schema.tables 
-                   WHERE table_schema = DATABASE() AND table_type = 'BASE TABLE'",
-            'pgsql' => "SELECT tablename FROM pg_tables 
-                       WHERE schemaname = 'public'",
-            'sqlite' => "SELECT name FROM sqlite_master 
-                        WHERE type='table' AND name NOT LIKE 'sqlite_%'",
-            'sqlsrv' => "SELECT TABLE_NAME FROM INFORMATION_SCHEMA.TABLES 
-                        WHERE TABLE_TYPE = 'BASE TABLE'",
-            default => "SELECT table_name FROM information_schema.tables 
-                       WHERE table_schema = DATABASE() AND table_type = 'BASE TABLE'",
-        };
+        $sql = $this->getShowTablesSql($databaseName);
 
         try {
             /** @var list<array<string, mixed>> $result */
             $result = await(DB::connection($this->connection)->raw($sql));
 
-            $columnName = match ($this->driver) {
-                'pgsql' => 'tablename',
-                'sqlite' => 'name',
-                'sqlsrv' => 'TABLE_NAME',
-                default => 'table_name',
-            };
-
-            $tables = [];
-            foreach ($result as $row) {
-                if (isset($row[$columnName]) && is_string($row[$columnName])) {
-                    $tables[] = $row[$columnName];
-                } elseif (isset($row[strtoupper($columnName)]) && is_string($row[strtoupper($columnName)])) {
-                    $tables[] = $row[strtoupper($columnName)];
-                }
-            }
-
-            return $tables;
+            return $this->extractTableNamesFromResult($result);
         } catch (\Throwable $e) {
-            if ($this->output->isVerbose()) {
-                $this->io->writeln("Error fetching tables: " . $e->getMessage());
-            }
+            $this->logVerboseError("Error fetching tables: " . $e->getMessage());
             return [];
         }
+    }
+
+    private function getShowTablesSql(?string $databaseName): string
+    {
+        return match ($this->driver) {
+            'mysql' => $this->getMysqlShowTablesSql($databaseName),
+            'pgsql' => "SELECT tablename FROM pg_tables WHERE schemaname = 'public'",
+            'sqlite' => "SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'",
+            'sqlsrv' => "SELECT TABLE_NAME FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_TYPE = 'BASE TABLE'",
+            default => "SELECT table_name FROM information_schema.tables WHERE table_schema = DATABASE() AND table_type = 'BASE TABLE'",
+        };
+    }
+
+    private function getMysqlShowTablesSql(?string $databaseName): string
+    {
+        if ($databaseName !== null) {
+            return "SELECT table_name FROM information_schema.tables 
+                   WHERE table_schema = '{$databaseName}' AND table_type = 'BASE TABLE'";
+        }
+
+        return "SELECT table_name FROM information_schema.tables 
+               WHERE table_schema = DATABASE() AND table_type = 'BASE TABLE'";
+    }
+
+    /**
+     * @param list<array<string, mixed>> $result
+     * @return list<string>
+     */
+    private function extractTableNamesFromResult(array $result): array
+    {
+        $columnName = $this->getTableColumnName();
+        $tables = [];
+
+        foreach ($result as $row) {
+            $tableName = $this->extractTableNameFromRow($row, $columnName);
+            
+            if ($tableName !== null) {
+                $tables[] = $tableName;
+            }
+        }
+
+        return $tables;
+    }
+
+    private function getTableColumnName(): string
+    {
+        return match ($this->driver) {
+            'pgsql' => 'tablename',
+            'sqlite' => 'name',
+            'sqlsrv' => 'TABLE_NAME',
+            default => 'table_name',
+        };
+    }
+
+    /**
+     * @param array<string, mixed> $row
+     */
+    private function extractTableNameFromRow(array $row, string $columnName): ?string
+    {
+        if (isset($row[$columnName]) && is_string($row[$columnName])) {
+            return $row[$columnName];
+        }
+
+        $upperColumnName = strtoupper($columnName);
+        if (isset($row[$upperColumnName]) && is_string($row[$upperColumnName])) {
+            return $row[$upperColumnName];
+        }
+
+        return null;
     }
 
     /**
@@ -311,90 +501,143 @@ class MigrateFreshCommand extends Command
     private function getCurrentDatabase(): ?string
     {
         try {
-            $dbConfig = Config::get('pdo-query-builder');
+            $dbConfig = $this->getDatabaseConfig();
 
-            if (! is_array($dbConfig)) {
+            if ($dbConfig === null) {
                 return null;
             }
 
-            $connectionName = $this->connection ?? ($dbConfig['default'] ?? 'mysql');
-            if (! is_string($connectionName)) {
-                return null;
-            }
+            $connectionName = $this->getConnectionName($dbConfig);
+            $connections = $this->getConnections($dbConfig);
+            $connectionConfig = $this->getConnectionConfig($connections, $connectionName);
 
-            $connections = $dbConfig['connections'] ?? [];
-            if (! is_array($connections)) {
-                return null;
-            }
-
-            $connectionConfig = $connections[$connectionName] ?? [];
-            if (! is_array($connectionConfig)) {
+            if ($connectionConfig === null) {
                 return null;
             }
 
             $database = $connectionConfig['database'] ?? null;
-
             return is_string($database) ? $database : null;
         } catch (\Throwable $e) {
             return null;
         }
     }
 
+    /**
+     * @return array<string, mixed>|null
+     */
+    private function getDatabaseConfig(): ?array
+    {
+        $dbConfig = Config::get('pdo-query-builder');
+        return is_array($dbConfig) ? $dbConfig : null;
+    }
+
+    /**
+     * @param array<string, mixed> $dbConfig
+     */
+    private function getConnectionName(array $dbConfig): string
+    {
+        $connectionName = $this->connection ?? ($dbConfig['default'] ?? 'mysql');
+        return is_string($connectionName) ? $connectionName : 'mysql';
+    }
+
+    /**
+     * @param array<string, mixed> $dbConfig
+     * @return array<string, mixed>
+     */
+    private function getConnections(array $dbConfig): array
+    {
+        $connections = $dbConfig['connections'] ?? [];
+        return is_array($connections) ? $connections : [];
+    }
+
+    /**
+     * @param array<string, mixed> $connections
+     * @return array<string, mixed>|null
+     */
+    private function getConnectionConfig(array $connections, string $connectionName): ?array
+    {
+        $connectionConfig = $connections[$connectionName] ?? [];
+        return is_array($connectionConfig) ? $connectionConfig : null;
+    }
+
     private function disableForeignKeyChecks(): void
     {
-        $sql = match ($this->driver) {
+        $sql = $this->getDisableForeignKeyChecksSql();
+
+        if ($sql !== null) {
+            $this->executeForeignKeyChecksSql($sql, 'disable');
+        }
+    }
+
+    private function enableForeignKeyChecks(): void
+    {
+        $sql = $this->getEnableForeignKeyChecksSql();
+
+        if ($sql !== null) {
+            $this->executeForeignKeyChecksSql($sql, 'enable');
+        }
+    }
+
+    private function getDisableForeignKeyChecksSql(): ?string
+    {
+        return match ($this->driver) {
             'mysql' => 'SET FOREIGN_KEY_CHECKS=0',
             'pgsql' => 'SET CONSTRAINTS ALL DEFERRED',
             'sqlite' => 'PRAGMA foreign_keys = OFF',
             'sqlsrv' => 'EXEC sp_MSforeachtable "ALTER TABLE ? NOCHECK CONSTRAINT all"',
             default => null,
         };
-
-        if ($sql !== null) {
-            try {
-                $promise = DB::connection($this->connection)->raw($sql);
-                await($promise);
-            } catch (\Throwable $e) {
-                if ($this->output->isVerbose()) {
-                    $this->io->writeln("Warning: Could not disable foreign key checks: " . $e->getMessage());
-                }
-            }
-        }
     }
 
-    private function enableForeignKeyChecks(): void
+    private function getEnableForeignKeyChecksSql(): ?string
     {
-        $sql = match ($this->driver) {
+        return match ($this->driver) {
             'mysql' => 'SET FOREIGN_KEY_CHECKS=1',
             'pgsql' => 'SET CONSTRAINTS ALL IMMEDIATE',
             'sqlite' => 'PRAGMA foreign_keys = ON',
             'sqlsrv' => 'EXEC sp_MSforeachtable "ALTER TABLE ? WITH CHECK CHECK CONSTRAINT all"',
             default => null,
         };
+    }
 
-        if ($sql !== null) {
-            try {
-                $promise = DB::connection($this->connection)->raw($sql);
-                await($promise);
-            } catch (\Throwable $e) {
-                if ($this->output->isVerbose()) {
-                    $this->io->writeln("Warning: Could not enable foreign key checks: " . $e->getMessage());
-                }
-            }
+    private function executeForeignKeyChecksSql(string $sql, string $action): void
+    {
+        try {
+            $promise = DB::connection($this->connection)->raw($sql);
+            await($promise);
+        } catch (\Throwable $e) {
+            $this->logVerboseError("Warning: Could not {$action} foreign key checks: " . $e->getMessage());
+        }
+    }
+
+    private function logVerboseError(string $message): void
+    {
+        if ($this->output->isVerbose()) {
+            $this->io->writeln($message);
         }
     }
 
     private function runMigrations(?string $path): bool
     {
         $application = $this->getApplication();
+        
         if ($application === null) {
             $this->io->error('Could not find application instance.');
-
             return false;
         }
 
         $command = $application->find('migrate');
+        $arguments = $this->buildMigrationArguments($path);
+        $input = new ArrayInput($arguments);
 
+        return $command->run($input, $this->output) === Command::SUCCESS;
+    }
+
+    /**
+     * @return array<string, string>
+     */
+    private function buildMigrationArguments(?string $path): array
+    {
         $arguments = [];
 
         if ($this->connection !== null) {
@@ -405,62 +648,60 @@ class MigrateFreshCommand extends Command
             $arguments['--path'] = $path;
         }
 
-        $input = new ArrayInput($arguments);
-        $code = $command->run($input, $this->output);
-
-        return $code === Command::SUCCESS;
+        return $arguments;
     }
 
     private function runSeeders(): bool
     {
         $application = $this->getApplication();
+        
         if ($application === null) {
             return false;
         }
 
         try {
             $command = $application->find('db:seed');
-            $arguments = [];
-
-            if ($this->connection !== null) {
-                $arguments['--connection'] = $this->connection;
-            }
-
+            $arguments = $this->buildSeederArguments();
             $input = new ArrayInput($arguments);
-            $code = $command->run($input, $this->output);
 
-            return $code === Command::SUCCESS;
+            return $command->run($input, $this->output) === Command::SUCCESS;
         } catch (\Throwable $e) {
             return false;
         }
     }
 
+    /**
+     * @return array<string, string>
+     */
+    private function buildSeederArguments(): array
+    {
+        $arguments = [];
+
+        if ($this->connection !== null) {
+            $arguments['--connection'] = $this->connection;
+        }
+
+        return $arguments;
+    }
+
     private function detectDriver(): string
     {
         try {
-            $dbConfig = Config::get('pdo-query-builder');
+            $dbConfig = $this->getDatabaseConfig();
 
-            if (! is_array($dbConfig)) {
+            if ($dbConfig === null) {
                 return 'mysql';
             }
 
-            $connectionName = $this->connection ?? ($dbConfig['default'] ?? 'mysql');
-            if (! is_string($connectionName)) {
-                return 'mysql';
-            }
+            $connectionName = $this->getConnectionName($dbConfig);
+            $connections = $this->getConnections($dbConfig);
+            $connectionConfig = $this->getConnectionConfig($connections, $connectionName);
 
-            $connections = $dbConfig['connections'] ?? [];
-            if (! is_array($connections)) {
-                return 'mysql';
-            }
-
-            $connectionConfig = $connections[$connectionName] ?? [];
-            if (! is_array($connectionConfig)) {
+            if ($connectionConfig === null) {
                 return 'mysql';
             }
 
             $driver = $connectionConfig['driver'] ?? 'mysql';
-
             return is_string($driver) ? strtolower($driver) : 'mysql';
         } catch (\Throwable $e) {
             return 'mysql';
@@ -471,18 +712,16 @@ class MigrateFreshCommand extends Command
     {
         try {
             $testQuery = 'SELECT 1';
-
             await(DB::connection($this->connection)->raw($testQuery));
         } catch (\Throwable $e) {
-            if ($this->output->isVerbose()) {
-                $this->io->writeln("Database initialization: " . $e->getMessage());
-            }
+            $this->logVerboseError("Database initialization: " . $e->getMessage());
         }
     }
 
     private function handleCriticalError(\Throwable $e): void
     {
         $this->io->error('Fresh migration failed: ' . $e->getMessage());
+        
         if ($this->output->isVerbose()) {
             $this->io->writeln($e->getTraceAsString());
         }

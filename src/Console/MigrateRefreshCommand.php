@@ -17,6 +17,9 @@ class MigrateRefreshCommand extends Command
     private SymfonyStyle $io;
     private OutputInterface $output;
     private InputInterface $input;
+    private ?string $connection = null;
+    private ?string $path = null;
+    private ?int $step = null;
 
     protected function configure(): void
     {
@@ -33,82 +36,162 @@ class MigrateRefreshCommand extends Command
 
     protected function execute(InputInterface $input, OutputInterface $output): int
     {
+        $this->initializeCommand($input, $output);
+        $this->io->title('Refresh Migrations');
+
+        $this->extractOptions($input);
+        $this->displayOptions();
+
+        if (!$this->shouldProceed($input)) {
+            $this->io->info('Operation cancelled');
+            return Command::SUCCESS;
+        }
+
+        return $this->performRefresh($input);
+    }
+
+    private function initializeCommand(InputInterface $input, OutputInterface $output): void
+    {
         $this->io = new SymfonyStyle($input, $output);
         $this->output = $output;
         $this->input = $input;
-        $this->io->title('Refresh Migrations');
+    }
 
-        $connectionOption = $input->getOption('connection');
-        $connection = (is_string($connectionOption) && $connectionOption !== '') ? $connectionOption : null;
+    private function extractOptions(InputInterface $input): void
+    {
+        $this->connection = $this->extractStringOption($input, 'connection');
+        $this->path = $this->extractStringOption($input, 'path');
+        $this->step = $this->extractStepOption($input);
+    }
 
-        if ($connection !== null) {
-            $this->io->note("Using database connection: {$connection}");
-        }
+    private function extractStringOption(InputInterface $input, string $optionName): ?string
+    {
+        $option = $input->getOption($optionName);
+        return (is_string($option) && $option !== '') ? $option : null;
+    }
 
-        $pathOption = $input->getOption('path');
-        $path = is_string($pathOption) && $pathOption !== '' ? $pathOption : null;
-
-        if ($path !== null) {
-            $this->io->note("Using migration path: {$path}");
-        }
-
+    private function extractStepOption(InputInterface $input): ?int
+    {
         $stepOption = $input->getOption('step');
-        $step = is_numeric($stepOption) ? (int) $stepOption : null;
+        return is_numeric($stepOption) ? (int) $stepOption : null;
+    }
 
-        if (!$input->getOption('force')) {
-            $message = $step !== null 
-                ? "This will rollback the last {$step} migration(s) and re-run them. Continue?" 
-                : 'This will rollback ALL migrations and re-run them. Continue?';
-            
-            if (!$this->io->confirm($message, false)) {
-                $this->io->info('Operation cancelled');
-                return Command::SUCCESS;
-            }
+    private function displayOptions(): void
+    {
+        if ($this->connection !== null) {
+            $this->io->note("Using database connection: {$this->connection}");
+        }
+
+        if ($this->path !== null) {
+            $this->io->note("Using migration path: {$this->path}");
+        }
+    }
+
+    private function shouldProceed(InputInterface $input): bool
+    {
+        if ((bool) $input->getOption('force')) {
+            return true;
+        }
+
+        return $this->confirmRefresh();
+    }
+
+    private function confirmRefresh(): bool
+    {
+        $message = $this->getConfirmationMessage();
+        return $this->io->confirm($message, false);
+    }
+
+    private function getConfirmationMessage(): string
+    {
+        if ($this->step !== null) {
+            return "This will rollback the last {$this->step} migration(s) and re-run them. Continue?";
+        }
+
+        return 'This will rollback ALL migrations and re-run them. Continue?';
+    }
+
+    private function performRefresh(InputInterface $input): int
+    {
+        $this->io->newLine();
+
+        if (!$this->performReset()) {
+            return Command::FAILURE;
         }
 
         $this->io->newLine();
-        $this->io->section($step !== null ? 'Rolling back migrations' : 'Resetting database');
-        
-        $resetResult = $this->resetMigrations($step, $path);
+
+        if (!$this->performMigration()) {
+            return Command::FAILURE;
+        }
+
+        if ($this->shouldRunSeeders($input)) {
+            $this->performSeeding();
+        }
+
+        $this->displaySuccessMessage();
+
+        return Command::SUCCESS;
+    }
+
+    private function performReset(): bool
+    {
+        $sectionTitle = $this->step !== null ? 'Rolling back migrations' : 'Resetting database';
+        $this->io->section($sectionTitle);
+
+        $resetResult = $this->resetMigrations($this->step, $this->path);
 
         if ($resetResult === false) {
             $this->io->error('Reset failed');
-            return Command::FAILURE;
+            return false;
         }
 
         if ($resetResult === 0) {
             $this->io->info('Nothing to reset');
         }
 
-        $this->io->newLine();
+        return true;
+    }
+
+    private function performMigration(): bool
+    {
         $this->io->section('Running migrations');
-        
-        $migrateResult = $this->runMigrations($path);
+
+        $migrateResult = $this->runMigrations($this->path);
 
         if ($migrateResult === false) {
             $this->io->error('Migration failed');
-            return Command::FAILURE;
+            return false;
         }
 
         if ($migrateResult === 0) {
             $this->io->info('Nothing to migrate');
         }
 
-        if ($input->getOption('seed')) {
-            $this->io->newLine();
-            $this->io->section('Running seeders');
+        return true;
+    }
 
-            if ($this->runSeeders()) {
-                $this->io->writeln('<info>✓ Seeders completed successfully</info>');
-            } else {
-                $this->io->warning('Seeders not available or failed');
-            }
+    private function shouldRunSeeders(InputInterface $input): bool
+    {
+        return (bool) $input->getOption('seed');
+    }
+
+    private function performSeeding(): void
+    {
+        $this->io->newLine();
+        $this->io->section('Running seeders');
+
+        if ($this->runSeeders()) {
+            $this->io->writeln('<info>✓ Seeders completed successfully</info>');
+        } else {
+            $this->io->warning('Seeders not available or failed');
         }
+    }
 
+    private function displaySuccessMessage(): void
+    {
         $this->io->newLine();
         $this->io->success('Database refreshed successfully!');
-
-        return Command::SUCCESS;
     }
 
     /**
@@ -118,22 +201,29 @@ class MigrateRefreshCommand extends Command
      */
     private function resetMigrations(?int $step, ?string $path): int|false
     {
-        $commandName = $step !== null ? 'migrate:rollback' : 'migrate:reset';
-        
+        $commandName = $this->getResetCommandName($step);
         $bufferedOutput = new BufferedOutput();
-       
-        $result = $this->executeCommand($commandName, $step, $path, $bufferedOutput, true);
-        
-        if (!$result) {
+
+        if (!$this->executeCommand($commandName, $step, $path, $bufferedOutput, true)) {
             return false;
         }
-        
+
+        return $this->processResetOutput($bufferedOutput);
+    }
+
+    private function getResetCommandName(?int $step): string
+    {
+        return $step !== null ? 'migrate:rollback' : 'migrate:reset';
+    }
+
+    private function processResetOutput(BufferedOutput $bufferedOutput): int
+    {
         $content = $bufferedOutput->fetch();
-        
-        if (str_contains($content, 'Nothing to reset') || str_contains($content, 'Nothing to rollback')) {
+
+        if ($this->isNothingToReset($content)) {
             return 0;
         }
-        
+
         $count = $this->displayFilteredOutput($content, [
             'Rolling back:',
             '✓',
@@ -141,6 +231,12 @@ class MigrateRefreshCommand extends Command
         ]);
 
         return $count > 0 ? $count : 1;
+    }
+
+    private function isNothingToReset(string $content): bool
+    {
+        return str_contains($content, 'Nothing to reset') ||
+            str_contains($content, 'Nothing to rollback');
     }
 
     /**
@@ -151,19 +247,22 @@ class MigrateRefreshCommand extends Command
     private function runMigrations(?string $path): int|false
     {
         $bufferedOutput = new BufferedOutput();
-        
-        $result = $this->executeCommand('migrate', null, $path, $bufferedOutput, false);
 
-        if (!$result) {
+        if (!$this->executeCommand('migrate', null, $path, $bufferedOutput, false)) {
             return false;
         }
 
+        return $this->processMigrationOutput($bufferedOutput);
+    }
+
+    private function processMigrationOutput(BufferedOutput $bufferedOutput): int
+    {
         $content = $bufferedOutput->fetch();
-        
+
         if (str_contains($content, 'Nothing to migrate')) {
             return 0;
         }
-        
+
         $count = $this->displayFilteredOutput($content, [
             'Migrating:',
             '✓',
@@ -176,30 +275,20 @@ class MigrateRefreshCommand extends Command
     private function runSeeders(): bool
     {
         $application = $this->getApplication();
+
         if ($application === null) {
             return false;
         }
 
         try {
             $command = $application->find('db:seed');
-            $arguments = [];
-
-            $connectionOption = $this->input->getOption('connection');
-            if (is_string($connectionOption) && $connectionOption !== '') {
-                $arguments['--connection'] = $connectionOption;
-            }
-
+            $arguments = $this->buildSeederArguments();
             $bufferedOutput = new BufferedOutput();
-            $input = new ArrayInput($arguments);
-            $code = $command->run($input, $bufferedOutput);
+
+            $code = $this->executeSeederCommand($command, $arguments, $bufferedOutput);
 
             if ($code === Command::SUCCESS) {
-                $content = $bufferedOutput->fetch();
-                $this->displayFilteredOutput($content, [
-                    'Seeding:',
-                    '✓',
-                    'Seeded:',
-                ]);
+                $this->displaySeederOutput($bufferedOutput);
             }
 
             return $code === Command::SUCCESS;
@@ -209,45 +298,121 @@ class MigrateRefreshCommand extends Command
     }
 
     /**
+     * @return array<string, string>
+     */
+    private function buildSeederArguments(): array
+    {
+        $arguments = [];
+
+        if ($this->connection !== null) {
+            $arguments['--connection'] = $this->connection;
+        }
+
+        return $arguments;
+    }
+
+    private function executeSeederCommand(
+        Command $command,
+        array $arguments,
+        BufferedOutput $bufferedOutput
+    ): int {
+        $input = new ArrayInput($arguments);
+        return $command->run($input, $bufferedOutput);
+    }
+
+    private function displaySeederOutput(BufferedOutput $bufferedOutput): void
+    {
+        $content = $bufferedOutput->fetch();
+        $this->displayFilteredOutput($content, [
+            'Seeding:',
+            '✓',
+            'Seeded:',
+        ]);
+    }
+
+    /**
      * Display filtered output based on keywords
      * 
+     * @param list<string> $keywords
      * @return int Number of lines displayed
      */
     private function displayFilteredOutput(string $content, array $keywords): int
     {
         $lines = explode("\n", $content);
         $displayedCount = 0;
-        
+
         foreach ($lines as $line) {
-            $trimmedLine = trim($line);
-            
-            if ($trimmedLine === '') {
-                continue;
-            }
-            
-            if (preg_match('/^[=\-]+$/', $trimmedLine)) {
-                continue;
-            }
-            
-            if (preg_match('/^(Reset Migrations|Database Migrations|Running migrations|Preparing migration)/', $trimmedLine)) {
-                continue;
-            }
-            
-            $shouldDisplay = false;
-            foreach ($keywords as $keyword) {
-                if (str_contains($line, $keyword)) {
-                    $shouldDisplay = true;
-                    break;
-                }
-            }
-            
-            if ($shouldDisplay) {
+            if ($this->shouldDisplayLine($line, $keywords)) {
                 $this->output->writeln($line);
                 $displayedCount++;
             }
         }
-        
+
         return $displayedCount;
+    }
+
+    /**
+     * @param list<string> $keywords
+     */
+    private function shouldDisplayLine(string $line, array $keywords): bool
+    {
+        $trimmedLine = trim($line);
+
+        if ($this->isEmptyLine($trimmedLine)) {
+            return false;
+        }
+
+        if ($this->isSeparatorLine($trimmedLine)) {
+            return false;
+        }
+
+        if ($this->isHeaderLine($trimmedLine)) {
+            return false;
+        }
+
+        return $this->lineContainsKeyword($line, $keywords);
+    }
+
+    private function isEmptyLine(string $line): bool
+    {
+        return $line === '';
+    }
+
+    private function isSeparatorLine(string $line): bool
+    {
+        return preg_match('/^[=\-]+$/', $line) === 1;
+    }
+
+    private function isHeaderLine(string $line): bool
+    {
+        $headers = [
+            'Reset Migrations',
+            'Database Migrations',
+            'Running migrations',
+            'Preparing migration',
+        ];
+
+        foreach ($headers as $header) {
+            if (str_starts_with($line, $header)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * @param list<string> $keywords
+     */
+    private function lineContainsKeyword(string $line, array $keywords): bool
+    {
+        foreach ($keywords as $keyword) {
+            if (str_contains($line, $keyword)) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     private function executeCommand(
@@ -258,6 +423,7 @@ class MigrateRefreshCommand extends Command
         bool $forceFlag = false
     ): bool {
         $application = $this->getApplication();
+
         if ($application === null) {
             $this->io->error('Application instance not found');
             return false;
@@ -265,33 +431,49 @@ class MigrateRefreshCommand extends Command
 
         try {
             $command = $application->find($commandName);
-            $arguments = [];
-
-            $connectionOption = $this->input->getOption('connection');
-            if (is_string($connectionOption) && $connectionOption !== '') {
-                $arguments['--connection'] = $connectionOption;
-            }
-
-            if ($path !== null) {
-                $arguments['--path'] = $path;
-            }
-
-            if ($step !== null && $commandName === 'migrate:rollback') {
-                $arguments['--step'] = $step;
-            }
-
-            if ($forceFlag) {
-                $arguments['--force'] = true;
-            }
-
+            $arguments = $this->buildCommandArguments($commandName, $step, $path, $forceFlag);
             $input = new ArrayInput($arguments);
             $outputToUse = $customOutput ?? $this->output;
-            $code = $command->run($input, $outputToUse);
 
-            return $code === Command::SUCCESS;
+            return $command->run($input, $outputToUse) === Command::SUCCESS;
         } catch (\Throwable $e) {
-            $this->io->error("Failed to execute command '{$commandName}': " . $e->getMessage());
+            $this->displayCommandError($commandName, $e);
             return false;
         }
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function buildCommandArguments(
+        string $commandName,
+        ?int $step,
+        ?string $path,
+        bool $forceFlag
+    ): array {
+        $arguments = [];
+
+        if ($this->connection !== null) {
+            $arguments['--connection'] = $this->connection;
+        }
+
+        if ($path !== null) {
+            $arguments['--path'] = $path;
+        }
+
+        if ($step !== null && $commandName === 'migrate:rollback') {
+            $arguments['--step'] = $step;
+        }
+
+        if ($forceFlag) {
+            $arguments['--force'] = true;
+        }
+
+        return $arguments;
+    }
+
+    private function displayCommandError(string $commandName, \Throwable $e): void
+    {
+        $this->io->error("Failed to execute command '{$commandName}': " . $e->getMessage());
     }
 }

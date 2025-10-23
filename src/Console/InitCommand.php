@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Hibla\PdoQueryBuilder\Console;
 
+use Hibla\PdoQueryBuilder\Console\Traits\FindProjectRoot;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Input\InputOption;
@@ -12,6 +13,8 @@ use Symfony\Component\Console\Style\SymfonyStyle;
 
 class InitCommand extends Command
 {
+    use FindProjectRoot;
+
     private SymfonyStyle $io;
     private ?string $projectRoot = null;
     private bool $force;
@@ -201,25 +204,6 @@ PHP;
                 'DB_PASSWORD=',
             ]);
         }
-    }
-
-    private function findProjectRoot(): ?string
-    {
-        $currentDir = getcwd();
-        $dir = ($currentDir !== false) ? $currentDir : __DIR__;
-
-        for ($i = 0; $i < 10; $i++) {
-            if (file_exists($dir.'/composer.json')) {
-                return $dir;
-            }
-            $parent = dirname($dir);
-            if ($parent === $dir) {
-                break;
-            }
-            $dir = $parent;
-        }
-
-        return null;
     }
 
     private function getSourceConfigPath(string $filename): string
