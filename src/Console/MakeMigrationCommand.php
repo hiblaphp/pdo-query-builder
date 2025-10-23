@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Hibla\PdoQueryBuilder\Console;
 
 use Carbon\Carbon;
+use Hibla\PdoQueryBuilder\Console\Traits\FindProjectRoot;
 use Hibla\PdoQueryBuilder\Console\Traits\LoadsSchemaConfiguration;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Input\InputArgument;
@@ -16,6 +17,7 @@ use Symfony\Component\Console\Style\SymfonyStyle;
 class MakeMigrationCommand extends Command
 {
     use LoadsSchemaConfiguration;
+    use FindProjectRoot;
 
     private SymfonyStyle $io;
     private ?string $projectRoot = null;
@@ -64,7 +66,7 @@ class MakeMigrationCommand extends Command
         $tableOption = $input->getOption('table');
         $createOption = $input->getOption('create');
         $this->table = is_string($tableOption) ? $tableOption : (is_string($createOption) ? $createOption : null);
-        
+
         $alterOption = $input->getOption('alter');
         $this->alter = is_string($alterOption) ? $alterOption : null;
 
@@ -94,18 +96,18 @@ class MakeMigrationCommand extends Command
     private function parseMigrationName(string $input): void
     {
         $normalized = str_replace('\\', '/', $input);
-        
+
         if (str_contains($normalized, '/')) {
             $parts = explode('/', $normalized);
             $this->migrationName = array_pop($parts);
-            
+
             if ($this->subdirectory === null) {
                 $this->subdirectory = implode(DIRECTORY_SEPARATOR, $parts);
             }
         } else {
             $this->migrationName = $input;
         }
-        
+
         $this->migrationName = $this->sanitizeMigrationName($this->migrationName);
     }
 
@@ -115,39 +117,25 @@ class MakeMigrationCommand extends Command
     private function sanitizeMigrationName(string $name): string
     {
         $name = str_replace(['/', '\\'], '', $name);
-        
+
         $name = preg_replace('/([a-z])([A-Z])/', '$1_$2', $name);
         $name = strtolower($name ?? '');
         $name = preg_replace('/[^a-z0-9_]/', '_', $name ?? '');
         $name = preg_replace('/_+/', '_', $name ?? '');
-        
+
         return trim($name ?? '', '_');
-    }
-
-    private function initializeProjectRoot(): bool
-    {
-        $this->projectRoot = $this->findProjectRoot();
-        if ($this->projectRoot === null) {
-            $this->io->error('Could not find project root');
-
-            return false;
-        }
-
-        return true;
     }
 
     private function ensureMigrationsDirectory(): bool
     {
         $basePath = $this->getMigrationsPath($this->connection);
-        
-        // Add subdirectory if specified
+
         if ($this->subdirectory !== null) {
             $this->migrationsPath = $basePath . DIRECTORY_SEPARATOR . $this->subdirectory;
         } else {
             $this->migrationsPath = $basePath;
         }
 
-        // Ensure the directory exists
         if (! $this->ensureDirectoryExists($this->migrationsPath)) {
             $this->io->error("Failed to create migrations directory: {$this->migrationsPath}");
 
@@ -161,13 +149,12 @@ class MakeMigrationCommand extends Command
     {
         $fileName = $this->generateFileName();
         $filePath = $this->migrationsPath . DIRECTORY_SEPARATOR . $fileName;
-        
-        // Check if file already exists
+
         if (file_exists($filePath)) {
             $this->io->error("Migration file already exists: {$fileName}");
             return false;
         }
-        
+
         $stub = $this->generateMigrationStub();
 
         if (file_put_contents($filePath, $stub) === false) {
@@ -176,13 +163,11 @@ class MakeMigrationCommand extends Command
             return false;
         }
 
-        // Display relative path from project root
         $relativePath = str_replace($this->projectRoot . DIRECTORY_SEPARATOR, '', $filePath);
         $relativePath = str_replace('\\', '/', $relativePath);
-        
+
         $this->io->success("Migration created: {$relativePath}");
-        
-        // Show additional info if in subdirectory
+
         if ($this->subdirectory !== null) {
             $this->io->note("Migration organized in subdirectory: {$this->subdirectory}");
         }
@@ -352,24 +337,5 @@ return new class extends Migration
     }
 };
 ";
-    }
-
-    private function findProjectRoot(): ?string
-    {
-        $currentDir = getcwd();
-        $dir = ($currentDir !== false) ? $currentDir : __DIR__;
-
-        for ($i = 0; $i < 10; $i++) {
-            if (file_exists($dir . '/composer.json')) {
-                return $dir;
-            }
-            $parent = dirname($dir);
-            if ($parent === $dir) {
-                break;
-            }
-            $dir = $parent;
-        }
-
-        return null;
     }
 }

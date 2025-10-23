@@ -28,7 +28,7 @@ trait LoadsSchemaConfiguration
 
             if (is_array($config)) {
                 $loadedConfig = $config;
-                
+
                 if ($connection !== null && isset($config['connections'][$connection])) {
                     $connectionConfig = $config['connections'][$connection];
                     if (is_array($connectionConfig)) {
@@ -102,7 +102,7 @@ trait LoadsSchemaConfiguration
         }
 
         $connectionPaths = $config['connection_paths'];
-        
+
         if (isset($connectionPaths[$connection])) {
             $subPath = $connectionPaths[$connection];
             if (is_string($subPath) && $subPath !== '') {
@@ -152,7 +152,7 @@ trait LoadsSchemaConfiguration
     private function getAllMigrationFiles(?string $connection = null): array
     {
         $migrationsPath = $this->getMigrationsPath($connection);
-        
+
         if (!is_dir($migrationsPath)) {
             return [];
         }
@@ -172,13 +172,13 @@ trait LoadsSchemaConfiguration
     private function getMigrationFilesFlat(string $directory): array
     {
         $files = glob($directory . '/*.php');
-        
+
         if ($files === false) {
             return [];
         }
 
         sort($files);
-        
+
         return array_values($files);
     }
 
@@ -190,7 +190,7 @@ trait LoadsSchemaConfiguration
     private function getMigrationFilesRecursive(string $directory): array
     {
         $files = [];
-        
+
         try {
             $iterator = new \RecursiveIteratorIterator(
                 new \RecursiveDirectoryIterator($directory, \RecursiveDirectoryIterator::SKIP_DOTS),
@@ -207,7 +207,7 @@ trait LoadsSchemaConfiguration
         }
 
         sort($files);
-        
+
         return array_values($files);
     }
 
@@ -218,17 +218,17 @@ trait LoadsSchemaConfiguration
     private function getRelativeMigrationPath(string $filePath, ?string $connection = null): string
     {
         $basePath = $this->getMigrationsPath($connection);
-        
+
         $normalizedBasePath = $this->normalizePath($basePath);
         $normalizedFilePath = $this->normalizePath($filePath);
-        
+
         if (str_starts_with($normalizedFilePath, $normalizedBasePath)) {
             $relativePath = substr($normalizedFilePath, strlen($normalizedBasePath));
             $relativePath = ltrim($relativePath, '/\\');
         } else {
             $relativePath = basename($filePath);
         }
-        
+
         return str_replace('\\', '/', $relativePath);
     }
 
@@ -239,9 +239,9 @@ trait LoadsSchemaConfiguration
     private function getFullMigrationPath(string $relativePath, ?string $connection = null): string
     {
         $basePath = $this->getMigrationsPath($connection);
-        
+
         $normalizedPath = str_replace(['/', '\\'], DIRECTORY_SEPARATOR, $relativePath);
-        
+
         return $basePath . DIRECTORY_SEPARATOR . $normalizedPath;
     }
 
@@ -252,7 +252,7 @@ trait LoadsSchemaConfiguration
     {
         $path = str_replace('\\', '/', $path);
         $path = rtrim($path, '/');
-        
+
         return $path;
     }
 
@@ -301,7 +301,7 @@ trait LoadsSchemaConfiguration
     {
         $allFiles = $this->getAllMigrationFiles($connection);
         $basePath = $this->getMigrationsPath($connection);
-        
+
         return array_values(array_filter($allFiles, function ($file) use ($pattern, $basePath) {
             $relativePath = $this->getRelativeMigrationPath($file, null);
             return fnmatch($pattern, $relativePath);
@@ -317,23 +317,23 @@ trait LoadsSchemaConfiguration
     {
         $allFiles = $this->getAllMigrationFiles($connection);
         $organized = [];
-        
+
         foreach ($allFiles as $file) {
             $relativePath = $this->getRelativeMigrationPath($file, $connection);
             $directory = dirname($relativePath);
-            
+
             // Normalize '.' to represent root directory
             if ($directory === '.') {
                 $directory = 'root';
             }
-            
+
             if (!isset($organized[$directory])) {
                 $organized[$directory] = [];
             }
-            
+
             $organized[$directory][] = $file;
         }
-        
+
         return $organized;
     }
 
@@ -357,7 +357,7 @@ trait LoadsSchemaConfiguration
 
         $config = $this->getSchemaConfig($connection);
         $connectionPaths = $config['connection_paths'];
-        
+
         if (isset($connectionPaths[$connection])) {
             $subPath = $connectionPaths[$connection];
             if (is_string($subPath) && $subPath !== '') {

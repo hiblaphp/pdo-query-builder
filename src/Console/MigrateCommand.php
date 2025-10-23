@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace Hibla\PdoQueryBuilder\Console;
 
+use Hibla\PdoQueryBuilder\Console\Traits\FindProjectRoot;
+use Hibla\PdoQueryBuilder\Console\Traits\InitializeDatabase;
 use Hibla\PdoQueryBuilder\Console\Traits\LoadsSchemaConfiguration;
 use Hibla\PdoQueryBuilder\DB;
 use Hibla\PdoQueryBuilder\Schema\DatabaseManager;
@@ -20,6 +22,8 @@ use Symfony\Component\Console\Style\SymfonyStyle;
 class MigrateCommand extends Command
 {
     use LoadsSchemaConfiguration;
+    use FindProjectRoot;
+    use InitializeDatabase;
 
     private SymfonyStyle $io;
     private OutputInterface $output;
@@ -241,18 +245,6 @@ class MigrateCommand extends Command
             str_contains($message, 'cannot connect to database');
     }
 
-    private function initializeProjectRoot(): bool
-    {
-        $this->projectRoot = $this->findProjectRoot();
-        if ($this->projectRoot === null) {
-            $this->io->error('Could not find project root');
-
-            return false;
-        }
-
-        return true;
-    }
-
     private function performMigration(int $step, ?string $path): ?bool
     {
         $pendingMigrations = $this->getPendingMigrations($path);
@@ -462,35 +454,5 @@ class MigrateCommand extends Command
         if ($this->output->isVerbose()) {
             $this->io->writeln($e->getTraceAsString());
         }
-    }
-
-    private function initializeDatabase(): void
-    {
-        try {
-            DB::connection($this->connection)->table('_test_init');
-        } catch (\Throwable $e) {
-            if (! str_contains($e->getMessage(), 'not found')) {
-                throw $e;
-            }
-        }
-    }
-
-    private function findProjectRoot(): ?string
-    {
-        $currentDir = getcwd();
-        $dir = ($currentDir !== false) ? $currentDir : __DIR__;
-
-        for ($i = 0; $i < 10; $i++) {
-            if (file_exists($dir . '/composer.json')) {
-                return $dir;
-            }
-            $parent = dirname($dir);
-            if ($parent === $dir) {
-                break;
-            }
-            $dir = $parent;
-        }
-
-        return null;
     }
 }

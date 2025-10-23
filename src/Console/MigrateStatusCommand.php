@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace Hibla\PdoQueryBuilder\Console;
 
+use Hibla\PdoQueryBuilder\Console\Traits\FindProjectRoot;
+use Hibla\PdoQueryBuilder\Console\Traits\InitializeDatabase;
 use Hibla\PdoQueryBuilder\Console\Traits\LoadsSchemaConfiguration;
 use Hibla\PdoQueryBuilder\DB;
 use Hibla\PdoQueryBuilder\Schema\MigrationRepository;
@@ -16,6 +18,8 @@ use Symfony\Component\Console\Style\SymfonyStyle;
 class MigrateStatusCommand extends Command
 {
     use LoadsSchemaConfiguration;
+    use FindProjectRoot;
+    use InitializeDatabase;
 
     private SymfonyStyle $io;
     private ?string $projectRoot = null;
@@ -66,18 +70,6 @@ class MigrateStatusCommand extends Command
 
             return Command::FAILURE;
         }
-    }
-
-    private function initializeProjectRoot(): bool
-    {
-        $this->projectRoot = $this->findProjectRoot();
-        if ($this->projectRoot === null) {
-            $this->io->error('Could not find project root');
-
-            return false;
-        }
-
-        return true;
     }
 
     private function displayMigrationStatus(?string $path, bool $pendingOnly, bool $ranOnly): void
@@ -418,40 +410,11 @@ class MigrateStatusCommand extends Command
         }
     }
 
-    private function initializeDatabase(): void
-    {
-        try {
-            DB::connection($this->connection)->table('_test_init');
-        } catch (\Throwable $e) {
-            if (! str_contains($e->getMessage(), 'not found')) {
-                throw $e;
-            }
-        }
-    }
-
     private function handleError(\Throwable $e): void
     {
         $this->io->error('Failed to get migration status: ' . $e->getMessage());
         if ($this->io->isVerbose()) {
             $this->io->writeln($e->getTraceAsString());
         }
-    }
-
-    private function findProjectRoot(): ?string
-    {
-        $currentDir = getcwd();
-        $dir = ($currentDir !== false) ? $currentDir : __DIR__;
-        for ($i = 0; $i < 10; $i++) {
-            if (file_exists($dir . '/composer.json')) {
-                return $dir;
-            }
-            $parent = dirname($dir);
-            if ($parent === $dir) {
-                break;
-            }
-            $dir = $parent;
-        }
-
-        return null;
     }
 }

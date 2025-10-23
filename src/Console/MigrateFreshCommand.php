@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Hibla\PdoQueryBuilder\Console;
 
+use Hibla\PdoQueryBuilder\Console\Traits\FindProjectRoot;
 use Hibla\PdoQueryBuilder\Console\Traits\LoadsSchemaConfiguration;
 use Hibla\PdoQueryBuilder\DB;
 use Rcalicdan\ConfigLoader\Config;
@@ -17,6 +18,7 @@ use Symfony\Component\Console\Style\SymfonyStyle;
 class MigrateFreshCommand extends Command
 {
     use LoadsSchemaConfiguration;
+    use FindProjectRoot;
 
     private SymfonyStyle $io;
     private OutputInterface $output;
@@ -113,18 +115,6 @@ class MigrateFreshCommand extends Command
         ]);
 
         return $this->io->confirm('Are you absolutely sure you want to continue?', false);
-    }
-
-    private function initializeProjectRoot(): bool
-    {
-        $this->projectRoot = $this->findProjectRoot();
-        if ($this->projectRoot === null) {
-            $this->io->error('Could not find project root');
-
-            return false;
-        }
-
-        return true;
     }
 
     private function dropAllTables(): bool
@@ -496,24 +486,5 @@ class MigrateFreshCommand extends Command
         if ($this->output->isVerbose()) {
             $this->io->writeln($e->getTraceAsString());
         }
-    }
-
-    private function findProjectRoot(): ?string
-    {
-        $currentDir = getcwd();
-        $dir = ($currentDir !== false) ? $currentDir : __DIR__;
-
-        for ($i = 0; $i < 10; $i++) {
-            if (file_exists($dir . '/composer.json')) {
-                return $dir;
-            }
-            $parent = dirname($dir);
-            if ($parent === $dir) {
-                break;
-            }
-            $dir = $parent;
-        }
-
-        return null;
     }
 }
