@@ -27,7 +27,6 @@ class MigrateResetCommand extends Command
     private OutputInterface $output;
     private ?string $projectRoot = null;
     private MigrationRepository $repository;
-    private SchemaBuilder $schema;
     private ?string $connection = null;
 
     protected function configure(): void
@@ -114,7 +113,7 @@ class MigrateResetCommand extends Command
     {
         $this->initializeDatabase();
         $this->repository = new MigrationRepository($this->getMigrationsTable($this->connection), $this->connection);
-        $this->schema = new SchemaBuilder(null, $this->connection);
+        // REMOVED: $this->schema = new SchemaBuilder(null, $this->connection);
     }
 
     private function handleResetResult(int|false $result): int
@@ -293,10 +292,12 @@ class MigrateResetCommand extends Command
 
     private function extractMigrationConnection(object $migration): ?string
     {
-        if (method_exists($migration, 'getConnection')) {
-            return $migration->getConnection();
+        if (!method_exists($migration, 'getConnection')) {
+            return null;
         }
-        return null;
+
+        $connection = $migration->getConnection();
+        return is_string($connection) ? $connection : null;
     }
 
     private function compareConnections(?string $migrationConnection, ?string $targetConnection): bool
@@ -360,11 +361,14 @@ class MigrateResetCommand extends Command
     {
         $migrationConnection = $this->connection;
         
-        if (method_exists($migration, 'getConnection')) {
-            $declaredConnection = $migration->getConnection();
-            if ($declaredConnection !== null) {
-                $migrationConnection = $declaredConnection;
-            }
+        if (!method_exists($migration, 'getConnection')) {
+            return $migrationConnection;
+        }
+
+        $declaredConnection = $migration->getConnection();
+        
+        if (is_string($declaredConnection)) {
+            return $declaredConnection;
         }
 
         return $migrationConnection;

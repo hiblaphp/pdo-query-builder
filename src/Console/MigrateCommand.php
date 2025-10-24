@@ -28,7 +28,6 @@ class MigrateCommand extends Command
     private SymfonyStyle $io;
     private OutputInterface $output;
     private ?string $projectRoot = null;
-    private SchemaBuilder $schema;
     private ?string $connection = null;
     /** @var array<string, MigrationRepository> */
     private array $repositories = [];
@@ -96,7 +95,7 @@ class MigrateCommand extends Command
         }
 
         $this->initializeDatabase();
-        $this->schema = new SchemaBuilder(null, $this->connection);
+        // REMOVED: $this->schema = new SchemaBuilder(null, $this->connection);
 
         $this->io->writeln('Preparing migration repository...');
 
@@ -149,8 +148,6 @@ class MigrateCommand extends Command
     }
 
     /**
-     * Ensure database exists with user confirmation
-     *
      * @return bool|null true = success, false = error, null = user declined
      */
     private function ensureDatabaseExists(bool $force): ?bool
@@ -238,8 +235,11 @@ class MigrateCommand extends Command
                 return 'unknown';
             }
 
-            $connectionName = $this->getConnectionName($dbConfig);
-            $connections = $this->getConnections($dbConfig);
+            /** @var array<string, mixed> $typedConfig */
+            $typedConfig = $dbConfig;
+
+            $connectionName = $this->getConnectionName($typedConfig);
+            $connections = $this->getConnections($typedConfig);
             $config = $connections[$connectionName] ?? [];
 
             if (!is_array($config)) {
@@ -253,16 +253,29 @@ class MigrateCommand extends Command
         }
     }
 
+    /**
+     * @param array<string, mixed> $dbConfig
+     */
     private function getConnectionName(array $dbConfig): string
     {
         $connectionName = $this->connection ?? ($dbConfig['default'] ?? 'mysql');
         return is_string($connectionName) ? $connectionName : 'mysql';
     }
 
+    /**
+     * @param array<string, mixed> $dbConfig
+     * @return array<string, mixed>
+     */
     private function getConnections(array $dbConfig): array
     {
         $connections = $dbConfig['connections'] ?? [];
-        return is_array($connections) ? $connections : [];
+        
+        if (!is_array($connections)) {
+            return [];
+        }
+        
+        /** @var array<string, mixed> */
+        return $connections;
     }
 
     private function isDatabaseNotExistError(\Throwable $e): bool
@@ -356,8 +369,6 @@ class MigrateCommand extends Command
     }
 
     /**
-     * Get pending migrations for all connections.
-     *
      * @return list<string>
      */
     private function getPendingMigrations(?string $path): array
@@ -434,10 +445,6 @@ class MigrateCommand extends Command
         return in_array($relativePath, $ranMigrationPaths, true);
     }
 
-    /**
-     * Get the connection from a migration file.
-     * Returns the explicit connection if set, or null if not specified.
-     */
     private function getMigrationConnectionFromFile(string $file): ?string
     {
         try {
@@ -459,11 +466,12 @@ class MigrateCommand extends Command
 
     private function extractConnectionFromMigration(object $migration): ?string
     {
-        if (method_exists($migration, 'getConnection')) {
-            return $migration->getConnection();
+        if (!method_exists($migration, 'getConnection')) {
+            return $this->extractConnectionFromProperty($migration);
         }
 
-        return $this->extractConnectionFromProperty($migration);
+        $connection = $migration->getConnection();
+        return is_string($connection) ? $connection : null;
     }
 
     private function extractConnectionFromProperty(object $migration): ?string
@@ -478,15 +486,14 @@ class MigrateCommand extends Command
             $property = $reflection->getProperty('connection');
             $property->setAccessible(true);
             
-            return $property->getValue($migration);
+            $value = $property->getValue($migration);
+            return is_string($value) ? $value : null;
         } catch (\Throwable $e) {
             return null;
         }
     }
 
     /**
-     * Group migrations by their connection.
-     *
      * @param list<string> $files
      * @return array<string, list<string>>
      */

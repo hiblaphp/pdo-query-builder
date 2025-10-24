@@ -84,13 +84,13 @@ class MigrateStatusCommand extends Command
     private function displayMigrationStatus(?string $path, bool $pendingOnly, bool $ranOnly): void
     {
         $migrationFiles = $this->loadMigrationFiles($path);
-        
+
         if ($migrationFiles === null) {
             return;
         }
 
         $migrationFiles = $this->applyConnectionFilter($migrationFiles);
-        
+
         if ($migrationFiles === null) {
             return;
         }
@@ -285,7 +285,7 @@ class MigrateStatusCommand extends Command
         foreach ($ranMigrations as $migration) {
             $path = $migration['migration'] ?? null;
             $batch = $migration['batch'] ?? null;
-            
+
             if (is_string($path)) {
                 $normalizedPath = $this->normalizePath($path);
                 $ranMap[$normalizedPath] = is_int($batch) ? $batch : 0;
@@ -315,7 +315,7 @@ class MigrateStatusCommand extends Command
 
         foreach ($migrationFiles as $file) {
             $row = $this->buildStatusRow($file, $ranMigrationsByConnection, $pendingOnly, $ranOnly);
-            
+
             if ($row !== null) {
                 $rows[] = $row;
             }
@@ -356,7 +356,7 @@ class MigrateStatusCommand extends Command
         if ($pendingOnly && $isRan) {
             return false;
         }
-        
+
         if ($ranOnly && !$isRan) {
             return false;
         }
@@ -445,82 +445,6 @@ class MigrateStatusCommand extends Command
         return $directory === '.' ? '(root)' : $directory;
     }
 
-    /**
-     * @param list<string> $migrationFiles
-     * @param list<array<string, mixed>> $ranMigrations
-     * @return list<array{0: string, 1: string, 2: string, 3: string}>
-     */
-    private function buildStatusRows(array $migrationFiles, array $ranMigrations, bool $pendingOnly, bool $ranOnly): array
-    {
-        $ranMigrationMap = $this->buildRanMigrationMapLegacy($ranMigrations);
-        $rows = [];
-
-        foreach ($migrationFiles as $file) {
-            $row = $this->buildStatusRowLegacy($file, $ranMigrationMap, $pendingOnly, $ranOnly);
-            
-            if ($row !== null) {
-                $rows[] = $row;
-            }
-        }
-
-        return $rows;
-    }
-
-    /**
-     * @param list<array<string, mixed>> $ranMigrations
-     * @return array<string, mixed>
-     */
-    private function buildRanMigrationMapLegacy(array $ranMigrations): array
-    {
-        $ranMigrationMap = [];
-        
-        foreach ($ranMigrations as $migration) {
-            $path = $migration['migration'] ?? null;
-            $batch = $migration['batch'] ?? null;
-            
-            if (is_string($path)) {
-                $normalizedPath = $this->normalizePath($path);
-                $ranMigrationMap[$normalizedPath] = $batch;
-            }
-        }
-
-        return $ranMigrationMap;
-    }
-
-    /**
-     * @param array<string, mixed> $ranMigrationMap
-     * @return array{0: string, 1: string, 2: string, 3: string}|null
-     */
-    private function buildStatusRowLegacy(
-        string $file,
-        array $ranMigrationMap,
-        bool $pendingOnly,
-        bool $ranOnly
-    ): ?array {
-        $relativePath = $this->getRelativeMigrationPath($file, $this->connection);
-        $normalizedRelativePath = $this->normalizePath($relativePath);
-
-        $isRan = array_key_exists($normalizedRelativePath, $ranMigrationMap);
-
-        if (!$this->shouldIncludeInResults($isRan, $pendingOnly, $ranOnly)) {
-            return null;
-        }
-
-        $migrationConnection = $this->getMigrationConnection($file);
-        $connectionDisplay = $migrationConnection ?? '<comment>default</comment>';
-
-        if ($isRan) {
-            $batch = $ranMigrationMap[$normalizedRelativePath];
-            $batchStr = is_int($batch) ? (string) $batch : 'N/A';
-            return [$relativePath, '<info>✓ Ran</info>', $batchStr, $connectionDisplay];
-        }
-
-        return [$relativePath, '<comment>Pending</comment>', '-', $connectionDisplay];
-    }
-
-    /**
-     * Get the connection name from a migration file.
-     */
     private function getMigrationConnection(string $file): ?string
     {
         try {
@@ -534,19 +458,19 @@ class MigrateStatusCommand extends Command
                 return null;
             }
 
-            if (method_exists($migration, 'getConnection')) {
-                return $migration->getConnection();
+            if (!method_exists($migration, 'getConnection')) {
+                return null;
             }
 
-            return null;
+            $connection = $migration->getConnection();
+
+            return is_string($connection) ? $connection : null;
         } catch (\Throwable $e) {
             return null;
         }
     }
 
     /**
-     * Display summary statistics.
-     *
      * @param list<array{0: string, 1: string, 2: string, 3: string}> $rows
      */
     private function displaySummary(array $rows): void
@@ -605,7 +529,7 @@ class MigrateStatusCommand extends Command
     {
         $this->io->newLine();
         $this->io->writeln('<comment>By connection:</comment>');
-        
+
         foreach ($connectionCounts as $conn => $count) {
             $this->io->writeln("  {$conn}: <info>{$count}</info>");
         }

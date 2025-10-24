@@ -7,9 +7,7 @@ namespace Hibla\PdoQueryBuilder\Console;
 use Hibla\PdoQueryBuilder\Console\Traits\FindProjectRoot;
 use Hibla\PdoQueryBuilder\Console\Traits\InitializeDatabase;
 use Hibla\PdoQueryBuilder\Console\Traits\LoadsSchemaConfiguration;
-use Hibla\PdoQueryBuilder\DB;
 use Hibla\PdoQueryBuilder\Schema\MigrationRepository;
-use Hibla\PdoQueryBuilder\Schema\SchemaBuilder;
 use Hibla\Promise\Interfaces\PromiseInterface;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Input\InputInterface;
@@ -27,7 +25,6 @@ class MigrateRollbackCommand extends Command
     private OutputInterface $output;
     private ?string $projectRoot = null;
     private MigrationRepository $repository;
-    private SchemaBuilder $schema;
     private ?string $connection = null;
 
     protected function configure(): void
@@ -56,7 +53,7 @@ class MigrateRollbackCommand extends Command
         try {
             $this->initializeDatabase();
             $this->repository = new MigrationRepository($this->getMigrationsTable($this->connection), $this->connection);
-            $this->schema = new SchemaBuilder(null, $this->connection);
+            // REMOVED: $this->schema = new SchemaBuilder(null, $this->connection);
 
             $step = $this->getStepFromInput($input);
             $path = $this->getPathFromInput($input);
@@ -273,7 +270,7 @@ class MigrateRollbackCommand extends Command
         
         if (method_exists($migration, 'getConnection')) {
             $declaredConnection = $migration->getConnection();
-            if ($declaredConnection !== null) {
+            if (is_string($declaredConnection)) {
                 $migrationConnection = $declaredConnection;
             }
         }

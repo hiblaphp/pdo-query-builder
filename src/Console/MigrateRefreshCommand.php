@@ -16,7 +16,6 @@ class MigrateRefreshCommand extends Command
 {
     private SymfonyStyle $io;
     private OutputInterface $output;
-    private InputInterface $input;
     private ?string $connection = null;
     private ?string $path = null;
     private ?int $step = null;
@@ -54,7 +53,7 @@ class MigrateRefreshCommand extends Command
     {
         $this->io = new SymfonyStyle($input, $output);
         $this->output = $output;
-        $this->input = $input;
+        // REMOVED: $this->input = $input;
     }
 
     private function extractOptions(InputInterface $input): void
@@ -311,6 +310,9 @@ class MigrateRefreshCommand extends Command
         return $arguments;
     }
 
+    /**
+     * @param array<string, string> $arguments
+     */
     private function executeSeederCommand(
         Command $command,
         array $arguments,

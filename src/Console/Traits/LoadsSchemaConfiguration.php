@@ -9,6 +9,9 @@ use Rcalicdan\ConfigLoader\Config;
 trait LoadsSchemaConfiguration
 {
     /**
+     * Get the schema configuration for the specified connection.
+     *
+     * @param string|null $connection The connection name, or null for default configuration
      * @return array{
      *     migrations_path: string,
      *     migrations_table: string,
@@ -16,40 +19,104 @@ trait LoadsSchemaConfiguration
      *     timezone: string,
      *     recursive: bool,
      *     connection_paths: array<string, string>
-     * }
+     * } The schema configuration array
      */
     private function getSchemaConfig(?string $connection = null): array
     {
         $defaults = $this->getDefaultSchemaConfig();
-        $loadedConfig = [];
-
-        try {
-            $config = Config::get('pdo-schema');
-
-            if (is_array($config)) {
-                $loadedConfig = $config;
-
-                if ($connection !== null && isset($config['connections'][$connection])) {
-                    $connectionConfig = $config['connections'][$connection];
-                    if (is_array($connectionConfig)) {
-                        $loadedConfig = array_merge($loadedConfig, $connectionConfig);
-                    }
-                }
-            }
-        } catch (\Throwable $e) {
-            // Ignore exceptions and use defaults
-        }
-
+        $loadedConfig = $this->loadConfigSafely($connection);
         $finalConfig = array_merge($defaults, $loadedConfig);
 
         return [
-            'migrations_path' => is_string($finalConfig['migrations_path']) ? $finalConfig['migrations_path'] : $defaults['migrations_path'],
-            'migrations_table' => is_string($finalConfig['migrations_table']) ? $finalConfig['migrations_table'] : $defaults['migrations_table'],
-            'naming_convention' => is_string($finalConfig['naming_convention']) ? $finalConfig['naming_convention'] : $defaults['naming_convention'],
+            'migrations_path' => is_string($finalConfig['migrations_path'] ?? null) ? $finalConfig['migrations_path'] : $defaults['migrations_path'],
+            'migrations_table' => is_string($finalConfig['migrations_table'] ?? null) ? $finalConfig['migrations_table'] : $defaults['migrations_table'],
+            'naming_convention' => is_string($finalConfig['naming_convention'] ?? null) ? $finalConfig['naming_convention'] : $defaults['naming_convention'],
             'timezone' => is_string($finalConfig['timezone'] ?? null) ? $finalConfig['timezone'] : $defaults['timezone'],
             'recursive' => isset($finalConfig['recursive']) ? (bool) $finalConfig['recursive'] : $defaults['recursive'],
-            'connection_paths' => is_array($finalConfig['connection_paths'] ?? null) ? $finalConfig['connection_paths'] : $defaults['connection_paths'],
+            'connection_paths' => $this->normalizeConnectionPaths($finalConfig['connection_paths'] ?? null, $defaults['connection_paths']),
         ];
+    }
+
+    /**
+     * Load configuration safely, catching any exceptions.
+     *
+     * @param string|null $connection The connection name to load configuration for
+     * @return array<string, mixed> The loaded configuration array, or empty array on failure
+     */
+    private function loadConfigSafely(?string $connection): array
+    {
+        try {
+            $config = Config::get('pdo-schema');
+
+            if (!is_array($config)) {
+                return [];
+            }
+
+            /** @var array<string, mixed> $baseConfig */
+            $baseConfig = $config;
+
+            if ($connection === null) {
+                return $baseConfig;
+            }
+
+            /** @var array<string, mixed> $connectionConfig */
+            $connectionConfig = $this->getConnectionConfig($baseConfig, $connection);
+
+            /** @var array<string, mixed> */
+            return array_merge($baseConfig, $connectionConfig);
+        } catch (\Throwable $e) {
+            return [];
+        }
+    }
+
+    /**
+     * Get the configuration for a specific connection.
+     *
+     * @param array<string, mixed> $config The full configuration array
+     * @param string $connection The connection name
+     * @return array<string, mixed> The connection-specific configuration, or empty array if not found
+     */
+    private function getConnectionConfig(array $config, string $connection): array
+    {
+        $connections = $config['connections'] ?? null;
+
+        if (!is_array($connections)) {
+            return [];
+        }
+
+        /** @var array<string, mixed> $connectionsTyped */
+        $connectionsTyped = $connections;
+        $connectionConfig = $connectionsTyped[$connection] ?? null;
+
+        if (!is_array($connectionConfig)) {
+            return [];
+        }
+
+        /** @var array<string, mixed> */
+        return $connectionConfig;
+    }
+
+    /**
+     * Normalize connection paths to ensure proper typing.
+     *
+     * @param mixed $connectionPaths
+     * @param array<string, string> $defaults
+     * @return array<string, string>
+     */
+    private function normalizeConnectionPaths($connectionPaths, array $defaults): array
+    {
+        if (!is_array($connectionPaths)) {
+            return $defaults;
+        }
+
+        $normalized = [];
+        foreach ($connectionPaths as $key => $value) {
+            if (is_string($key) && is_string($value)) {
+                $normalized[$key] = $value;
+            }
+        }
+
+        return $normalized;
     }
 
     /**
@@ -179,7 +246,7 @@ trait LoadsSchemaConfiguration
 
         sort($files);
 
-        return array_values($files);
+        return $files;
     }
 
     /**
@@ -197,6 +264,7 @@ trait LoadsSchemaConfiguration
                 \RecursiveIteratorIterator::SELF_FIRST
             );
 
+            /** @var \SplFileInfo $file */
             foreach ($iterator as $file) {
                 if ($file->isFile() && $file->getExtension() === 'php') {
                     $files[] = $file->getPathname();
@@ -208,7 +276,7 @@ trait LoadsSchemaConfiguration
 
         sort($files);
 
-        return array_values($files);
+        return $files;
     }
 
     /**
@@ -300,9 +368,8 @@ trait LoadsSchemaConfiguration
     private function getFilteredMigrationFiles(string $pattern, ?string $connection = null): array
     {
         $allFiles = $this->getAllMigrationFiles($connection);
-        $basePath = $this->getMigrationsPath($connection);
 
-        return array_values(array_filter($allFiles, function ($file) use ($pattern, $basePath) {
+        return array_values(array_filter($allFiles, function ($file) use ($pattern) {
             $relativePath = $this->getRelativeMigrationPath($file, null);
             return fnmatch($pattern, $relativePath);
         }));

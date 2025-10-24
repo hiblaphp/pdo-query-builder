@@ -90,9 +90,6 @@ class MakeMigrationCommand extends Command
         return Command::SUCCESS;
     }
 
-    /**
-     * Parse migration name to extract subdirectory and actual name.
-     */
     private function parseMigrationName(string $input): void
     {
         $normalized = str_replace('\\', '/', $input);
@@ -111,19 +108,16 @@ class MakeMigrationCommand extends Command
         $this->migrationName = $this->sanitizeMigrationName($this->migrationName);
     }
 
-    /**
-     * Sanitize migration name to ensure it's valid.
-     */
     private function sanitizeMigrationName(string $name): string
     {
         $name = str_replace(['/', '\\'], '', $name);
 
-        $name = preg_replace('/([a-z])([A-Z])/', '$1_$2', $name);
-        $name = strtolower($name ?? '');
-        $name = preg_replace('/[^a-z0-9_]/', '_', $name ?? '');
-        $name = preg_replace('/_+/', '_', $name ?? '');
+        $name = preg_replace('/([a-z])([A-Z])/', '$1_$2', $name) ?? $name;
+        $name = strtolower($name);
+        $name = preg_replace('/[^a-z0-9_]/', '_', $name) ?? '';
+        $name = preg_replace('/_+/', '_', $name) ?? '';
 
-        return trim($name ?? '', '_');
+        return trim($name, '_');
     }
 
     private function ensureMigrationsDirectory(): bool

@@ -68,7 +68,7 @@ class PublishTemplatesCommand extends Command
     private function initializeProjectRoot(): bool
     {
         $this->projectRoot = $this->findProjectRoot();
-        
+
         if ($this->projectRoot === null) {
             $this->io->error('Could not find project root');
             return false;
@@ -80,7 +80,7 @@ class PublishTemplatesCommand extends Command
     private function determineTargetPath(InputInterface $input): ?string
     {
         $customPath = $input->getOption('path');
-        
+
         if (is_string($customPath) && $customPath !== '') {
             return $this->resolveCustomPath($customPath);
         }
@@ -103,7 +103,10 @@ class PublishTemplatesCommand extends Command
                 return null;
             }
 
-            $templatesPath = $this->extractTemplatesPathFromConfig($dbConfig);
+            /** @var array<string, mixed> $typedConfig */
+            $typedConfig = $dbConfig;
+
+            $templatesPath = $this->extractTemplatesPathFromConfig($typedConfig);
 
             return $this->validateTemplatesPath($templatesPath);
         } catch (\Throwable $e) {
@@ -118,7 +121,7 @@ class PublishTemplatesCommand extends Command
     private function extractTemplatesPathFromConfig(array $dbConfig): mixed
     {
         $paginationConfig = $dbConfig['pagination'] ?? [];
-        
+
         if (!is_array($paginationConfig)) {
             return null;
         }
@@ -186,7 +189,7 @@ class PublishTemplatesCommand extends Command
         }
 
         $templates = $this->getTemplateList();
-        
+
         return $this->copyTemplates($sourceTemplatesDir, $targetPath, $templates);
     }
 
@@ -355,8 +358,8 @@ class PublishTemplatesCommand extends Command
 
     private function buildVendorPath(): string
     {
-        return $this->projectRoot . DIRECTORY_SEPARATOR . 'vendor' . DIRECTORY_SEPARATOR . 'hibla' 
-            . DIRECTORY_SEPARATOR . 'pdo-query-builder' . DIRECTORY_SEPARATOR . 'src' 
+        return $this->projectRoot . DIRECTORY_SEPARATOR . 'vendor' . DIRECTORY_SEPARATOR . 'hibla'
+            . DIRECTORY_SEPARATOR . 'pdo-query-builder' . DIRECTORY_SEPARATOR . 'src'
             . DIRECTORY_SEPARATOR . 'Pagination' . DIRECTORY_SEPARATOR . 'templates';
     }
 
