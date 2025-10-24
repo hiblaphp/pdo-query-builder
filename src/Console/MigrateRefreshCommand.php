@@ -32,7 +32,6 @@ class MigrateRefreshCommand extends Command
             ->addOption('connection', null, InputOption::VALUE_OPTIONAL, 'The database connection to use')
             ->addOption('path', null, InputOption::VALUE_OPTIONAL, 'The path to migrations files')
             ->addOption('step', null, InputOption::VALUE_OPTIONAL, 'Number of migrations to rollback')
-            ->addOption('seed', null, InputOption::VALUE_NONE, 'Run seeders after migrations')
             ->addOption('force', null, InputOption::VALUE_NONE, 'Force the operation without confirmation')
         ;
     }
@@ -59,7 +58,7 @@ class MigrateRefreshCommand extends Command
             return Command::SUCCESS;
         }
 
-        return $this->performRefresh($input);
+        return $this->performRefresh();
     }
 
     private function initializeCommand(InputInterface $input, OutputInterface $output): void
@@ -125,7 +124,7 @@ class MigrateRefreshCommand extends Command
         return 'This will rollback ALL migrations and re-run them. Continue?';
     }
 
-    private function performRefresh(InputInterface $input): int
+    private function performRefresh(): int
     {
         $this->io->newLine();
 
@@ -137,10 +136,6 @@ class MigrateRefreshCommand extends Command
 
         if (! $this->performMigration()) {
             return Command::FAILURE;
-        }
-
-        if ($this->shouldRunSeeders($input)) {
-            $this->performSeeding();
         }
 
         $this->displaySuccessMessage();
@@ -185,23 +180,6 @@ class MigrateRefreshCommand extends Command
         }
 
         return true;
-    }
-
-    private function shouldRunSeeders(InputInterface $input): bool
-    {
-        return (bool) $input->getOption('seed');
-    }
-
-    private function performSeeding(): void
-    {
-        $this->io->newLine();
-        $this->io->section('Running seeders');
-
-        if ($this->runSeeders()) {
-            $this->io->writeln('<info>✓ Seeders completed successfully</info>');
-        } else {
-            $this->io->warning('Seeders not available or failed');
-        }
     }
 
     private function displaySuccessMessage(): void
@@ -286,68 +264,6 @@ class MigrateRefreshCommand extends Command
         ]);
 
         return $count > 0 ? $count : 1;
-    }
-
-    private function runSeeders(): bool
-    {
-        $application = $this->getApplication();
-
-        if ($application === null) {
-            return false;
-        }
-
-        try {
-            $command = $application->find('db:seed');
-            $arguments = $this->buildSeederArguments();
-            $bufferedOutput = new BufferedOutput();
-
-            $code = $this->executeSeederCommand($command, $arguments, $bufferedOutput);
-
-            if ($code === Command::SUCCESS) {
-                $this->displaySeederOutput($bufferedOutput);
-            }
-
-            return $code === Command::SUCCESS;
-        } catch (\Throwable $e) {
-            return false;
-        }
-    }
-
-    /**
-     * @return array<string, string>
-     */
-    private function buildSeederArguments(): array
-    {
-        $arguments = [];
-
-        if ($this->connection !== null) {
-            $arguments['--connection'] = $this->connection;
-        }
-
-        return $arguments;
-    }
-
-    /**
-     * @param array<string, string> $arguments
-     */
-    private function executeSeederCommand(
-        Command $command,
-        array $arguments,
-        BufferedOutput $bufferedOutput
-    ): int {
-        $input = new ArrayInput($arguments);
-
-        return $command->run($input, $bufferedOutput);
-    }
-
-    private function displaySeederOutput(BufferedOutput $bufferedOutput): void
-    {
-        $content = $bufferedOutput->fetch();
-        $this->displayFilteredOutput($content, [
-            'Seeding:',
-            '✓',
-            'Seeded:',
-        ]);
     }
 
     /**

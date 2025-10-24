@@ -37,7 +37,6 @@ class MigrateFreshCommand extends Command
             ->addOption('force', 'f', InputOption::VALUE_NONE, 'Force the operation without confirmation')
             ->addOption('connection', null, InputOption::VALUE_OPTIONAL, 'The database connection to use')
             ->addOption('path', null, InputOption::VALUE_OPTIONAL, 'The path to migrations files')
-            ->addOption('seed', null, InputOption::VALUE_NONE, 'Run seeders after migrations')
         ;
     }
 
@@ -119,10 +118,6 @@ class MigrateFreshCommand extends Command
 
         $this->io->success('Database refreshed successfully!');
 
-        if ($this->shouldRunSeeders($input)) {
-            $this->runSeedersWithFeedback();
-        }
-
         return Command::SUCCESS;
     }
 
@@ -131,11 +126,6 @@ class MigrateFreshCommand extends Command
         $pathOption = $input->getOption('path');
 
         return is_string($pathOption) && $pathOption !== '' ? $pathOption : null;
-    }
-
-    private function shouldRunSeeders(InputInterface $input): bool
-    {
-        return (bool) $input->getOption('seed');
     }
 
     private function dropAllTablesWithFeedback(): bool
@@ -162,17 +152,6 @@ class MigrateFreshCommand extends Command
         }
 
         return true;
-    }
-
-    private function runSeedersWithFeedback(): void
-    {
-        $this->io->section('Running seeders...');
-
-        if ($this->runSeeders()) {
-            $this->io->success('Seeders completed!');
-        } else {
-            $this->io->warning('Seeders not available or failed');
-        }
     }
 
     private function confirmFresh(): bool
@@ -572,39 +551,6 @@ class MigrateFreshCommand extends Command
 
         if ($path !== null) {
             $arguments['--path'] = $path;
-        }
-
-        return $arguments;
-    }
-
-    private function runSeeders(): bool
-    {
-        $application = $this->getApplication();
-
-        if ($application === null) {
-            return false;
-        }
-
-        try {
-            $command = $application->find('db:seed');
-            $arguments = $this->buildSeederArguments();
-            $input = new ArrayInput($arguments);
-
-            return $command->run($input, $this->output) === Command::SUCCESS;
-        } catch (\Throwable $e) {
-            return false;
-        }
-    }
-
-    /**
-     * @return array<string, string>
-     */
-    private function buildSeederArguments(): array
-    {
-        $arguments = [];
-
-        if ($this->connection !== null) {
-            $arguments['--connection'] = $this->connection;
         }
 
         return $arguments;
