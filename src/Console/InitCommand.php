@@ -78,44 +78,51 @@ class InitCommand extends Command
             'pdo-schema.php' => $this->getSourceConfigPath('pdo-schema.php'),
         ];
 
+        $copiedFiles = [];
+        $skippedFiles = [];
         $failedFiles = [];
 
         foreach ($files as $filename => $sourceConfig) {
-            if ($this->copyFile($filename, $sourceConfig, $configDir)) {
-                $this->io->success("✓ Configuration created: config/{$filename}");
+            $result = $this->copyFile($filename, $sourceConfig, $configDir);
+            
+            if ($result === 'copied') {
+                $copiedFiles[] = $filename;
+            } elseif ($result === 'skipped') {
+                $skippedFiles[] = $filename;
             } else {
                 $failedFiles[] = $filename;
             }
         }
 
+        foreach ($copiedFiles as $filename) {
+            $this->io->success("✓ Configuration created: config/{$filename}");
+        }
+
         return count($failedFiles) === 0 ? Command::SUCCESS : Command::FAILURE;
     }
 
-    private function copyFile(string $filename, string $sourceConfig, string $configDir): bool
+    private function copyFile(string $filename, string $sourceConfig, string $configDir): string
     {
         $destConfig = $configDir.'/'.$filename;
 
         if (file_exists($destConfig) && ! $this->force) {
             if (! $this->io->confirm("File '{$filename}' already exists. Overwrite?", false)) {
                 $this->io->warning("Skipped: {$filename}");
-
-                return true;
+                return 'skipped';
             }
         }
 
         if (! file_exists($sourceConfig)) {
             $this->io->error("Source config not found: {$sourceConfig}");
-
-            return false;
+            return 'failed';
         }
 
         if (! copy($sourceConfig, $destConfig)) {
             $this->io->error("Failed to copy {$filename}");
-
-            return false;
+            return 'failed';
         }
 
-        return true;
+        return 'copied';
     }
 
     private function createAsyncPdoExecutable(): void
