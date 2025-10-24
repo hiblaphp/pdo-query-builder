@@ -38,7 +38,7 @@ class PublishTemplatesCommand extends Command
 
         $this->io->title('Publish Pagination Templates');
 
-        if (!$this->initializeProjectRoot()) {
+        if (! $this->initializeProjectRoot()) {
             return Command::FAILURE;
         }
 
@@ -46,12 +46,13 @@ class PublishTemplatesCommand extends Command
 
         if ($targetPath === null) {
             $this->displayConfigurationError();
+
             return Command::FAILURE;
         }
 
         $this->io->info("Publishing templates to: {$targetPath}");
 
-        if (!$this->ensureDirectoryExists($targetPath)) {
+        if (! $this->ensureDirectoryExists($targetPath)) {
             return Command::FAILURE;
         }
 
@@ -71,6 +72,7 @@ class PublishTemplatesCommand extends Command
 
         if ($this->projectRoot === null) {
             $this->io->error('Could not find project root');
+
             return false;
         }
 
@@ -99,7 +101,7 @@ class PublishTemplatesCommand extends Command
         try {
             $dbConfig = Config::get('pdo-query-builder');
 
-            if (!is_array($dbConfig)) {
+            if (! is_array($dbConfig)) {
                 return null;
             }
 
@@ -111,6 +113,7 @@ class PublishTemplatesCommand extends Command
             return $this->validateTemplatesPath($templatesPath);
         } catch (\Throwable $e) {
             $this->io->warning("Could not load config: {$e->getMessage()}");
+
             return null;
         }
     }
@@ -122,7 +125,7 @@ class PublishTemplatesCommand extends Command
     {
         $paginationConfig = $dbConfig['pagination'] ?? [];
 
-        if (!is_array($paginationConfig)) {
+        if (! is_array($paginationConfig)) {
             return null;
         }
 
@@ -131,7 +134,7 @@ class PublishTemplatesCommand extends Command
 
     private function validateTemplatesPath(mixed $templatesPath): ?string
     {
-        if (!is_string($templatesPath)) {
+        if (! is_string($templatesPath)) {
             return null;
         }
 
@@ -162,18 +165,20 @@ class PublishTemplatesCommand extends Command
             return true;
         }
 
-        if (!$this->createDirectory($path)) {
+        if (! $this->createDirectory($path)) {
             return false;
         }
 
         $this->io->info("✓ Created directory: {$path}");
+
         return true;
     }
 
     private function createDirectory(string $path): bool
     {
-        if (!mkdir($path, 0755, true)) {
+        if (! mkdir($path, 0755, true)) {
             $this->io->error("Failed to create directory: {$path}");
+
             return false;
         }
 
@@ -184,7 +189,7 @@ class PublishTemplatesCommand extends Command
     {
         $sourceTemplatesDir = $this->getSourceTemplatesPath();
 
-        if (!$this->validateSourceDirectory($sourceTemplatesDir)) {
+        if (! $this->validateSourceDirectory($sourceTemplatesDir)) {
             return 0;
         }
 
@@ -244,13 +249,15 @@ class PublishTemplatesCommand extends Command
         $source = $sourceTemplatesDir . DIRECTORY_SEPARATOR . $template;
         $destination = $targetPath . DIRECTORY_SEPARATOR . $template;
 
-        if (!file_exists($source)) {
+        if (! file_exists($source)) {
             $this->io->warning("Source not found: {$template}");
+
             return false;
         }
 
-        if (!$this->shouldOverwriteTemplate($destination, $template)) {
+        if (! $this->shouldOverwriteTemplate($destination, $template)) {
             $this->io->text("  <comment>⊘</comment> Skipped: {$template}");
+
             return false;
         }
 
@@ -259,7 +266,7 @@ class PublishTemplatesCommand extends Command
 
     private function shouldOverwriteTemplate(string $destination, string $template): bool
     {
-        if (!file_exists($destination)) {
+        if (! file_exists($destination)) {
             return true;
         }
 
@@ -274,10 +281,12 @@ class PublishTemplatesCommand extends Command
     {
         if (copy($source, $destination)) {
             $this->io->text("  <info>✓</info> Published: {$template}");
+
             return true;
         }
 
         $this->io->text("  <error>✗</error> Failed: {$template}");
+
         return false;
     }
 

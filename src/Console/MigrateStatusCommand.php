@@ -7,8 +7,9 @@ namespace Hibla\PdoQueryBuilder\Console;
 use Hibla\PdoQueryBuilder\Console\Traits\FindProjectRoot;
 use Hibla\PdoQueryBuilder\Console\Traits\InitializeDatabase;
 use Hibla\PdoQueryBuilder\Console\Traits\LoadsSchemaConfiguration;
-use Hibla\PdoQueryBuilder\DB;
+use Hibla\PdoQueryBuilder\Console\Traits\ValidateConnection;
 use Hibla\PdoQueryBuilder\Schema\MigrationRepository;
+use InvalidArgumentException;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Input\InputOption;
@@ -20,6 +21,7 @@ class MigrateStatusCommand extends Command
     use LoadsSchemaConfiguration;
     use FindProjectRoot;
     use InitializeDatabase;
+    use ValidateConnection;
 
     private SymfonyStyle $io;
     private ?string $projectRoot = null;
@@ -44,7 +46,15 @@ class MigrateStatusCommand extends Command
 
         $this->setConnectionFromInput($input);
 
-        if (!$this->initializeProjectRoot()) {
+        try {
+            $this->validateConnection($this->connection);
+        } catch (InvalidArgumentException $e) {
+            $this->io->error($e->getMessage());
+
+            return Command::FAILURE;
+        }
+
+        if (! $this->initializeProjectRoot()) {
             return Command::FAILURE;
         }
 
@@ -78,6 +88,7 @@ class MigrateStatusCommand extends Command
     private function getPathFromInput(InputInterface $input): ?string
     {
         $pathOption = $input->getOption('path');
+
         return is_string($pathOption) && $pathOption !== '' ? $pathOption : null;
     }
 
@@ -99,7 +110,7 @@ class MigrateStatusCommand extends Command
 
         $rows = $this->buildStatusRowsWithMultipleConnections($migrationFiles, $ranMigrationsByConnection, $pendingOnly, $ranOnly);
 
-        if (!$this->displayRowsOrEmptyMessage($rows, $pendingOnly, $ranOnly)) {
+        if (! $this->displayRowsOrEmptyMessage($rows, $pendingOnly, $ranOnly)) {
             return;
         }
 
@@ -118,10 +129,12 @@ class MigrateStatusCommand extends Command
 
             if (count($migrationFiles) === 0) {
                 $this->io->warning("No migration files found in path: {$path}");
+
                 return null;
             }
 
             $this->io->note("Showing migrations from path: {$path}");
+
             return $migrationFiles;
         }
 
@@ -129,6 +142,7 @@ class MigrateStatusCommand extends Command
 
         if (count($migrationFiles) === 0) {
             $this->io->warning('No migration files found');
+
             return null;
         }
 
@@ -149,6 +163,7 @@ class MigrateStatusCommand extends Command
 
         if (count($filtered) === 0) {
             $this->io->warning("No migrations found for connection: {$this->connection}");
+
             return null;
         }
 
@@ -300,7 +315,7 @@ class MigrateStatusCommand extends Command
         return str_replace('\\', '/', trim($path, '/\\'));
     }
 
-    /** 
+    /**
      * @param list<string> $migrationFiles
      * @param array<string, array<string, int>> $ranMigrationsByConnection
      * @return list<array{0: string, 1: string, 2: string, 3: string}>
@@ -344,7 +359,7 @@ class MigrateStatusCommand extends Command
         $ranMap = $ranMigrationsByConnection[$connectionKey] ?? [];
         $isRan = array_key_exists($normalizedRelativePath, $ranMap);
 
-        if (!$this->shouldIncludeInResults($isRan, $pendingOnly, $ranOnly)) {
+        if (! $this->shouldIncludeInResults($isRan, $pendingOnly, $ranOnly)) {
             return null;
         }
 
@@ -357,7 +372,7 @@ class MigrateStatusCommand extends Command
             return false;
         }
 
-        if ($ranOnly && !$isRan) {
+        if ($ranOnly && ! $isRan) {
             return false;
         }
 
@@ -378,6 +393,7 @@ class MigrateStatusCommand extends Command
         if ($isRan) {
             $batch = $ranMap[$normalizedRelativePath];
             $batchStr = $batch > 0 ? (string) $batch : 'N/A';
+
             return [$relativePath, '<info>✓ Ran</info>', $batchStr, $connectionDisplay];
         }
 
@@ -395,6 +411,7 @@ class MigrateStatusCommand extends Command
                 return true;
             }
         }
+
         return false;
     }
 
@@ -424,7 +441,7 @@ class MigrateStatusCommand extends Command
             $path = $row[0];
             $directory = $this->getDirectoryLabel($path);
 
-            if (!isset($grouped[$directory])) {
+            if (! isset($grouped[$directory])) {
                 $grouped[$directory] = [];
             }
 
@@ -432,7 +449,7 @@ class MigrateStatusCommand extends Command
                 basename($path),
                 $row[1],
                 $row[2],
-                $row[3]
+                $row[3],
             ];
         }
 
@@ -442,23 +459,24 @@ class MigrateStatusCommand extends Command
     private function getDirectoryLabel(string $path): string
     {
         $directory = dirname($path);
+
         return $directory === '.' ? '(root)' : $directory;
     }
 
     private function getMigrationConnection(string $file): ?string
     {
         try {
-            if (!file_exists($file)) {
+            if (! file_exists($file)) {
                 return null;
             }
 
             $migration = require $file;
 
-            if (!is_object($migration)) {
+            if (! is_object($migration)) {
                 return null;
             }
 
-            if (!method_exists($migration, 'getConnection')) {
+            if (! method_exists($migration, 'getConnection')) {
                 return null;
             }
 
@@ -508,7 +526,7 @@ class MigrateStatusCommand extends Command
             }
 
             $connection = strip_tags($row[3]);
-            if (!isset($connectionCounts[$connection])) {
+            if (! isset($connectionCounts[$connection])) {
                 $connectionCounts[$connection] = 0;
             }
             $connectionCounts[$connection]++;
@@ -518,7 +536,7 @@ class MigrateStatusCommand extends Command
             'total' => $total,
             'ran' => $ran,
             'pending' => $pending,
-            'connectionCounts' => $connectionCounts
+            'connectionCounts' => $connectionCounts,
         ];
     }
 

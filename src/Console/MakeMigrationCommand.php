@@ -70,6 +70,10 @@ class MakeMigrationCommand extends Command
         $alterOption = $input->getOption('alter');
         $this->alter = is_string($alterOption) ? $alterOption : null;
 
+        if ($this->table === null && $this->alter === null) {
+            $this->autoDetectTableOperation($migrationNameValue);
+        }
+
         $pathOption = $input->getOption('path');
         if (is_string($pathOption) && $pathOption !== '') {
             $this->subdirectory = trim($pathOption, '/\\');
@@ -120,6 +124,46 @@ class MakeMigrationCommand extends Command
         return trim($name, '_');
     }
 
+    private function autoDetectTableOperation(string $migrationName): void
+    {
+        $normalized = $this->sanitizeMigrationName($migrationName);
+
+        if (preg_match('/^create_(.+?)_table$/', $normalized, $matches) === 1) {
+            $this->table = $matches[1];
+            $this->io->note("Auto-detected table creation: {$this->table}");
+
+            return;
+        }
+
+        if (preg_match('/^add_.+?_to_(.+?)(?:_table)?$/', $normalized, $matches) === 1) {
+            $this->alter = $matches[1];
+            $this->io->note("Auto-detected table alteration: {$this->alter}");
+
+            return;
+        }
+
+        if (preg_match('/^remove_.+?_from_(.+?)(?:_table)?$/', $normalized, $matches) === 1) {
+            $this->alter = $matches[1];
+            $this->io->note("Auto-detected table alteration: {$this->alter}");
+
+            return;
+        }
+
+        if (preg_match('/^drop_(.+?)_table$/', $normalized, $matches) === 1) {
+            $this->alter = $matches[1];
+            $this->io->note("Auto-detected table operation: {$this->alter}");
+
+            return;
+        }
+
+        if (preg_match('/^(?:update|modify)_(.+?)_table$/', $normalized, $matches) === 1) {
+            $this->alter = $matches[1];
+            $this->io->note("Auto-detected table alteration: {$this->alter}");
+
+            return;
+        }
+    }
+
     private function ensureMigrationsDirectory(): bool
     {
         $basePath = $this->getMigrationsPath($this->connection);
@@ -146,6 +190,7 @@ class MakeMigrationCommand extends Command
 
         if (file_exists($filePath)) {
             $this->io->error("Migration file already exists: {$fileName}");
+
             return false;
         }
 
@@ -157,10 +202,13 @@ class MakeMigrationCommand extends Command
             return false;
         }
 
-        $relativePath = str_replace($this->projectRoot . DIRECTORY_SEPARATOR, '', $filePath);
-        $relativePath = str_replace('\\', '/', $relativePath);
+        $displayPath = $this->subdirectory !== null
+            ? $this->subdirectory . DIRECTORY_SEPARATOR . $fileName
+            : $fileName;
 
-        $this->io->success("Migration created: {$relativePath}");
+        $displayPath = str_replace('\\', '/', $displayPath);
+
+        $this->io->success("Migration created: {$displayPath}");
 
         if ($this->subdirectory !== null) {
             $this->io->note("Migration organized in subdirectory: {$this->subdirectory}");
@@ -225,6 +273,9 @@ use Hibla\PdoQueryBuilder\Schema\Blueprint;
 use Hibla\PdoQueryBuilder\Schema\Migration;
 use Hibla\Promise\Interfaces\PromiseInterface;
 
+use function Hibla\async;
+use function Hibla\await;
+
 return new class extends Migration
 {
 {$connectionLine}    /**
@@ -234,9 +285,11 @@ return new class extends Migration
      */
     public function up(): PromiseInterface
     {
-        return \$this->create('{$this->table}', function (Blueprint \$table) {
-            \$table->id();
-            \$table->timestamps();
+        return async(function () {
+            await(\$this->create('{$this->table}', function (Blueprint \$table) {
+                \$table->id();
+                \$table->timestamps();
+            }));
         });
     }
     
@@ -247,7 +300,9 @@ return new class extends Migration
      */
     public function down(): PromiseInterface
     {
-        return \$this->dropIfExists('{$this->table}');
+        return async(function () {
+            await(\$this->dropIfExists('{$this->table}'));
+        });
     }
 };
 ";
@@ -265,6 +320,9 @@ use Hibla\PdoQueryBuilder\Schema\Blueprint;
 use Hibla\PdoQueryBuilder\Schema\Migration;
 use Hibla\Promise\Interfaces\PromiseInterface;
 
+use function Hibla\async;
+use function Hibla\await;
+
 return new class extends Migration
 {
 {$connectionLine}    /**
@@ -274,8 +332,10 @@ return new class extends Migration
      */
     public function up(): PromiseInterface
     {
-        return \$this->table('{$this->alter}', function (Blueprint \$table) {
-            // Add columns, indexes, etc.
+        return async(function () {
+            await(\$this->table('{$this->alter}', function (Blueprint \$table) {
+                // Add columns, indexes, etc.
+            }));
         });
     }
 
@@ -286,8 +346,10 @@ return new class extends Migration
      */
     public function down(): PromiseInterface
     {
-        return \$this->table('{$this->alter}', function (Blueprint \$table) {
-            // Reverse the changes
+        return async(function () {
+            await(\$this->table('{$this->alter}', function (Blueprint \$table) {
+                // Reverse the changes
+            }));
         });
     }
 };
@@ -306,6 +368,9 @@ use Hibla\PdoQueryBuilder\Schema\Blueprint;
 use Hibla\PdoQueryBuilder\Schema\Migration;
 use Hibla\Promise\Interfaces\PromiseInterface;
 
+use function Hibla\async;
+use function Hibla\await;
+
 return new class extends Migration
 {
 {$connectionLine}    /**
@@ -315,8 +380,10 @@ return new class extends Migration
      */
     public function up(): PromiseInterface
     {
-        // Write your migration here
-        return \$this->raw('-- Add your SQL here');
+        return async(function () {
+            // Write your migration here
+            await(\$this->raw('-- Add your SQL here'));
+        });
     }
 
     /**
@@ -326,8 +393,10 @@ return new class extends Migration
      */
     public function down(): PromiseInterface
     {
-        // Reverse your migration here
-        return \$this->raw('-- Add your rollback SQL here');
+        return async(function () {
+            // Reverse your migration here
+            await(\$this->raw('-- Add your rollback SQL here'));
+        });
     }
 };
 ";

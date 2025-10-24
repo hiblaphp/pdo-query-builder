@@ -48,7 +48,7 @@ trait LoadsSchemaConfiguration
         try {
             $config = Config::get('pdo-schema');
 
-            if (!is_array($config)) {
+            if (! is_array($config)) {
                 return [];
             }
 
@@ -80,7 +80,7 @@ trait LoadsSchemaConfiguration
     {
         $connections = $config['connections'] ?? null;
 
-        if (!is_array($connections)) {
+        if (! is_array($connections)) {
             return [];
         }
 
@@ -88,7 +88,7 @@ trait LoadsSchemaConfiguration
         $connectionsTyped = $connections;
         $connectionConfig = $connectionsTyped[$connection] ?? null;
 
-        if (!is_array($connectionConfig)) {
+        if (! is_array($connectionConfig)) {
             return [];
         }
 
@@ -105,7 +105,7 @@ trait LoadsSchemaConfiguration
      */
     private function normalizeConnectionPaths($connectionPaths, array $defaults): array
     {
-        if (!is_array($connectionPaths)) {
+        if (! is_array($connectionPaths)) {
             return $defaults;
         }
 
@@ -220,7 +220,7 @@ trait LoadsSchemaConfiguration
     {
         $migrationsPath = $this->getMigrationsPath($connection);
 
-        if (!is_dir($migrationsPath)) {
+        if (! is_dir($migrationsPath)) {
             return [];
         }
 
@@ -371,6 +371,7 @@ trait LoadsSchemaConfiguration
 
         return array_values(array_filter($allFiles, function ($file) use ($pattern) {
             $relativePath = $this->getRelativeMigrationPath($file, null);
+
             return fnmatch($pattern, $relativePath);
         }));
     }
@@ -394,7 +395,7 @@ trait LoadsSchemaConfiguration
                 $directory = 'root';
             }
 
-            if (!isset($organized[$directory])) {
+            if (! isset($organized[$directory])) {
                 $organized[$directory] = [];
             }
 
@@ -410,6 +411,7 @@ trait LoadsSchemaConfiguration
     private function migrationExists(string $relativePath, ?string $connection = null): bool
     {
         $fullPath = $this->getFullMigrationPath($relativePath, $connection);
+
         return file_exists($fullPath);
     }
 

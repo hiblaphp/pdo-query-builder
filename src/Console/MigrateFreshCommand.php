@@ -6,7 +6,9 @@ namespace Hibla\PdoQueryBuilder\Console;
 
 use Hibla\PdoQueryBuilder\Console\Traits\FindProjectRoot;
 use Hibla\PdoQueryBuilder\Console\Traits\LoadsSchemaConfiguration;
+use Hibla\PdoQueryBuilder\Console\Traits\ValidateConnection;
 use Hibla\PdoQueryBuilder\DB;
+use InvalidArgumentException;
 use Rcalicdan\ConfigLoader\Config;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Input\ArrayInput;
@@ -19,6 +21,7 @@ class MigrateFreshCommand extends Command
 {
     use LoadsSchemaConfiguration;
     use FindProjectRoot;
+    use ValidateConnection;
 
     private SymfonyStyle $io;
     private OutputInterface $output;
@@ -45,12 +48,21 @@ class MigrateFreshCommand extends Command
 
         $this->setConnectionFromInput($input);
 
-        if (!$this->shouldProceed($input)) {
+        try {
+            $this->validateConnection($this->connection);
+        } catch (InvalidArgumentException $e) {
+            $this->io->error($e->getMessage());
+
+            return Command::FAILURE;
+        }
+
+        if (! $this->shouldProceed($input)) {
             $this->io->warning('Fresh migration cancelled');
+
             return Command::SUCCESS;
         }
 
-        if (!$this->initializeProjectRoot()) {
+        if (! $this->initializeProjectRoot()) {
             return Command::FAILURE;
         }
 
@@ -58,6 +70,7 @@ class MigrateFreshCommand extends Command
             return $this->performFreshMigration($input);
         } catch (\Throwable $e) {
             $this->handleCriticalError($e);
+
             return Command::FAILURE;
         }
     }
@@ -94,13 +107,13 @@ class MigrateFreshCommand extends Command
         $this->driver = $this->detectDriver();
         $this->initializeDatabase();
 
-        if (!$this->dropAllTablesWithFeedback()) {
+        if (! $this->dropAllTablesWithFeedback()) {
             return Command::FAILURE;
         }
 
         $path = $this->getPathOption($input);
 
-        if (!$this->runMigrationsWithFeedback($path)) {
+        if (! $this->runMigrationsWithFeedback($path)) {
             return Command::FAILURE;
         }
 
@@ -116,6 +129,7 @@ class MigrateFreshCommand extends Command
     private function getPathOption(InputInterface $input): ?string
     {
         $pathOption = $input->getOption('path');
+
         return is_string($pathOption) && $pathOption !== '' ? $pathOption : null;
     }
 
@@ -128,11 +142,12 @@ class MigrateFreshCommand extends Command
     {
         $this->io->section('Dropping all tables...');
 
-        if (!$this->dropAllTables()) {
+        if (! $this->dropAllTables()) {
             return false;
         }
 
         $this->io->success('All tables dropped successfully!');
+
         return true;
     }
 
@@ -140,8 +155,9 @@ class MigrateFreshCommand extends Command
     {
         $this->io->section('Running migrations...');
 
-        if (!$this->runMigrations($path)) {
+        if (! $this->runMigrations($path)) {
             $this->io->error('Migration failed');
+
             return false;
         }
 
@@ -197,6 +213,7 @@ class MigrateFreshCommand extends Command
             return true;
         } catch (\Throwable $e) {
             $this->displayDropTablesError($e);
+
             return false;
         }
     }
@@ -209,6 +226,7 @@ class MigrateFreshCommand extends Command
         if (count($tables) === 0) {
             $connectionName = $this->getConnectionDisplayName();
             $this->io->note("No migrated tables found for connection '{$connectionName}'");
+
             return true;
         }
 
@@ -273,12 +291,14 @@ class MigrateFreshCommand extends Command
         $tables = $this->extractTablesFromMigrations($migrationFiles, $targetConnection);
 
         sort($tables);
+
         return $tables;
     }
 
     private function getTargetConnection(): string
     {
         $defaultConnection = $this->getDefaultConnection();
+
         return $this->connection ?? $defaultConnection;
     }
 
@@ -313,7 +333,7 @@ class MigrateFreshCommand extends Command
             return [];
         }
 
-        if (!$this->isMigrationForTargetConnection($content, $targetConnection, $defaultConnection)) {
+        if (! $this->isMigrationForTargetConnection($content, $targetConnection, $defaultConnection)) {
             return [];
         }
 
@@ -344,7 +364,7 @@ class MigrateFreshCommand extends Command
         $matchResult = preg_match_all('/->create\([\'"]([^\'"]+)[\'"]\s*,/i', $content, $matches);
 
         if ($matchResult !== false && $matchResult > 0) {
-            return $matches[1];  
+            return $matches[1];
         }
 
         return $tables;
@@ -415,7 +435,7 @@ class MigrateFreshCommand extends Command
     {
         $dbConfig = Config::get('pdo-query-builder');
 
-        if (!is_array($dbConfig)) {
+        if (! is_array($dbConfig)) {
             return null;
         }
 
@@ -429,6 +449,7 @@ class MigrateFreshCommand extends Command
     private function getConnectionName(array $dbConfig): string
     {
         $connectionName = $this->connection ?? ($dbConfig['default'] ?? 'mysql');
+
         return is_string($connectionName) ? $connectionName : 'mysql';
     }
 
@@ -440,7 +461,7 @@ class MigrateFreshCommand extends Command
     {
         $connections = $dbConfig['connections'] ?? [];
 
-        if (!is_array($connections)) {
+        if (! is_array($connections)) {
             return [];
         }
 
@@ -456,7 +477,7 @@ class MigrateFreshCommand extends Command
     {
         $connectionConfig = $connections[$connectionName] ?? [];
 
-        if (!is_array($connectionConfig)) {
+        if (! is_array($connectionConfig)) {
             return null;
         }
 
@@ -527,6 +548,7 @@ class MigrateFreshCommand extends Command
 
         if ($application === null) {
             $this->io->error('Could not find application instance.');
+
             return false;
         }
 
@@ -606,6 +628,7 @@ class MigrateFreshCommand extends Command
             }
 
             $driver = $connectionConfig['driver'] ?? 'mysql';
+
             return is_string($driver) ? strtolower($driver) : 'mysql';
         } catch (\Throwable $e) {
             return 'mysql';
@@ -618,7 +641,7 @@ class MigrateFreshCommand extends Command
             $testQuery = 'SELECT 1';
             await(DB::connection($this->connection)->raw($testQuery));
         } catch (\Throwable $e) {
-            $this->logVerboseError("Database initialization: " . $e->getMessage());
+            $this->logVerboseError('Database initialization: ' . $e->getMessage());
         }
     }
 

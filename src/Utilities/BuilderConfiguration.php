@@ -54,12 +54,12 @@ class BuilderConfiguration
         try {
             $dbConfig = Config::get('pdo-query-builder');
 
-            if (!is_array($dbConfig)) {
+            if (! is_array($dbConfig)) {
                 return;
             }
 
             $paginationConfig = $dbConfig['pagination'] ?? [];
-            if (!is_array($paginationConfig)) {
+            if (! is_array($paginationConfig)) {
                 return;
             }
 
@@ -93,22 +93,22 @@ class BuilderConfiguration
     {
         $dbConfig = Config::get('pdo-query-builder');
 
-        if (!is_array($dbConfig)) {
+        if (! is_array($dbConfig)) {
             return null;
         }
 
         $defaultConnection = $dbConfig['default'] ?? null;
-        if (!is_string($defaultConnection)) {
+        if (! is_string($defaultConnection)) {
             return null;
         }
 
         $connections = $dbConfig['connections'] ?? [];
-        if (!is_array($connections)) {
+        if (! is_array($connections)) {
             return null;
         }
 
         $connectionConfig = $connections[$defaultConnection] ?? null;
-        if (!is_array($connectionConfig)) {
+        if (! is_array($connectionConfig)) {
             return null;
         }
 

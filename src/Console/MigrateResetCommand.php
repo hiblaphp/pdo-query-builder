@@ -7,10 +7,11 @@ namespace Hibla\PdoQueryBuilder\Console;
 use Hibla\PdoQueryBuilder\Console\Traits\FindProjectRoot;
 use Hibla\PdoQueryBuilder\Console\Traits\InitializeDatabase;
 use Hibla\PdoQueryBuilder\Console\Traits\LoadsSchemaConfiguration;
-use Hibla\PdoQueryBuilder\DB;
+use Hibla\PdoQueryBuilder\Console\Traits\ValidateConnection;
 use Hibla\PdoQueryBuilder\Schema\MigrationRepository;
 use Hibla\PdoQueryBuilder\Schema\SchemaBuilder;
 use Hibla\Promise\Interfaces\PromiseInterface;
+use InvalidArgumentException;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Input\InputOption;
@@ -22,6 +23,7 @@ class MigrateResetCommand extends Command
     use LoadsSchemaConfiguration;
     use FindProjectRoot;
     use InitializeDatabase;
+    use ValidateConnection;
 
     private SymfonyStyle $io;
     private OutputInterface $output;
@@ -43,10 +45,18 @@ class MigrateResetCommand extends Command
     protected function execute(InputInterface $input, OutputInterface $output): int
     {
         $this->initializeCommandState($input, $output);
-        
+
         $connectionOption = $input->getOption('connection');
         $this->connection = $this->parseConnectionOption($connectionOption);
         $this->displayConnectionInfo();
+
+        try {
+            $this->validateConnection($this->connection);
+        } catch (InvalidArgumentException $e) {
+            $this->io->error($e->getMessage());
+
+            return Command::FAILURE;
+        }
 
         $pathOption = $input->getOption('path');
         $path = $this->parsePathOption($pathOption);
@@ -54,21 +64,24 @@ class MigrateResetCommand extends Command
 
         $force = $input->getOption('force') === true;
 
-        if (!$this->shouldProceedWithReset($force, $path)) {
+        if (! $this->shouldProceedWithReset($force, $path)) {
             $this->io->info('Operation cancelled');
+
             return Command::SUCCESS;
         }
 
-        if (!$this->initializeProjectRoot()) {
+        if (! $this->initializeProjectRoot()) {
             return Command::FAILURE;
         }
 
         try {
             $this->setupDatabaseComponents();
             $result = $this->performReset($path);
+
             return $this->handleResetResult($result);
         } catch (\Throwable $e) {
             $this->handleCriticalError($e);
+
             return Command::FAILURE;
         }
     }
@@ -120,21 +133,25 @@ class MigrateResetCommand extends Command
     {
         if ($result === false) {
             $this->io->error('Reset failed');
+
             return Command::FAILURE;
         }
 
         if ($result === 0) {
             $this->io->info('Nothing to reset');
+
             return Command::SUCCESS;
         }
 
         $this->io->success("Successfully reset {$result} migration(s)");
+
         return Command::SUCCESS;
     }
 
     private function confirmReset(?string $path): bool
     {
         $message = $this->buildConfirmationMessage($path);
+
         return $this->io->confirm($message, false);
     }
 
@@ -204,11 +221,13 @@ class MigrateResetCommand extends Command
         $normalizedPath = trim($path, '/') . '/';
         $filtered = array_filter($migrations, function ($migration) use ($normalizedPath) {
             $migrationPath = $migration['migration'] ?? '';
+
             return is_string($migrationPath) && str_starts_with($migrationPath, $normalizedPath);
         });
 
         if (count($filtered) === 0) {
             $this->io->warning("No migrations found in path: {$path}");
+
             return null;
         }
 
@@ -229,6 +248,7 @@ class MigrateResetCommand extends Command
 
         if (count($filtered) === 0) {
             $this->io->warning("No migrations found for connection: {$this->connection}");
+
             return null;
         }
 
@@ -261,13 +281,13 @@ class MigrateResetCommand extends Command
     private function migrationBelongsToConnection(array $migrationData, ?string $connection): bool
     {
         $relativePath = $migrationData['migration'] ?? null;
-        if (!is_string($relativePath)) {
+        if (! is_string($relativePath)) {
             return false;
         }
 
         $file = $this->getFullMigrationPath($relativePath, null);
 
-        if (!file_exists($file)) {
+        if (! file_exists($file)) {
             return false;
         }
 
@@ -278,6 +298,7 @@ class MigrateResetCommand extends Command
             }
 
             $migrationConnection = $this->extractMigrationConnection($migration);
+
             return $this->compareConnections($migrationConnection, $connection);
         } catch (\Throwable $e) {
             return false;
@@ -287,16 +308,18 @@ class MigrateResetCommand extends Command
     private function loadMigrationFile(string $file): ?object
     {
         $migration = require $file;
+
         return is_object($migration) ? $migration : null;
     }
 
     private function extractMigrationConnection(object $migration): ?string
     {
-        if (!method_exists($migration, 'getConnection')) {
+        if (! method_exists($migration, 'getConnection')) {
             return null;
         }
 
         $connection = $migration->getConnection();
+
         return is_string($connection) ? $connection : null;
     }
 
@@ -315,14 +338,15 @@ class MigrateResetCommand extends Command
     private function resetMigration(array $migrationData): bool
     {
         $relativePath = $migrationData['migration'] ?? null;
-        if (!is_string($relativePath)) {
+        if (! is_string($relativePath)) {
             $this->io->warning('Skipping invalid migration record');
+
             return false;
         }
 
         $file = $this->getFullMigrationPath($relativePath, $this->connection);
 
-        if (!$this->validateMigrationFile($file, $relativePath)) {
+        if (! $this->validateMigrationFile($file, $relativePath)) {
             return $this->handleMissingMigrationFile($relativePath);
         }
 
@@ -330,6 +354,7 @@ class MigrateResetCommand extends Command
             return $this->executeMigrationReset($file, $relativePath);
         } catch (\Throwable $e) {
             $this->handleMigrationError($relativePath, $e);
+
             return false;
         }
     }
@@ -338,15 +363,17 @@ class MigrateResetCommand extends Command
     {
         await($this->repository->delete($relativePath));
         $this->io->warning("Migration file not found, removed from repository: {$relativePath}");
+
         return true;
     }
 
     private function executeMigrationReset(string $file, string $relativePath): bool
     {
         $migration = $this->loadMigrationFile($file);
-        
+
         if ($migration === null) {
             $this->io->error("Migration file did not return an object: {$relativePath}");
+
             return false;
         }
 
@@ -360,13 +387,13 @@ class MigrateResetCommand extends Command
     private function resolveMigrationConnection(object $migration): ?string
     {
         $migrationConnection = $this->connection;
-        
-        if (!method_exists($migration, 'getConnection')) {
+
+        if (! method_exists($migration, 'getConnection')) {
             return $migrationConnection;
         }
 
         $declaredConnection = $migration->getConnection();
-        
+
         if (is_string($declaredConnection)) {
             return $declaredConnection;
         }
@@ -376,7 +403,7 @@ class MigrateResetCommand extends Command
 
     private function executeMigrationDown(object $migration, string $relativePath, ?string $migrationConnection): void
     {
-        if (!method_exists($migration, 'down')) {
+        if (! method_exists($migration, 'down')) {
             return;
         }
 
@@ -393,7 +420,7 @@ class MigrateResetCommand extends Command
             $this->io->write(" <comment>[{$migrationConnection}]</comment>");
         }
 
-        $this->io->write("...");
+        $this->io->write('...');
     }
 
     private function runDownMethod(object $migration): void
@@ -418,7 +445,7 @@ class MigrateResetCommand extends Command
     {
         $this->io->newLine();
         $this->io->error("Failed to rollback {$migrationName}: " . $e->getMessage());
-        
+
         if ($this->output->isVerbose()) {
             $this->io->writeln($e->getTraceAsString());
         }
@@ -427,7 +454,7 @@ class MigrateResetCommand extends Command
     private function handleCriticalError(\Throwable $e): void
     {
         $this->io->error('Reset operation failed: ' . $e->getMessage());
-        
+
         if ($this->output->isVerbose()) {
             $this->io->writeln($e->getTraceAsString());
         }

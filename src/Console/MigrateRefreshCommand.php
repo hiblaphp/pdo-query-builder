@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace Hibla\PdoQueryBuilder\Console;
 
+use Hibla\PdoQueryBuilder\Console\Traits\ValidateConnection;
+use InvalidArgumentException;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Input\ArrayInput;
 use Symfony\Component\Console\Input\InputInterface;
@@ -14,6 +16,8 @@ use Symfony\Component\Console\Style\SymfonyStyle;
 
 class MigrateRefreshCommand extends Command
 {
+    use ValidateConnection;
+
     private SymfonyStyle $io;
     private OutputInterface $output;
     private ?string $connection = null;
@@ -41,8 +45,17 @@ class MigrateRefreshCommand extends Command
         $this->extractOptions($input);
         $this->displayOptions();
 
-        if (!$this->shouldProceed($input)) {
+        try {
+            $this->validateConnection($this->connection);
+        } catch (InvalidArgumentException $e) {
+            $this->io->error($e->getMessage());
+
+            return Command::FAILURE;
+        }
+
+        if (! $this->shouldProceed($input)) {
             $this->io->info('Operation cancelled');
+
             return Command::SUCCESS;
         }
 
@@ -53,7 +66,6 @@ class MigrateRefreshCommand extends Command
     {
         $this->io = new SymfonyStyle($input, $output);
         $this->output = $output;
-        // REMOVED: $this->input = $input;
     }
 
     private function extractOptions(InputInterface $input): void
@@ -66,12 +78,14 @@ class MigrateRefreshCommand extends Command
     private function extractStringOption(InputInterface $input, string $optionName): ?string
     {
         $option = $input->getOption($optionName);
+
         return (is_string($option) && $option !== '') ? $option : null;
     }
 
     private function extractStepOption(InputInterface $input): ?int
     {
         $stepOption = $input->getOption('step');
+
         return is_numeric($stepOption) ? (int) $stepOption : null;
     }
 
@@ -98,6 +112,7 @@ class MigrateRefreshCommand extends Command
     private function confirmRefresh(): bool
     {
         $message = $this->getConfirmationMessage();
+
         return $this->io->confirm($message, false);
     }
 
@@ -114,13 +129,13 @@ class MigrateRefreshCommand extends Command
     {
         $this->io->newLine();
 
-        if (!$this->performReset()) {
+        if (! $this->performReset()) {
             return Command::FAILURE;
         }
 
         $this->io->newLine();
 
-        if (!$this->performMigration()) {
+        if (! $this->performMigration()) {
             return Command::FAILURE;
         }
 
@@ -142,6 +157,7 @@ class MigrateRefreshCommand extends Command
 
         if ($resetResult === false) {
             $this->io->error('Reset failed');
+
             return false;
         }
 
@@ -160,6 +176,7 @@ class MigrateRefreshCommand extends Command
 
         if ($migrateResult === false) {
             $this->io->error('Migration failed');
+
             return false;
         }
 
@@ -195,7 +212,7 @@ class MigrateRefreshCommand extends Command
 
     /**
      * Reset migrations
-     * 
+     *
      * @return int|false Number of migrations reset (0 if nothing to reset), false on error
      */
     private function resetMigrations(?int $step, ?string $path): int|false
@@ -203,7 +220,7 @@ class MigrateRefreshCommand extends Command
         $commandName = $this->getResetCommandName($step);
         $bufferedOutput = new BufferedOutput();
 
-        if (!$this->executeCommand($commandName, $step, $path, $bufferedOutput, true)) {
+        if (! $this->executeCommand($commandName, $step, $path, $bufferedOutput, true)) {
             return false;
         }
 
@@ -240,14 +257,14 @@ class MigrateRefreshCommand extends Command
 
     /**
      * Run migrations
-     * 
+     *
      * @return int|false Number of migrations run (0 if nothing to migrate), false on failure
      */
     private function runMigrations(?string $path): int|false
     {
         $bufferedOutput = new BufferedOutput();
 
-        if (!$this->executeCommand('migrate', null, $path, $bufferedOutput, false)) {
+        if (! $this->executeCommand('migrate', null, $path, $bufferedOutput, false)) {
             return false;
         }
 
@@ -319,6 +336,7 @@ class MigrateRefreshCommand extends Command
         BufferedOutput $bufferedOutput
     ): int {
         $input = new ArrayInput($arguments);
+
         return $command->run($input, $bufferedOutput);
     }
 
@@ -334,7 +352,7 @@ class MigrateRefreshCommand extends Command
 
     /**
      * Display filtered output based on keywords
-     * 
+     *
      * @param list<string> $keywords
      * @return int Number of lines displayed
      */
@@ -428,6 +446,7 @@ class MigrateRefreshCommand extends Command
 
         if ($application === null) {
             $this->io->error('Application instance not found');
+
             return false;
         }
 
@@ -440,6 +459,7 @@ class MigrateRefreshCommand extends Command
             return $command->run($input, $outputToUse) === Command::SUCCESS;
         } catch (\Throwable $e) {
             $this->displayCommandError($commandName, $e);
+
             return false;
         }
     }

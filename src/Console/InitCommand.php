@@ -84,7 +84,7 @@ class InitCommand extends Command
 
         foreach ($files as $filename => $sourceConfig) {
             $result = $this->copyFile($filename, $sourceConfig, $configDir);
-            
+
             if ($result === 'copied') {
                 $copiedFiles[] = $filename;
             } elseif ($result === 'skipped') {
@@ -108,17 +108,20 @@ class InitCommand extends Command
         if (file_exists($destConfig) && ! $this->force) {
             if (! $this->io->confirm("File '{$filename}' already exists. Overwrite?", false)) {
                 $this->io->warning("Skipped: {$filename}");
+
                 return 'skipped';
             }
         }
 
         if (! file_exists($sourceConfig)) {
             $this->io->error("Source config not found: {$sourceConfig}");
+
             return 'failed';
         }
 
         if (! copy($sourceConfig, $destConfig)) {
             $this->io->error("Failed to copy {$filename}");
+
             return 'failed';
         }
 

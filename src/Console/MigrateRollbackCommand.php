@@ -7,8 +7,10 @@ namespace Hibla\PdoQueryBuilder\Console;
 use Hibla\PdoQueryBuilder\Console\Traits\FindProjectRoot;
 use Hibla\PdoQueryBuilder\Console\Traits\InitializeDatabase;
 use Hibla\PdoQueryBuilder\Console\Traits\LoadsSchemaConfiguration;
+use Hibla\PdoQueryBuilder\Console\Traits\ValidateConnection;
 use Hibla\PdoQueryBuilder\Schema\MigrationRepository;
 use Hibla\Promise\Interfaces\PromiseInterface;
+use InvalidArgumentException;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Input\InputOption;
@@ -20,6 +22,7 @@ class MigrateRollbackCommand extends Command
     use LoadsSchemaConfiguration;
     use FindProjectRoot;
     use InitializeDatabase;
+    use ValidateConnection;
 
     private SymfonyStyle $io;
     private OutputInterface $output;
@@ -46,21 +49,28 @@ class MigrateRollbackCommand extends Command
 
         $this->setConnectionFromInput($input);
 
-        if (!$this->initializeProjectRoot()) {
+        try {
+            $this->validateConnection($this->connection);
+        } catch (InvalidArgumentException $e) {
+            $this->io->error($e->getMessage());
+
+            return Command::FAILURE;
+        }
+
+        if (! $this->initializeProjectRoot()) {
             return Command::FAILURE;
         }
 
         try {
             $this->initializeDatabase();
             $this->repository = new MigrationRepository($this->getMigrationsTable($this->connection), $this->connection);
-            // REMOVED: $this->schema = new SchemaBuilder(null, $this->connection);
 
             $step = $this->getStepFromInput($input);
             $path = $this->getPathFromInput($input);
 
             $rolledBack = $this->performRollback($step, $path);
 
-            if (!$rolledBack) {
+            if (! $rolledBack) {
                 return Command::FAILURE;
             }
 
@@ -85,12 +95,14 @@ class MigrateRollbackCommand extends Command
     private function getStepFromInput(InputInterface $input): int
     {
         $stepOption = $input->getOption('step');
+
         return is_numeric($stepOption) ? (int) $stepOption : 1;
     }
 
     private function getPathFromInput(InputInterface $input): ?string
     {
         $pathOption = $input->getOption('path');
+
         return is_string($pathOption) && $pathOption !== '' ? $pathOption : null;
     }
 
@@ -113,11 +125,12 @@ class MigrateRollbackCommand extends Command
 
         if (count($ranMigrations) === 0) {
             $this->io->info('Nothing to rollback.');
+
             return true;
         }
 
         $ranMigrations = $this->filterMigrationsByPath($ranMigrations, $path);
-        
+
         if ($ranMigrations === null) {
             return true;
         }
@@ -140,15 +153,18 @@ class MigrateRollbackCommand extends Command
         $normalizedPath = trim($path, '/') . '/';
         $filtered = array_filter($ranMigrations, function ($migration) use ($normalizedPath) {
             $migrationPath = $migration['migration'] ?? '';
+
             return is_string($migrationPath) && str_starts_with($migrationPath, $normalizedPath);
         });
 
         if (count($filtered) === 0) {
             $this->io->info("No migrations to rollback in path: {$path}");
+
             return null;
         }
 
         $this->io->note("Rolling back migrations from path: {$path}");
+
         return array_values($filtered);
     }
 
@@ -173,7 +189,7 @@ class MigrateRollbackCommand extends Command
         $this->io->section('Rolling back migrations');
 
         foreach ($ranMigrations as $migrationData) {
-            if (!$this->rollbackMigration($migrationData)) {
+            if (! $this->rollbackMigration($migrationData)) {
                 return false;
             }
         }
@@ -189,14 +205,14 @@ class MigrateRollbackCommand extends Command
     private function rollbackMigration(array $migrationData): bool
     {
         $relativePath = $this->extractRelativePath($migrationData);
-        
+
         if ($relativePath === null) {
             return false;
         }
 
         $file = $this->getFullMigrationPath($relativePath, $this->connection);
 
-        if (!$this->validateMigrationFile($file, $relativePath)) {
+        if (! $this->validateMigrationFile($file, $relativePath)) {
             await($this->repository->delete($relativePath));
             $this->io->warning("Migration file not found but removed from repository: {$relativePath}");
 
@@ -212,9 +228,10 @@ class MigrateRollbackCommand extends Command
     private function extractRelativePath(array $migrationData): ?string
     {
         $relativePath = $migrationData['migration'] ?? null;
-        
-        if (!is_string($relativePath)) {
+
+        if (! is_string($relativePath)) {
             $this->io->warning('Skipping invalid migration record.');
+
             return null;
         }
 
@@ -225,12 +242,12 @@ class MigrateRollbackCommand extends Command
     {
         try {
             $migration = $this->loadMigrationFile($file, $relativePath);
-            
+
             if ($migration === null) {
                 return false;
             }
 
-            if (!$this->validateMigrationClass($migration, $relativePath)) {
+            if (! $this->validateMigrationClass($migration, $relativePath)) {
                 return false;
             }
 
@@ -255,9 +272,10 @@ class MigrateRollbackCommand extends Command
     private function loadMigrationFile(string $file, string $relativePath): ?object
     {
         $migration = require $file;
-        
-        if (!is_object($migration)) {
+
+        if (! is_object($migration)) {
             $this->io->error("Migration file {$relativePath} did not return an object.");
+
             return null;
         }
 
@@ -267,7 +285,7 @@ class MigrateRollbackCommand extends Command
     private function determineMigrationConnection(object $migration): ?string
     {
         $migrationConnection = $this->connection;
-        
+
         if (method_exists($migration, 'getConnection')) {
             $declaredConnection = $migration->getConnection();
             if (is_string($declaredConnection)) {
@@ -281,12 +299,12 @@ class MigrateRollbackCommand extends Command
     private function displayRollbackProgress(string $relativePath, ?string $migrationConnection): void
     {
         $this->io->write("Rolling back: {$relativePath}");
-        
+
         if ($migrationConnection !== null && $migrationConnection !== $this->connection) {
             $this->io->write(" <comment>[{$migrationConnection}]</comment>");
         }
-        
-        $this->io->write("...");
+
+        $this->io->write('...');
     }
 
     private function executeDownMethod(object $migration): void
@@ -301,7 +319,7 @@ class MigrateRollbackCommand extends Command
     {
         $this->io->newLine();
         $this->io->error("Failed to rollback migration {$relativePath}: " . $e->getMessage());
-        
+
         if ($this->output->isVerbose()) {
             $this->io->writeln($e->getTraceAsString());
         }
@@ -314,7 +332,7 @@ class MigrateRollbackCommand extends Command
 
     private function validateMigrationClass(object $migration, string $migrationName): bool
     {
-        if (!method_exists($migration, 'down')) {
+        if (! method_exists($migration, 'down')) {
             $this->io->error("Migration {$migrationName} does not have a down() method");
 
             return false;

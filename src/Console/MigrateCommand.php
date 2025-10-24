@@ -7,11 +7,11 @@ namespace Hibla\PdoQueryBuilder\Console;
 use Hibla\PdoQueryBuilder\Console\Traits\FindProjectRoot;
 use Hibla\PdoQueryBuilder\Console\Traits\InitializeDatabase;
 use Hibla\PdoQueryBuilder\Console\Traits\LoadsSchemaConfiguration;
-use Hibla\PdoQueryBuilder\DB;
+use Hibla\PdoQueryBuilder\Console\Traits\ValidateConnection;
 use Hibla\PdoQueryBuilder\Schema\DatabaseManager;
 use Hibla\PdoQueryBuilder\Schema\MigrationRepository;
-use Hibla\PdoQueryBuilder\Schema\SchemaBuilder;
 use Hibla\Promise\Interfaces\PromiseInterface;
+use InvalidArgumentException;
 use Rcalicdan\ConfigLoader\Config;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Input\InputInterface;
@@ -24,6 +24,7 @@ class MigrateCommand extends Command
     use LoadsSchemaConfiguration;
     use FindProjectRoot;
     use InitializeDatabase;
+    use ValidateConnection;
 
     private SymfonyStyle $io;
     private OutputInterface $output;
@@ -51,7 +52,15 @@ class MigrateCommand extends Command
 
         $this->setConnectionFromInput($input);
 
-        if (!$this->initializeProjectRoot()) {
+        try {
+            $this->validateConnection($this->connection);
+        } catch (InvalidArgumentException $e) {
+            $this->io->error($e->getMessage());
+
+            return Command::FAILURE;
+        }
+
+        if (! $this->initializeProjectRoot()) {
             return Command::FAILURE;
         }
 
@@ -59,6 +68,7 @@ class MigrateCommand extends Command
             return $this->runMigrations($input);
         } catch (\Throwable $e) {
             $this->handleCriticalError($e);
+
             return Command::FAILURE;
         }
     }
@@ -91,6 +101,7 @@ class MigrateCommand extends Command
 
         if ($dbCheckResult === null) {
             $this->io->warning('Migration cancelled by user');
+
             return Command::SUCCESS;
         }
 
@@ -121,12 +132,14 @@ class MigrateCommand extends Command
     private function getStepOption(InputInterface $input): int
     {
         $stepOption = $input->getOption('step');
+
         return is_numeric($stepOption) ? (int) $stepOption : 0;
     }
 
     private function getPathOption(InputInterface $input): ?string
     {
         $pathOption = $input->getOption('path');
+
         return is_string($pathOption) && $pathOption !== '' ? $pathOption : null;
     }
 
@@ -137,7 +150,7 @@ class MigrateCommand extends Command
     {
         $key = $connection ?? 'default';
 
-        if (!isset($this->repositories[$key])) {
+        if (! isset($this->repositories[$key])) {
             $this->repositories[$key] = new MigrationRepository(
                 $this->getMigrationsTable($connection),
                 $connection
@@ -155,7 +168,7 @@ class MigrateCommand extends Command
         try {
             $dbManager = new DatabaseManager($this->connection);
 
-            if (!$dbManager->databaseExists()) {
+            if (! $dbManager->databaseExists()) {
                 return $this->handleMissingDatabase($force);
             }
 
@@ -170,7 +183,7 @@ class MigrateCommand extends Command
         $dbName = $this->getDatabaseName();
         $this->io->warning("Database '{$dbName}' does not exist!");
 
-        if (!$force && !$this->confirmDatabaseCreation($dbName)) {
+        if (! $force && ! $this->confirmDatabaseCreation($dbName)) {
             return null;
         }
 
@@ -193,9 +206,11 @@ class MigrateCommand extends Command
             $dbManager->createDatabaseIfNotExists();
             $this->io->writeln('<info>✓ Database created successfully!</info>');
             $this->io->newLine();
+
             return true;
         } catch (\Throwable $createError) {
             $this->displayDatabaseCreationError($createError);
+
             return false;
         }
     }
@@ -207,6 +222,7 @@ class MigrateCommand extends Command
         }
 
         $this->displayDatabaseConnectionError($e);
+
         return false;
     }
 
@@ -231,7 +247,7 @@ class MigrateCommand extends Command
         try {
             $dbConfig = Config::get('pdo-query-builder');
 
-            if (!is_array($dbConfig)) {
+            if (! is_array($dbConfig)) {
                 return 'unknown';
             }
 
@@ -242,11 +258,12 @@ class MigrateCommand extends Command
             $connections = $this->getConnections($typedConfig);
             $config = $connections[$connectionName] ?? [];
 
-            if (!is_array($config)) {
+            if (! is_array($config)) {
                 return 'unknown';
             }
 
             $database = $config['database'] ?? 'unknown';
+
             return is_string($database) ? $database : 'unknown';
         } catch (\Throwable $e) {
             return 'unknown';
@@ -259,6 +276,7 @@ class MigrateCommand extends Command
     private function getConnectionName(array $dbConfig): string
     {
         $connectionName = $this->connection ?? ($dbConfig['default'] ?? 'mysql');
+
         return is_string($connectionName) ? $connectionName : 'mysql';
     }
 
@@ -269,11 +287,11 @@ class MigrateCommand extends Command
     private function getConnections(array $dbConfig): array
     {
         $connections = $dbConfig['connections'] ?? [];
-        
-        if (!is_array($connections)) {
+
+        if (! is_array($connections)) {
             return [];
         }
-        
+
         /** @var array<string, mixed> */
         return $connections;
     }
@@ -294,6 +312,7 @@ class MigrateCommand extends Command
 
         if (count($pendingMigrations) === 0) {
             $this->io->success('Nothing to migrate');
+
             return null;
         }
 
@@ -313,6 +332,7 @@ class MigrateCommand extends Command
         if ($step > 0) {
             return array_slice($migrations, 0, $step);
         }
+
         return $migrations;
     }
 
@@ -333,7 +353,7 @@ class MigrateCommand extends Command
         $migrationsByConnection = $this->groupMigrationsByConnection($migrations);
 
         foreach ($migrationsByConnection as $conn => $files) {
-            if (!$this->executeMigrationsForConnection($conn, $files)) {
+            if (! $this->executeMigrationsForConnection($conn, $files)) {
                 return false;
             }
         }
@@ -354,7 +374,7 @@ class MigrateCommand extends Command
         $batchNumber = $this->getNextBatchNumber($repository);
 
         foreach ($files as $file) {
-            if (!$this->runMigration($file, $batchNumber, $connection)) {
+            if (! $this->runMigration($file, $batchNumber, $connection)) {
                 return false;
             }
         }
@@ -365,6 +385,7 @@ class MigrateCommand extends Command
     private function getNextBatchNumber(MigrationRepository $repository): int
     {
         $batchNumber = await($repository->getNextBatchNumber());
+
         return (is_int($batchNumber) ? $batchNumber : 0) + 1;
     }
 
@@ -389,6 +410,7 @@ class MigrateCommand extends Command
     {
         if ($path !== null) {
             $pattern = rtrim($path, '/') . '/*.php';
+
             return $this->getFilteredMigrationFiles($pattern, null);
         }
 
@@ -416,11 +438,11 @@ class MigrateCommand extends Command
     {
         $migrationConnection = $this->getMigrationConnectionFromFile($file);
 
-        if (!$this->isConnectionMatching($migrationConnection)) {
+        if (! $this->isConnectionMatching($migrationConnection)) {
             return false;
         }
 
-        return !$this->isMigrationAlreadyRan($file, $migrationConnection);
+        return ! $this->isMigrationAlreadyRan($file, $migrationConnection);
     }
 
     private function isConnectionMatching(?string $migrationConnection): bool
@@ -436,9 +458,9 @@ class MigrateCommand extends Command
     {
         $relativePath = $this->getRelativeMigrationPath($file, $migrationConnection);
         $repository = $this->getRepository($migrationConnection);
-        
+
         await($repository->createRepository());
-        
+
         $ranMigrations = await($repository->getRan());
         $ranMigrationPaths = array_column($ranMigrations, 'migration');
 
@@ -448,13 +470,13 @@ class MigrateCommand extends Command
     private function getMigrationConnectionFromFile(string $file): ?string
     {
         try {
-            if (!file_exists($file)) {
+            if (! file_exists($file)) {
                 return null;
             }
 
             $migration = require $file;
 
-            if (!is_object($migration)) {
+            if (! is_object($migration)) {
                 return null;
             }
 
@@ -466,11 +488,12 @@ class MigrateCommand extends Command
 
     private function extractConnectionFromMigration(object $migration): ?string
     {
-        if (!method_exists($migration, 'getConnection')) {
+        if (! method_exists($migration, 'getConnection')) {
             return $this->extractConnectionFromProperty($migration);
         }
 
         $connection = $migration->getConnection();
+
         return is_string($connection) ? $connection : null;
     }
 
@@ -478,15 +501,16 @@ class MigrateCommand extends Command
     {
         try {
             $reflection = new \ReflectionObject($migration);
-            
-            if (!$reflection->hasProperty('connection')) {
+
+            if (! $reflection->hasProperty('connection')) {
                 return null;
             }
 
             $property = $reflection->getProperty('connection');
             $property->setAccessible(true);
-            
+
             $value = $property->getValue($migration);
+
             return is_string($value) ? $value : null;
         } catch (\Throwable $e) {
             return null;
@@ -505,7 +529,7 @@ class MigrateCommand extends Command
             $connection = $this->getMigrationConnectionFromFile($file);
             $key = $connection ?? 'default';
 
-            if (!isset($grouped[$key])) {
+            if (! isset($grouped[$key])) {
                 $grouped[$key] = [];
             }
 
@@ -521,13 +545,14 @@ class MigrateCommand extends Command
         $displayName = $relativePath;
 
         try {
-            if (!file_exists($file)) {
+            if (! file_exists($file)) {
                 $this->io->error("Migration file not found: {$displayName}");
+
                 return false;
             }
 
             $migration = $this->loadMigrationFile($file, $displayName);
-            
+
             if ($migration === null) {
                 return false;
             }
@@ -543,6 +568,7 @@ class MigrateCommand extends Command
             return true;
         } catch (\Throwable $e) {
             $this->displayMigrationError($displayName, $e);
+
             return false;
         }
     }
@@ -551,7 +577,7 @@ class MigrateCommand extends Command
     {
         $migration = require $file;
 
-        if (!is_object($migration) || !$this->validateMigrationClass($migration, $displayName)) {
+        if (! is_object($migration) || ! $this->validateMigrationClass($migration, $displayName)) {
             return null;
         }
 
@@ -561,12 +587,12 @@ class MigrateCommand extends Command
     private function displayMigrationProgress(string $displayName, ?string $migrationConnection): void
     {
         $this->io->write("Migrating: {$displayName}");
-        
+
         if ($migrationConnection !== null && $migrationConnection !== $this->connection) {
             $this->io->write(" <comment>[{$migrationConnection}]</comment>");
         }
-        
-        $this->io->write("...");
+
+        $this->io->write('...');
     }
 
     private function executeMigration(object $migration): void
@@ -587,7 +613,7 @@ class MigrateCommand extends Command
     {
         $this->io->newLine();
         $this->io->error("Failed to run migration {$displayName}: " . $e->getMessage());
-        
+
         if ($this->output->isVerbose()) {
             $this->io->writeln($e->getTraceAsString());
         }
@@ -595,8 +621,9 @@ class MigrateCommand extends Command
 
     private function validateMigrationClass(object $migration, string $migrationName): bool
     {
-        if (!method_exists($migration, 'up')) {
+        if (! method_exists($migration, 'up')) {
             $this->io->error("Migration {$migrationName} does not have an up() method");
+
             return false;
         }
 
@@ -606,7 +633,7 @@ class MigrateCommand extends Command
     private function handleCriticalError(\Throwable $e): void
     {
         $this->io->error('Migration failed: ' . $e->getMessage());
-        
+
         if ($this->output->isVerbose()) {
             $this->io->writeln($e->getTraceAsString());
         }

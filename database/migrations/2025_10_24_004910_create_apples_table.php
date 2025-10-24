@@ -4,8 +4,7 @@ use Hibla\PdoQueryBuilder\Schema\Blueprint;
 use Hibla\PdoQueryBuilder\Schema\Migration;
 use Hibla\Promise\Interfaces\PromiseInterface;
 
-return new class extends Migration
-{
+return new class () extends Migration {
     /**
      * Run the migration.
      *
@@ -18,7 +17,7 @@ return new class extends Migration
             $table->timestamps();
         });
     }
-    
+
     /**
      * Reverse the migration.
      *

@@ -222,6 +222,7 @@ class DatabaseManager
 
         return (bool) $stmt->fetchColumn();
     }
+
     private function checkPostgreSQLDatabase(string $database): bool
     {
         $dsn = sprintf(

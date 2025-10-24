@@ -14,7 +14,7 @@ class CursorPaginationHelper
      */
     public static function decodeCursor(?string $cursor): string|false
     {
-        if (!is_string($cursor) || $cursor === '') {
+        if (! is_string($cursor) || $cursor === '') {
             return false;
         }
 
@@ -30,7 +30,7 @@ class CursorPaginationHelper
             return null;
         }
 
-        if (!is_scalar($value) && !(is_object($value) && method_exists($value, '__toString'))) {
+        if (! is_scalar($value) && ! (is_object($value) && method_exists($value, '__toString'))) {
             return null;
         }
 
@@ -63,7 +63,7 @@ class CursorPaginationHelper
         string $cursorColumn,
         bool $hasMore
     ): ?string {
-        if (!$hasMore || count($results) === 0) {
+        if (! $hasMore || count($results) === 0) {
             return null;
         }
 

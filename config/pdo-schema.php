@@ -86,5 +86,5 @@ return [
     | Connection-specific overrides (optional)
     |
     */
-    'connections' => []
+    'connections' => [],
 ];
