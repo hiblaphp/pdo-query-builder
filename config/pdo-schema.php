@@ -63,12 +63,18 @@ return [
     | Connection-Specific Migration Paths
     |--------------------------------------------------------------------------
     |
-    | Define specific subdirectories for different database connections.
-    | When a migration is created with --connection flag, it will be placed
-    | in the corresponding subdirectory if defined here.
+    | Organize migration files into subdirectories based on database connections.
+    | When creating a migration with --connection flag, it will automatically
+    | be placed in the mapped subdirectory.
     |
-    | Example: 'mysql' => 'mysql', 'pgsql' => 'postgres'
+    | This is purely for FILE ORGANIZATION - it doesn't affect database behavior.
     |
+    | Example:
+    |   'mysql' => 'mysql'     → migrations/mysql/2024_01_01_create_users.php
+    |
+    |   'pgsql' => 'postgres'  → migrations/postgres/2024_01_01_create_orders.php
+    |
+    | Leave empty to store all migrations in the root migrations directory.
     */
     'connection_paths' => [
         // 'mysql' => 'mysql',
@@ -78,13 +84,28 @@ return [
 
     /*
     |--------------------------------------------------------------------------
-    | Database Connections
+    | Connection-Specific Configuration Overrides
     |--------------------------------------------------------------------------
     |
-    | The database connections to use for migrations.
+    | Override migration settings (migrations_table, naming_convention, timezone)
+    | for specific database connections. These settings affect how migrations
+    | are STORED IN THE DATABASE and NAMED, not where files are located.
     |
-    | Connection-specific overrides (optional)
+    | Example:
+    |   'pgsql' => [
+    |       'migrations_table' => 'schema_versions',  // Use different table name
+    |       'naming_convention' => 'sequential',      // Use 0001_, 0002_ instead of timestamps
+    |       'timezone' => 'America/New_York',         // Timezone for timestamps
+    |   ]
+    |
+    | If not specified, the connection uses the global settings defined above.
     |
     */
-    'connections' => [],
+    'connections' => [
+        // 'mysql' => [
+        //     'migrations_table' => 'migrations',
+        //     'naming_convention' => 'timestamp',
+        //     'timezone' => 'UTC',
+        // ],
+    ],
 ];
