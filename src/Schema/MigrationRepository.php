@@ -11,15 +11,18 @@ class MigrationRepository
 {
     private string $table;
     private string $driver;
+    private ?string $connection = null;
 
     /**
      * Create a new migration repository instance.
      *
      * @param string $table The name of the migrations table.
+     * @param string|null $connection The database connection to use.
      */
-    public function __construct(string $table = 'migrations')
+    public function __construct(string $table = 'migrations', ?string $connection = null)
     {
         $this->table = $table;
+        $this->connection = $connection;
         $this->driver = $this->detectDriver();
     }
 
@@ -32,8 +35,8 @@ class MigrationRepository
                 return 'mysql';
             }
 
-            $defaultConnection = $dbConfig['default'] ?? 'mysql';
-            if (! is_string($defaultConnection)) {
+            $connectionName = $this->connection ?? ($dbConfig['default'] ?? 'mysql');
+            if (! is_string($connectionName)) {
                 return 'mysql';
             }
 
@@ -42,7 +45,7 @@ class MigrationRepository
                 return 'mysql';
             }
 
-            $connectionConfig = $connections[$defaultConnection] ?? [];
+            $connectionConfig = $connections[$connectionName] ?? [];
             if (! is_array($connectionConfig)) {
                 return 'mysql';
             }
@@ -53,6 +56,14 @@ class MigrationRepository
         } catch (\Throwable $e) {
             return 'mysql';
         }
+    }
+
+    /**
+     * Get the database connection to use.
+     */
+    private function getConnection(): \Hibla\PdoQueryBuilder\ConnectionProxy
+    {
+        return \Hibla\PdoQueryBuilder\DB::connection($this->connection);
     }
 
     private function quoteIdentifier(string $identifier): string
@@ -102,7 +113,7 @@ class MigrationRepository
             )",
         };
 
-        return \Hibla\PdoQueryBuilder\DB::rawExecute($sql, []);
+        return $this->getConnection()->rawExecute($sql, []);
     }
 
     /**
@@ -114,8 +125,8 @@ class MigrationRepository
     {
         $table = $this->quoteIdentifier($this->table);
 
-        return \Hibla\PdoQueryBuilder\DB::raw(
-            "SELECT migration FROM {$table} ORDER BY batch, migration",
+        return $this->getConnection()->raw(
+            "SELECT id, migration, batch, executed_at FROM {$table} ORDER BY batch DESC, id DESC",
             []
         );
     }
@@ -135,7 +146,7 @@ class MigrationRepository
             default => "SELECT migration FROM {$table} ORDER BY batch DESC, migration DESC LIMIT ?",
         };
 
-        return \Hibla\PdoQueryBuilder\DB::raw($sql, [$steps]);
+        return $this->getConnection()->raw($sql, [$steps]);
     }
 
     /**
@@ -147,8 +158,8 @@ class MigrationRepository
     {
         $table = $this->quoteIdentifier($this->table);
 
-        return \Hibla\PdoQueryBuilder\DB::raw(
-            "SELECT migration FROM {$table} WHERE batch = (SELECT MAX(batch) FROM {$table})",
+        return $this->getConnection()->raw(
+            "SELECT id, migration, batch, executed_at FROM {$table} WHERE batch = (SELECT MAX(batch) FROM {$table}) ORDER BY id DESC",
             []
         );
     }
@@ -164,7 +175,7 @@ class MigrationRepository
     {
         $table = $this->quoteIdentifier($this->table);
 
-        return \Hibla\PdoQueryBuilder\DB::rawExecute(
+        return $this->getConnection()->rawExecute(
             "INSERT INTO {$table} (migration, batch) VALUES (?, ?)",
             [$file, $batch]
         );
@@ -180,7 +191,7 @@ class MigrationRepository
     {
         $table = $this->quoteIdentifier($this->table);
 
-        return \Hibla\PdoQueryBuilder\DB::rawExecute(
+        return $this->getConnection()->rawExecute(
             "DELETE FROM {$table} WHERE migration = ?",
             [$migration]
         );
@@ -195,7 +206,7 @@ class MigrationRepository
     {
         $table = $this->quoteIdentifier($this->table);
 
-        return \Hibla\PdoQueryBuilder\DB::rawValue(
+        return $this->getConnection()->rawValue(
             "SELECT MAX(batch) FROM {$table}",
             []
         );
@@ -219,6 +230,6 @@ class MigrationRepository
                        WHERE table_schema = DATABASE() AND table_name = ?',
         };
 
-        return \Hibla\PdoQueryBuilder\DB::rawValue($sql, [$this->table]);
+        return $this->getConnection()->rawValue($sql, [$this->table]);
     }
 }

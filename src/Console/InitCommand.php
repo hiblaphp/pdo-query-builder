@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Hibla\PdoQueryBuilder\Console;
 
+use Hibla\PdoQueryBuilder\Console\Traits\FindProjectRoot;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Input\InputOption;
@@ -12,6 +13,8 @@ use Symfony\Component\Console\Style\SymfonyStyle;
 
 class InitCommand extends Command
 {
+    use FindProjectRoot;
+
     private SymfonyStyle $io;
     private ?string $projectRoot = null;
     private bool $force;
@@ -58,7 +61,7 @@ class InitCommand extends Command
 
     private function ensureConfigDirectoryExists(): ?string
     {
-        $configDir = $this->projectRoot.'/config';
+        $configDir = $this->projectRoot . '/config';
         if (! is_dir($configDir) && ! mkdir($configDir, 0755, true)) {
             $this->io->error('Failed to create config directory');
 
@@ -75,49 +78,59 @@ class InitCommand extends Command
             'pdo-schema.php' => $this->getSourceConfigPath('pdo-schema.php'),
         ];
 
+        $copiedFiles = [];
+        $skippedFiles = [];
         $failedFiles = [];
 
         foreach ($files as $filename => $sourceConfig) {
-            if ($this->copyFile($filename, $sourceConfig, $configDir)) {
-                $this->io->success("✓ Configuration created: config/{$filename}");
+            $result = $this->copyFile($filename, $sourceConfig, $configDir);
+
+            if ($result === 'copied') {
+                $copiedFiles[] = $filename;
+            } elseif ($result === 'skipped') {
+                $skippedFiles[] = $filename;
             } else {
                 $failedFiles[] = $filename;
             }
         }
 
+        foreach ($copiedFiles as $filename) {
+            $this->io->success("✓ Configuration created: config/{$filename}");
+        }
+
         return count($failedFiles) === 0 ? Command::SUCCESS : Command::FAILURE;
     }
 
-    private function copyFile(string $filename, string $sourceConfig, string $configDir): bool
+    private function copyFile(string $filename, string $sourceConfig, string $configDir): string
     {
-        $destConfig = $configDir.'/'.$filename;
+        if (! file_exists($sourceConfig)) {
+            $this->io->error("Source config not found: {$sourceConfig}");
+
+            return 'failed';
+        }
+
+        $destConfig = $configDir . '/' . $filename;
 
         if (file_exists($destConfig) && ! $this->force) {
             if (! $this->io->confirm("File '{$filename}' already exists. Overwrite?", false)) {
                 $this->io->warning("Skipped: {$filename}");
 
-                return true;
+                return 'skipped';
             }
-        }
-
-        if (! file_exists($sourceConfig)) {
-            $this->io->error("Source config not found: {$sourceConfig}");
-
-            return false;
         }
 
         if (! copy($sourceConfig, $destConfig)) {
             $this->io->error("Failed to copy {$filename}");
 
-            return false;
+            return 'failed';
         }
 
-        return true;
+        return 'copied';
     }
 
     private function createAsyncPdoExecutable(): void
     {
-        $asyncPdoPath = $this->projectRoot.'/async-pdo';
+        $asyncPdoPath = $this->projectRoot . '/async-pdo';
 
         if (file_exists($asyncPdoPath) && ! $this->force) {
             $this->io->warning('async-pdo file already exists. Use --force to overwrite.');
@@ -171,7 +184,6 @@ use Hibla\PdoQueryBuilder\Console\StatusCommand;
 
 $application = new Application('Async PDO Query Builder', '1.0.0');
 
-// Register all commands
 $application->add(new InitCommand());
 $application->add(new PublishTemplatesCommand());
 $application->add(new MakeMigrationCommand());
@@ -190,7 +202,7 @@ PHP;
 
     private function promptEnvFileCreation(): void
     {
-        if ($this->projectRoot !== null && ! file_exists($this->projectRoot.'/.env')) {
+        if ($this->projectRoot !== null && ! file_exists($this->projectRoot . '/.env')) {
             $this->io->section('Create .env file with:');
             $this->io->listing([
                 'DB_CONNECTION=mysql',
@@ -203,30 +215,11 @@ PHP;
         }
     }
 
-    private function findProjectRoot(): ?string
-    {
-        $currentDir = getcwd();
-        $dir = ($currentDir !== false) ? $currentDir : __DIR__;
-
-        for ($i = 0; $i < 10; $i++) {
-            if (file_exists($dir.'/composer.json')) {
-                return $dir;
-            }
-            $parent = dirname($dir);
-            if ($parent === $dir) {
-                break;
-            }
-            $dir = $parent;
-        }
-
-        return null;
-    }
-
     private function getSourceConfigPath(string $filename): string
     {
         $paths = [
-            __DIR__."/../../config/{$filename}",
-            __DIR__."/../../../config/{$filename}",
+            __DIR__ . "/../../config/{$filename}",
+            __DIR__ . "/../../../config/{$filename}",
         ];
 
         foreach ($paths as $path) {
@@ -235,6 +228,6 @@ PHP;
             }
         }
 
-        return __DIR__."/../../config/{$filename}";
+        return __DIR__ . "/../../config/{$filename}";
     }
 }

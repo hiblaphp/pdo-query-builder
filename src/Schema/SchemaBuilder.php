@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace Hibla\PdoQueryBuilder\Schema;
 
 use function Hibla\async;
-
 use function Hibla\await;
 
 use Hibla\Promise\Interfaces\PromiseInterface;
@@ -15,9 +14,11 @@ class SchemaBuilder
 {
     private string $driver;
     private ?SQLiteSchemaBuilder $sqliteBuilder = null;
+    private ?string $connection = null;
 
-    public function __construct(?string $driver = null)
+    public function __construct(?string $driver = null, ?string $connection = null)
     {
+        $this->connection = $connection;
         $this->driver = $driver ?? $this->detectDriver();
     }
 
@@ -29,8 +30,8 @@ class SchemaBuilder
             return 'mysql';
         }
 
-        $defaultConnection = $dbConfig['default'] ?? 'mysql';
-        if (! is_string($defaultConnection)) {
+        $connectionName = $this->connection ?? ($dbConfig['default'] ?? 'mysql');
+        if (! is_string($connectionName)) {
             return 'mysql';
         }
 
@@ -39,7 +40,7 @@ class SchemaBuilder
             return 'mysql';
         }
 
-        $connectionConfig = $connections[$defaultConnection] ?? [];
+        $connectionConfig = $connections[$connectionName] ?? [];
         if (! is_array($connectionConfig)) {
             return 'mysql';
         }
@@ -55,6 +56,14 @@ class SchemaBuilder
         }
 
         return $this->sqliteBuilder;
+    }
+
+    /**
+     * Get the database connection to use.
+     */
+    private function getConnection(): \Hibla\PdoQueryBuilder\ConnectionProxy
+    {
+        return \Hibla\PdoQueryBuilder\DB::connection($this->connection);
     }
 
     /**
@@ -77,7 +86,7 @@ class SchemaBuilder
         }
 
         /** @phpstan-ignore-next-line */
-        return \Hibla\PdoQueryBuilder\DB::rawExecute($sql, []);
+        return $this->getConnection()->rawExecute($sql, []);
     }
 
     /**
@@ -90,7 +99,7 @@ class SchemaBuilder
         $compiler = $this->getCompiler();
         $sql = $compiler->compileDropIfExists($table);
 
-        return \Hibla\PdoQueryBuilder\DB::rawExecute($sql, []);
+        return $this->getConnection()->rawExecute($sql, []);
     }
 
     /**
@@ -103,7 +112,7 @@ class SchemaBuilder
         $compiler = $this->getCompiler();
         $sql = $compiler->compileDrop($table);
 
-        return \Hibla\PdoQueryBuilder\DB::rawExecute($sql, []);
+        return $this->getConnection()->rawExecute($sql, []);
     }
 
     /**
@@ -116,7 +125,7 @@ class SchemaBuilder
         $compiler = $this->getCompiler();
         $sql = $compiler->compileTableExists($table);
 
-        return \Hibla\PdoQueryBuilder\DB::rawValue($sql, []);
+        return $this->getConnection()->rawValue($sql, []);
     }
 
     /**
@@ -147,7 +156,7 @@ class SchemaBuilder
         }
 
         /** @phpstan-ignore-next-line */
-        return \Hibla\PdoQueryBuilder\DB::rawExecute($sql, []);
+        return $this->getConnection()->rawExecute($sql, []);
     }
 
     /**
@@ -160,7 +169,7 @@ class SchemaBuilder
         $compiler = $this->getCompiler();
         $sql = $compiler->compileRename($from, $to);
 
-        return \Hibla\PdoQueryBuilder\DB::rawExecute($sql, []);
+        return $this->getConnection()->rawExecute($sql, []);
     }
 
     /**
@@ -193,7 +202,7 @@ class SchemaBuilder
         }
 
         /** @phpstan-ignore-next-line */
-        return \Hibla\PdoQueryBuilder\DB::rawExecute($sql, []);
+        return $this->getConnection()->rawExecute($sql, []);
     }
 
     /**
@@ -216,7 +225,7 @@ class SchemaBuilder
         }
 
         /** @phpstan-ignore-next-line */
-        return \Hibla\PdoQueryBuilder\DB::rawExecute($sql, []);
+        return $this->getConnection()->rawExecute($sql, []);
     }
 
     /**
@@ -249,7 +258,7 @@ class SchemaBuilder
         }
 
         /** @phpstan-ignore-next-line */
-        return \Hibla\PdoQueryBuilder\DB::rawExecute($sql, []);
+        return $this->getConnection()->rawExecute($sql, []);
     }
 
     /**
@@ -282,7 +291,7 @@ class SchemaBuilder
         }
 
         /** @phpstan-ignore-next-line */
-        return \Hibla\PdoQueryBuilder\DB::rawExecute($sql, []);
+        return $this->getConnection()->rawExecute($sql, []);
     }
 
     /**
@@ -320,7 +329,7 @@ class SchemaBuilder
         return async(function () use ($statements) {
             $results = [];
             foreach ($statements as $sql) {
-                $result = await(\Hibla\PdoQueryBuilder\DB::rawExecute($sql, []));
+                $result = await($this->getConnection()->rawExecute($sql, []));
                 $results[] = $result;
             }
 
@@ -340,7 +349,7 @@ class SchemaBuilder
         return async(function () use ($statements) {
             $results = [];
             foreach ($statements as $sql) {
-                $result = await(\Hibla\PdoQueryBuilder\DB::rawExecute($sql, []));
+                $result = await($this->getConnection()->rawExecute($sql, []));
                 $results[] = $result;
             }
 

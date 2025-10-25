@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Hibla\PdoQueryBuilder\Console;
 
+use Hibla\PdoQueryBuilder\Console\Traits\FindProjectRoot;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Output\OutputInterface;
@@ -11,6 +12,8 @@ use Symfony\Component\Console\Style\SymfonyStyle;
 
 class StatusCommand extends Command
 {
+    use FindProjectRoot;
+
     private SymfonyStyle $io;
     private ?string $projectRoot = null;
     /**
@@ -79,7 +82,7 @@ class StatusCommand extends Command
             $rows[] = [$label, $status];
         }
 
-        $envFile = $this->projectRoot.'/.env';
+        $envFile = $this->projectRoot . '/.env';
         $envStatus = file_exists($envFile) ? '✓ Found' : '✗ Missing';
         $rows[] = ['.env File', $envStatus];
 
@@ -104,24 +107,6 @@ class StatusCommand extends Command
             throw new \LogicException('Project root must be initialized before getting config file path.');
         }
 
-        return $this->projectRoot.'/config/'.$filename;
-    }
-
-    private function findProjectRoot(): ?string
-    {
-        $currentDir = getcwd();
-        $dir = ($currentDir !== false) ? $currentDir : __DIR__;
-        for ($i = 0; $i < 10; $i++) {
-            if (file_exists($dir.'/composer.json')) {
-                return $dir;
-            }
-            $parent = dirname($dir);
-            if ($parent === $dir) {
-                break;
-            }
-            $dir = $parent;
-        }
-
-        return null;
+        return $this->projectRoot . '/config/' . $filename;
     }
 }

@@ -10,7 +10,6 @@ use Hibla\PdoQueryBuilder\Pagination\CursorPaginator;
 use Hibla\PdoQueryBuilder\Pagination\Paginator;
 use Hibla\Promise\Interfaces\PromiseInterface;
 use Hibla\Promise\Promise;
-use Rcalicdan\ConfigLoader\Config;
 use Rcalicdan\QueryBuilderPrimitives\QueryBuilderBase;
 
 /**
@@ -22,29 +21,7 @@ use Rcalicdan\QueryBuilderPrimitives\QueryBuilderBase;
  */
 class Builder extends QueryBuilderBase
 {
-    /**
-     * @var string|null Cached driver to avoid repeated detection
-     */
-    private static ?string $cachedDriver = null;
-
-    /**
-     * @var bool Whether driver detection has been attempted
-     */
-    private static bool $driverDetected = false;
-
-    /**
-     * @var bool Whether templates have been configured
-     */
-    private static bool $templatesConfigured = false;
-
-    /**
-     * @var bool Whether to return results as objects
-     */
     private bool $returnAsObject = false;
-
-    /**
-     * @var AsyncPDOConnection|null The connection instance to use for queries
-     */
     private ?AsyncPDOConnection $connection = null;
 
     /**
@@ -60,25 +37,12 @@ class Builder extends QueryBuilderBase
         }
 
         $this->connection = $connection;
-
-        if (! self::$driverDetected) {
-            $this->autoDetectDriver();
-            self::$driverDetected = true;
-        } else {
-            $this->driver = self::$cachedDriver;
-        }
-
-        if (! self::$templatesConfigured) {
-            $this->configureTemplates();
-            self::$templatesConfigured = true;
-        }
+        $this->driver = BuilderConfiguration::detectDriver();
+        BuilderConfiguration::configureTemplates();
     }
 
     /**
      * Set the connection for this builder instance.
-     *
-     * @param  AsyncPDOConnection  $connection
-     * @return static
      */
     public function setConnection(AsyncPDOConnection $connection): static
     {
@@ -90,8 +54,6 @@ class Builder extends QueryBuilderBase
 
     /**
      * Get the connection instance.
-     *
-     * @return AsyncPDOConnection
      *
      * @throws \RuntimeException If no connection can be obtained
      */
@@ -120,15 +82,11 @@ class Builder extends QueryBuilderBase
      */
     public static function resetDriverCache(): void
     {
-        self::$cachedDriver = null;
-        self::$driverDetected = false;
-        self::$templatesConfigured = false;
+        BuilderConfiguration::reset();
     }
 
     /**
      * Set the query to return results as objects instead of arrays.
-     *
-     * @return static
      */
     public function toObject(): static
     {
@@ -140,9 +98,6 @@ class Builder extends QueryBuilderBase
 
     /**
      * Set the query to return results as arrays instead of objects.
-     * Useful to override a previous toObject() call.
-     *
-     * @return static
      */
     public function toArray(): static
     {
@@ -203,8 +158,6 @@ class Builder extends QueryBuilderBase
     /**
      * Find a record by ID.
      *
-     * @param  mixed  $id  The ID value to search for.
-     * @param  string  $column  The column name to search in.
      * @return PromiseInterface<array<string, mixed>|\stdClass|false>
      */
     public function find(mixed $id, string $column = 'id'): PromiseInterface
@@ -215,10 +168,7 @@ class Builder extends QueryBuilderBase
     /**
      * Find a record by ID or throw an exception if not found.
      *
-     * @param  mixed  $id  The ID value to search for.
-     * @param  string  $column  The column name to search in.
      * @return PromiseInterface<array<string, mixed>|\stdClass>
-     *
      * @throws \RuntimeException When no record is found.
      */
     public function findOrFail(mixed $id, string $column = 'id'): PromiseInterface
@@ -238,7 +188,6 @@ class Builder extends QueryBuilderBase
     /**
      * Get a single value from the first result.
      *
-     * @param  string  $column  The column name to retrieve.
      * @return PromiseInterface<mixed>
      */
     public function value(string $column): PromiseInterface
@@ -261,7 +210,7 @@ class Builder extends QueryBuilderBase
     /**
      * Map the query results using a callback function.
      *
-     * @param  callable(array<string, mixed>|object): mixed  $callback  The mapping function.
+     * @param  callable(array<string, mixed>|object): mixed  $callback
      * @return PromiseInterface<array<int, mixed>>
      */
     public function map(callable $callback): PromiseInterface
@@ -276,7 +225,7 @@ class Builder extends QueryBuilderBase
     /**
      * Get the first result and map it using a callback function.
      *
-     * @param  callable(array<string, mixed>|object): mixed  $callback  The mapping function.
+     * @param  callable(array<string, mixed>|object): mixed  $callback
      * @return PromiseInterface<mixed|false>
      */
     public function firstMap(callable $callback): PromiseInterface
@@ -291,22 +240,72 @@ class Builder extends QueryBuilderBase
     /**
      * Count the number of records.
      *
-     * @param  string  $column  The column to count.
-     * @return PromiseInterface<int> A promise that resolves to the record count.
+     * @return PromiseInterface<int>
      */
     public function count(string $column = '*'): PromiseInterface
     {
         $sql = $this->buildCountQuery($column);
-        /** @var PromiseInterface<int> */
-        $promise = $this->getConnection()->fetchValue($sql, $this->getCompiledBindings());
 
-        return $promise;
+        /** @var PromiseInterface<int> */
+        return $this->getConnection()->fetchValue($sql, $this->getCompiledBindings());
+    }
+
+    /**
+     * Get the maximum value of a column.
+     *
+     * @param  string  $column  The column to get max value from
+     * @return PromiseInterface<mixed> A promise that resolves to the maximum value
+     */
+    public function max(string $column): PromiseInterface
+    {
+        $sql = $this->buildAggregateQuery('MAX', $column);
+
+        return $this->getConnection()->fetchValue($sql, $this->getCompiledBindings());
+    }
+
+    /**
+     * Get the minimum value of a column.
+     *
+     * @param  string  $column  The column to get min value from
+     * @return PromiseInterface<mixed> A promise that resolves to the minimum value
+     */
+    public function min(string $column): PromiseInterface
+    {
+        $sql = $this->buildAggregateQuery('MIN', $column);
+
+        return $this->getConnection()->fetchValue($sql, $this->getCompiledBindings());
+    }
+
+    /**
+     * Get the average value of a column.
+     *
+     * @param  string  $column  The column to get average from
+     * @return PromiseInterface<mixed> A promise that resolves to the average value
+     */
+    public function avg(string $column): PromiseInterface
+    {
+        $sql = $this->buildAggregateQuery('AVG', $column);
+
+        return $this->getConnection()->fetchValue($sql, $this->getCompiledBindings());
+    }
+
+    /**
+     * Get the sum of a column.
+     *
+     * @param  string  $column  The column to sum
+     * @return PromiseInterface<mixed> A promise that resolves to the sum value
+     */
+    public function sum(string $column): PromiseInterface
+    {
+        $sql = $this->buildAggregateQuery('SUM', $column);
+
+        return $this->getConnection()->fetchValue($sql, $this->getCompiledBindings());
     }
 
     /**
      * Check if any records exist.
      *
-     * @return PromiseInterface<bool> A promise that resolves to true if records exist, false otherwise.
+     * @return PromiseInterface<bool>
      */
     public function exists(): PromiseInterface
     {
@@ -320,8 +319,8 @@ class Builder extends QueryBuilderBase
     /**
      * Insert a single record.
      *
-     * @param  array<string, mixed>  $data  The data to insert as column => value pairs.
-     * @return PromiseInterface<int> A promise that resolves to the number of affected rows.
+     * @param  array<string, mixed>  $data
+     * @return PromiseInterface<int>
      */
     public function insert(array $data): PromiseInterface
     {
@@ -336,10 +335,10 @@ class Builder extends QueryBuilderBase
     /**
      * Insert or update a record based on unique columns.
      *
-     * @param  array<string, mixed>|array<array<string, mixed>>  $data  The data to insert or update as column => value pairs.
-     * @param  array<string>  $uniqueColumns  The columns to check for uniqueness.
-     * @param  array<string>  $updateColumns  The columns to update on conflict.
-     * @return PromiseInterface<int> A promise that resolves to the number of affected rows.
+     * @param  array<string, mixed>|array<array<string, mixed>>  $data
+     * @param  array<string>  $uniqueColumns
+     * @param  array<string>  $updateColumns
+     * @return PromiseInterface<int>
      */
     public function upsert(array $data, array $uniqueColumns, array $updateColumns): PromiseInterface
     {
@@ -348,7 +347,6 @@ class Builder extends QueryBuilderBase
         }
 
         $sql = $this->buildUpsertQuery($data, $uniqueColumns, $updateColumns);
-
         $params = $this->flattenBatchParameters($data);
 
         return $this->getConnection()->execute($sql, $params);
@@ -358,7 +356,7 @@ class Builder extends QueryBuilderBase
      * Flatten batch parameters from nested arrays to a single flat array.
      *
      * @param  array<string, mixed>|array<int, array<string, mixed>>  $data
-     * @return array<int, mixed> Flattened parameters
+     * @return array<int, mixed>
      */
     protected function flattenBatchParameters(array $data): array
     {
@@ -381,8 +379,8 @@ class Builder extends QueryBuilderBase
     /**
      * Insert multiple records in a batch operation.
      *
-     * @param  array<array<string, mixed>>  $data  An array of records to insert.
-     * @return PromiseInterface<int> A promise that resolves to the number of affected rows.
+     * @param  array<array<string, mixed>>  $data
+     * @return PromiseInterface<int>
      */
     public function insertBatch(array $data): PromiseInterface
     {
@@ -404,8 +402,8 @@ class Builder extends QueryBuilderBase
     /**
      * Create a new record (alias for insert).
      *
-     * @param  array<string, mixed>  $data  The data to insert as column => value pairs.
-     * @return PromiseInterface<int> A promise that resolves to the number of affected rows.
+     * @param  array<string, mixed>  $data
+     * @return PromiseInterface<int>
      */
     public function create(array $data): PromiseInterface
     {
@@ -415,8 +413,8 @@ class Builder extends QueryBuilderBase
     /**
      * Update records matching the query conditions.
      *
-     * @param  array<string, mixed>  $data  The data to update as column => value pairs.
-     * @return PromiseInterface<int> A promise that resolves to the number of affected rows.
+     * @param  array<string, mixed>  $data
+     * @return PromiseInterface<int>
      */
     public function update(array $data): PromiseInterface
     {
@@ -433,7 +431,7 @@ class Builder extends QueryBuilderBase
     /**
      * Delete records matching the query conditions.
      *
-     * @return PromiseInterface<int> A promise that resolves to the number of affected rows.
+     * @return PromiseInterface<int>
      */
     public function delete(): PromiseInterface
     {
@@ -445,22 +443,18 @@ class Builder extends QueryBuilderBase
     /**
      * Paginate the results with automatic request handling.
      *
-     * @param  int  $perPage  Records per page
-     * @param  string|null  $path  The path for pagination links
      * @return PromiseInterface<Paginator>
      */
     public function paginate(int $perPage = 15, ?string $path = null): PromiseInterface
     {
-        $pageParam = $_GET['page'] ?? 1;
-        $page = max(1, is_numeric($pageParam) ? (int) $pageParam : 1);
+        $page = RequestHelper::getCurrentPage();
 
         if ($path === null) {
-            $path = $this->getCurrentPath();
+            $path = RequestHelper::getCurrentPath();
         }
 
         return async(function () use ($perPage, $page, $path): Paginator {
             $total = await($this->count());
-
             $results = await($this->forPage($page, $perPage)->get());
 
             return new Paginator(
@@ -476,9 +470,6 @@ class Builder extends QueryBuilderBase
     /**
      * Paginate with cursor-based pagination (automatic request handling).
      *
-     * @param  int  $perPage  Records per page
-     * @param  string  $cursorColumn  The column to use for cursor
-     * @param  string|null  $path  The path for pagination links
      * @return PromiseInterface<CursorPaginator>
      */
     public function cursorPaginate(
@@ -486,15 +477,14 @@ class Builder extends QueryBuilderBase
         string $cursorColumn = 'id',
         ?string $path = null,
     ): PromiseInterface {
-        $cursor = $_GET['cursor'] ?? null;
+        $cursor = RequestHelper::getCursor();
 
         if ($path === null) {
-            $path = $this->getCurrentPath();
+            $path = RequestHelper::getCurrentPath();
         }
 
         return async(function () use ($perPage, $cursor, $cursorColumn, $path): CursorPaginator {
-            /** @var string|null $cursor */
-            $query = $this->applyDecodedCursor($cursor, $cursorColumn);
+            $query = CursorPaginationHelper::applyCursor($this, $cursor, $cursorColumn);
             $results = await($query->limit($perPage + 1)->get());
 
             $hasMore = count($results) > $perPage;
@@ -502,7 +492,7 @@ class Builder extends QueryBuilderBase
                 array_pop($results);
             }
 
-            $nextCursor = $this->resolveNextCursor($results, $cursorColumn, $hasMore);
+            $nextCursor = CursorPaginationHelper::resolveNextCursor($results, $cursorColumn, $hasMore);
 
             return new CursorPaginator(
                 items: $results,
@@ -512,184 +502,5 @@ class Builder extends QueryBuilderBase
                 path: $path,
             );
         });
-    }
-
-    /**
-     * @param string|null $cursor
-     * @param string $cursorColumn
-     * @return self
-     */
-    private function applyDecodedCursor(
-        ?string $cursor,
-        string $cursorColumn,
-    ): self {
-        if (! is_string($cursor) || $cursor === '') {
-            return $this;
-        }
-
-        $cursorValue = base64_decode($cursor, true);
-        if ($cursorValue === false) {
-            return $this;
-        }
-
-        return $this->where($cursorColumn, '>', $cursorValue);
-    }
-
-    /**
-     * @param array<mixed> $results
-     * @param string $cursorColumn
-     * @param bool $hasMore
-     * @return string|null
-     */
-    private function resolveNextCursor(
-        array $results,
-        string $cursorColumn,
-        bool $hasMore,
-    ): ?string {
-        if (! $hasMore || count($results) === 0) {
-            return null;
-        }
-
-        /** @var array<mixed>|object $lastItem */
-        $lastItem = end($results);
-        $cursorValue = $this->extractColumnValue($lastItem, $cursorColumn);
-
-        return $this->encodeCursorValue($cursorValue);
-    }
-
-    /**
-     * @param array<mixed>|object $item
-     * @param string $column
-     * @return mixed
-     */
-    private function extractColumnValue(
-        array|object $item,
-        string $column,
-    ): mixed {
-        if (is_array($item)) {
-            return $item[$column] ?? null;
-        }
-
-        $vars = get_object_vars($item);
-
-        return $vars[$column] ?? null;
-    }
-
-    /**
-     * @param mixed $value
-     * @return string|null
-     */
-    private function encodeCursorValue(
-        mixed $value,
-    ): ?string {
-        if ($value === null) {
-            return null;
-        }
-
-        if (! is_scalar($value) && ! (is_object($value) && method_exists($value, '__toString'))) {
-            return null;
-        }
-
-        return base64_encode((string) $value);
-    }
-
-    /**
-     * Get current request path for pagination links
-     */
-    private function getCurrentPath(): string
-    {
-        if (php_sapi_name() === 'cli') {
-            return '';
-        }
-
-        $scheme = isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off' ? 'https' : 'http';
-        $host = is_string($_SERVER['HTTP_HOST'] ?? null) ? $_SERVER['HTTP_HOST'] : 'localhost';
-        $requestUri = is_string($_SERVER['REQUEST_URI'] ?? null) ? $_SERVER['REQUEST_URI'] : '/';
-
-        $parsedPath = parse_url($requestUri, PHP_URL_PATH);
-        $path = is_string($parsedPath) ? $parsedPath : '/';
-
-        return $scheme . '://' . $host . $path;
-    }
-
-    /**
-     * Auto-detect the database driver from the current connection.
-     * This runs only once and caches the result.
-     */
-    private function autoDetectDriver(): void
-    {
-        try {
-            $driver = $this->getDriverFromConfig();
-            if ($driver !== null) {
-                $detectedDriver = strtolower($driver);
-                $this->driver = $detectedDriver;
-                self::$cachedDriver = $detectedDriver;
-            } else {
-                $this->driver = 'mysql';
-                self::$cachedDriver = 'mysql';
-            }
-        } catch (\Throwable $e) {
-            $this->driver = 'mysql';
-            self::$cachedDriver = 'mysql';
-        }
-    }
-
-    /**
-     * Get the driver from the loaded configuration.
-     */
-    private function getDriverFromConfig(): ?string
-    {
-        $dbConfig = Config::get('pdo-query-builder');
-
-        if (! is_array($dbConfig)) {
-            return null;
-        }
-
-        $defaultConnection = $dbConfig['default'] ?? null;
-        if (! is_string($defaultConnection)) {
-            return null;
-        }
-
-        $connections = $dbConfig['connections'] ?? [];
-        if (! is_array($connections)) {
-            return null;
-        }
-
-        $connectionConfig = $connections[$defaultConnection] ?? null;
-        if (! is_array($connectionConfig)) {
-            return null;
-        }
-
-        $driver = $connectionConfig['driver'] ?? null;
-
-        return is_string($driver) ? $driver : null;
-    }
-
-    /**
-     * Configure custom pagination templates path from config
-     */
-    private function configureTemplates(): void
-    {
-        try {
-            $dbConfig = Config::get('pdo-query-builder');
-
-            if (! is_array($dbConfig)) {
-                return;
-            }
-
-            $paginationConfig = $dbConfig['pagination'] ?? [];
-            if (! is_array($paginationConfig)) {
-                return;
-            }
-
-            $templatesPath = $paginationConfig['templates_path'] ?? null;
-
-            if (is_string($templatesPath) && trim($templatesPath) !== '' && is_dir($templatesPath)) {
-                Paginator::setTemplatesPath($templatesPath);
-                CursorPaginator::setTemplatesPath($templatesPath);
-            }
-        } catch (\Throwable $e) {
-            error_log('Failed to configure pagination templates: ' . $e->getMessage());
-        }
     }
 }

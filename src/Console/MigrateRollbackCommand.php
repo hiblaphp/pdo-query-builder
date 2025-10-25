@@ -4,11 +4,13 @@ declare(strict_types=1);
 
 namespace Hibla\PdoQueryBuilder\Console;
 
+use Hibla\PdoQueryBuilder\Console\Traits\FindProjectRoot;
+use Hibla\PdoQueryBuilder\Console\Traits\InitializeDatabase;
 use Hibla\PdoQueryBuilder\Console\Traits\LoadsSchemaConfiguration;
-use Hibla\PdoQueryBuilder\DB;
+use Hibla\PdoQueryBuilder\Console\Traits\ValidateConnection;
 use Hibla\PdoQueryBuilder\Schema\MigrationRepository;
-use Hibla\PdoQueryBuilder\Schema\SchemaBuilder;
 use Hibla\Promise\Interfaces\PromiseInterface;
+use InvalidArgumentException;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Input\InputOption;
@@ -18,13 +20,15 @@ use Symfony\Component\Console\Style\SymfonyStyle;
 class MigrateRollbackCommand extends Command
 {
     use LoadsSchemaConfiguration;
+    use FindProjectRoot;
+    use InitializeDatabase;
+    use ValidateConnection;
 
     private SymfonyStyle $io;
     private OutputInterface $output;
     private ?string $projectRoot = null;
-    private string $migrationsPath;
     private MigrationRepository $repository;
-    private SchemaBuilder $schema;
+    private ?string $connection = null;
 
     protected function configure(): void
     {
@@ -32,6 +36,8 @@ class MigrateRollbackCommand extends Command
             ->setName('migrate:rollback')
             ->setDescription('Rollback the last database migration')
             ->addOption('step', null, InputOption::VALUE_OPTIONAL, 'Number of migrations to rollback', 1)
+            ->addOption('connection', null, InputOption::VALUE_OPTIONAL, 'The database connection to use')
+            ->addOption('path', null, InputOption::VALUE_OPTIONAL, 'Only rollback migrations from this path')
         ;
     }
 
@@ -41,27 +47,32 @@ class MigrateRollbackCommand extends Command
         $this->output = $output;
         $this->io->title('Rollback Migrations');
 
-        if (! $this->initializeProjectRoot()) {
+        $this->setConnectionFromInput($input);
+
+        try {
+            $this->validateConnection($this->connection);
+        } catch (InvalidArgumentException $e) {
+            $this->io->error($e->getMessage());
+
             return Command::FAILURE;
         }
 
-        if (! $this->validateMigrationsDirectory()) {
+        if (! $this->initializeProjectRoot()) {
             return Command::FAILURE;
         }
 
         try {
             $this->initializeDatabase();
-            $this->repository = new MigrationRepository($this->getMigrationsTable());
-            $this->schema = new SchemaBuilder();
+            $this->repository = new MigrationRepository($this->getMigrationsTable($this->connection), $this->connection);
 
-            $stepOption = $input->getOption('step');
-            $step = is_numeric($stepOption) ? (int) $stepOption : 1;
+            $step = $this->getStepFromInput($input);
+            $path = $this->getPathFromInput($input);
 
-            if (! $this->performRollback($step)) {
+            $rolledBack = $this->performRollback($step, $path);
+
+            if (! $rolledBack) {
                 return Command::FAILURE;
             }
-
-            $this->io->success('Rollback completed successfully!');
 
             return Command::SUCCESS;
         } catch (\Throwable $e) {
@@ -69,6 +80,30 @@ class MigrateRollbackCommand extends Command
 
             return Command::FAILURE;
         }
+    }
+
+    private function setConnectionFromInput(InputInterface $input): void
+    {
+        $connectionOption = $input->getOption('connection');
+        $this->connection = (is_string($connectionOption) && $connectionOption !== '') ? $connectionOption : null;
+
+        if ($this->connection !== null) {
+            $this->io->note("Using database connection: {$this->connection}");
+        }
+    }
+
+    private function getStepFromInput(InputInterface $input): int
+    {
+        $stepOption = $input->getOption('step');
+
+        return is_numeric($stepOption) ? (int) $stepOption : 1;
+    }
+
+    private function getPathFromInput(InputInterface $input): ?string
+    {
+        $pathOption = $input->getOption('path');
+
+        return is_string($pathOption) && $pathOption !== '' ? $pathOption : null;
     }
 
     private function initializeProjectRoot(): bool
@@ -83,42 +118,83 @@ class MigrateRollbackCommand extends Command
         return true;
     }
 
-    private function validateMigrationsDirectory(): bool
+    private function performRollback(int $step, ?string $path): bool
     {
-        $this->migrationsPath = $this->getMigrationsPath();
-        if (! is_dir($this->migrationsPath)) {
-            $this->io->error('Migrations directory not found');
+        /** @var list<array<string, mixed>> $ranMigrations */
+        $ranMigrations = await($this->repository->getRan());
 
-            return false;
-        }
-
-        return true;
-    }
-
-    private function performRollback(int $step): bool
-    {
-        /** @var list<array<string, mixed>> $lastBatchMigrations */
-        $lastBatchMigrations = await($this->repository->getLast());
-
-        if (count($lastBatchMigrations) === 0) {
-            $this->io->warning('Nothing to rollback');
+        if (count($ranMigrations) === 0) {
+            $this->io->info('Nothing to rollback.');
 
             return true;
         }
 
-        if ($step > 0) {
-            $lastBatchMigrations = array_slice($lastBatchMigrations, 0, $step);
+        $ranMigrations = $this->filterMigrationsByPath($ranMigrations, $path);
+
+        if ($ranMigrations === null) {
+            return true;
         }
 
+        $ranMigrations = $this->limitMigrationsByStep($ranMigrations, $step);
+
+        return $this->rollbackMigrations($ranMigrations);
+    }
+
+    /**
+     * @param list<array<string, mixed>> $ranMigrations
+     * @return list<array<string, mixed>>|null
+     */
+    private function filterMigrationsByPath(array $ranMigrations, ?string $path): ?array
+    {
+        if ($path === null) {
+            return $ranMigrations;
+        }
+
+        $normalizedPath = trim($path, '/') . '/';
+        $filtered = array_filter($ranMigrations, function ($migration) use ($normalizedPath) {
+            $migrationPath = $migration['migration'] ?? '';
+
+            return is_string($migrationPath) && str_starts_with($migrationPath, $normalizedPath);
+        });
+
+        if (count($filtered) === 0) {
+            $this->io->info("No migrations to rollback in path: {$path}");
+
+            return null;
+        }
+
+        $this->io->note("Rolling back migrations from path: {$path}");
+
+        return array_values($filtered);
+    }
+
+    /**
+     * @param list<array<string, mixed>> $ranMigrations
+     * @return list<array<string, mixed>>
+     */
+    private function limitMigrationsByStep(array $ranMigrations, int $step): array
+    {
+        if ($step > 0) {
+            return array_slice($ranMigrations, 0, $step);
+        }
+
+        return $ranMigrations;
+    }
+
+    /**
+     * @param list<array<string, mixed>> $ranMigrations
+     */
+    private function rollbackMigrations(array $ranMigrations): bool
+    {
         $this->io->section('Rolling back migrations');
 
-        $lastBatchMigrations = array_reverse($lastBatchMigrations);
-
-        foreach ($lastBatchMigrations as $migrationData) {
+        foreach ($ranMigrations as $migrationData) {
             if (! $this->rollbackMigration($migrationData)) {
                 return false;
             }
         }
+
+        $this->io->success('Rollback completed successfully!');
 
         return true;
     }
@@ -128,65 +204,130 @@ class MigrateRollbackCommand extends Command
      */
     private function rollbackMigration(array $migrationData): bool
     {
-        $migrationName = $migrationData['migration'] ?? null;
-        if (! is_string($migrationName)) {
-            $this->io->warning('Skipping invalid migration record.');
+        $relativePath = $this->extractRelativePath($migrationData);
 
+        if ($relativePath === null) {
             return false;
         }
 
-        $file = $this->migrationsPath.'/'.$migrationName;
+        $file = $this->getFullMigrationPath($relativePath, $this->connection);
 
-        if (! $this->validateMigrationFile($file, $migrationName)) {
-            await($this->repository->delete($migrationName));
+        if (! $this->validateMigrationFile($file, $relativePath)) {
+            await($this->repository->delete($relativePath));
+            $this->io->warning("Migration file not found but removed from repository: {$relativePath}");
 
             return true;
         }
 
+        return $this->executeMigrationRollback($file, $relativePath);
+    }
+
+    /**
+     * @param array<string, mixed> $migrationData
+     */
+    private function extractRelativePath(array $migrationData): ?string
+    {
+        $relativePath = $migrationData['migration'] ?? null;
+
+        if (! is_string($relativePath)) {
+            $this->io->warning('Skipping invalid migration record.');
+
+            return null;
+        }
+
+        return $relativePath;
+    }
+
+    private function executeMigrationRollback(string $file, string $relativePath): bool
+    {
         try {
-            $migration = require $file;
-            if (! is_object($migration)) {
-                $this->io->error("Migration file {$migrationName} did not return an object.");
+            $migration = $this->loadMigrationFile($file, $relativePath);
 
+            if ($migration === null) {
                 return false;
             }
 
-            if (! $this->validateMigrationClass($migration, $migrationName)) {
+            if (! $this->validateMigrationClass($migration, $relativePath)) {
                 return false;
             }
 
-            $this->io->write("Rolling back: {$migrationName}...");
+            $migrationConnection = $this->determineMigrationConnection($migration);
 
-            /** @var callable(SchemaBuilder): PromiseInterface<mixed> $downMethod */
-            $downMethod = [$migration, 'down'];
-            $promise = $downMethod($this->schema);
-            await($promise);
+            $this->displayRollbackProgress($relativePath, $migrationConnection);
 
-            await($this->repository->delete($migrationName));
+            $this->executeDownMethod($migration);
+
+            await($this->repository->delete($relativePath));
 
             $this->io->writeln(' <info>✓</info>');
 
             return true;
         } catch (\Throwable $e) {
-            $this->io->newLine();
-            $this->io->error("Failed to rollback migration {$migrationName}: ".$e->getMessage());
-            if ($this->output->isVerbose()) {
-                $this->io->writeln($e->getTraceAsString());
-            }
+            $this->handleMigrationError($e, $relativePath);
 
             return false;
         }
     }
 
-    private function validateMigrationFile(string $file, string $migrationName): bool
+    private function loadMigrationFile(string $file, string $relativePath): ?object
     {
-        if (! file_exists($file)) {
-            $this->io->warning("Migration file not found: {$migrationName}");
+        $migration = require $file;
 
-            return false;
+        if (! is_object($migration)) {
+            $this->io->error("Migration file {$relativePath} did not return an object.");
+
+            return null;
         }
 
-        return true;
+        return $migration;
+    }
+
+    private function determineMigrationConnection(object $migration): ?string
+    {
+        $migrationConnection = $this->connection;
+
+        if (method_exists($migration, 'getConnection')) {
+            $declaredConnection = $migration->getConnection();
+            if (is_string($declaredConnection)) {
+                $migrationConnection = $declaredConnection;
+            }
+        }
+
+        return $migrationConnection;
+    }
+
+    private function displayRollbackProgress(string $relativePath, ?string $migrationConnection): void
+    {
+        $this->io->write("Rolling back: {$relativePath}");
+
+        if ($migrationConnection !== null && $migrationConnection !== $this->connection) {
+            $this->io->write(" <comment>[{$migrationConnection}]</comment>");
+        }
+
+        $this->io->write('...');
+    }
+
+    private function executeDownMethod(object $migration): void
+    {
+        /** @var callable(): PromiseInterface<mixed> $downMethod */
+        $downMethod = [$migration, 'down'];
+        $promise = $downMethod();
+        await($promise);
+    }
+
+    private function handleMigrationError(\Throwable $e, string $relativePath): void
+    {
+        $this->io->newLine();
+        $this->io->error("Failed to rollback migration {$relativePath}: " . $e->getMessage());
+
+        if ($this->output->isVerbose()) {
+            $this->io->writeln($e->getTraceAsString());
+        }
+    }
+
+    private function validateMigrationFile(string $file, string $migrationName): bool
+    {
+        return file_exists($file);
     }
 
     private function validateMigrationClass(object $migration, string $migrationName): bool
@@ -200,40 +341,11 @@ class MigrateRollbackCommand extends Command
         return true;
     }
 
-    private function initializeDatabase(): void
-    {
-        try {
-            DB::table('_test_init');
-        } catch (\Throwable $e) {
-            if (! str_contains($e->getMessage(), 'not found')) {
-                throw $e;
-            }
-        }
-    }
-
     private function handleCriticalError(\Throwable $e): void
     {
-        $this->io->error('Rollback failed: '.$e->getMessage());
+        $this->io->error('Rollback failed: ' . $e->getMessage());
         if ($this->output->isVerbose()) {
             $this->io->writeln($e->getTraceAsString());
         }
-    }
-
-    private function findProjectRoot(): ?string
-    {
-        $currentDir = getcwd();
-        $dir = ($currentDir !== false) ? $currentDir : __DIR__;
-        for ($i = 0; $i < 10; $i++) {
-            if (file_exists($dir.'/composer.json')) {
-                return $dir;
-            }
-            $parent = dirname($dir);
-            if ($parent === $dir) {
-                break;
-            }
-            $dir = $parent;
-        }
-
-        return null;
     }
 }

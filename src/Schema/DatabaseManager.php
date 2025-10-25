@@ -25,7 +25,7 @@ class DatabaseManager
     /** @var TConnectionConfig */
     private array $config;
 
-    public function __construct()
+    public function __construct(?string $connection = null)
     {
         $dbConfig = Config::get('pdo-query-builder');
 
@@ -33,9 +33,9 @@ class DatabaseManager
             throw new \RuntimeException('Invalid database configuration format');
         }
 
-        $defaultConnection = $dbConfig['default'] ?? 'mysql';
-        if (! is_string($defaultConnection)) {
-            throw new \RuntimeException('Default connection name must be a string');
+        $connectionName = $connection ?? ($dbConfig['default'] ?? 'mysql');
+        if (! is_string($connectionName)) {
+            throw new \RuntimeException('Connection name must be a string');
         }
 
         $connections = $dbConfig['connections'] ?? [];
@@ -43,9 +43,9 @@ class DatabaseManager
             throw new \RuntimeException('Connections configuration must be an array');
         }
 
-        $config = $connections[$defaultConnection] ?? [];
+        $config = $connections[$connectionName] ?? [];
         if (! is_array($config)) {
-            throw new \RuntimeException("Configuration for '{$defaultConnection}' connection is invalid");
+            throw new \RuntimeException("Configuration for '{$connectionName}' connection is invalid");
         }
 
         /** @var TConnectionConfig $config */

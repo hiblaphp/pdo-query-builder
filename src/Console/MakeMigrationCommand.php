@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Hibla\PdoQueryBuilder\Console;
 
 use Carbon\Carbon;
+use Hibla\PdoQueryBuilder\Console\Traits\FindProjectRoot;
 use Hibla\PdoQueryBuilder\Console\Traits\LoadsSchemaConfiguration;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Input\InputArgument;
@@ -16,6 +17,7 @@ use Symfony\Component\Console\Style\SymfonyStyle;
 class MakeMigrationCommand extends Command
 {
     use LoadsSchemaConfiguration;
+    use FindProjectRoot;
 
     private SymfonyStyle $io;
     private ?string $projectRoot = null;
@@ -23,15 +25,20 @@ class MakeMigrationCommand extends Command
     private string $migrationName;
     private ?string $table;
     private ?string $alter;
+    private ?string $connection = null;
+    private ?string $subdirectory = null;
 
     protected function configure(): void
     {
         $this
             ->setName('make:migration')
             ->setDescription('Create a new migration file')
-            ->addArgument('name', InputArgument::REQUIRED, 'Migration name')
+            ->addArgument('name', InputArgument::REQUIRED, 'Migration name (supports subdirectories, e.g., backup/create_users_table)')
             ->addOption('table', null, InputOption::VALUE_OPTIONAL, 'Table to create')
             ->addOption('alter', null, InputOption::VALUE_OPTIONAL, 'Table to alter')
+            ->addOption('connection', null, InputOption::VALUE_OPTIONAL, 'The database connection to use')
+            ->addOption('path', null, InputOption::VALUE_OPTIONAL, 'Custom subdirectory path for the migration')
+            ->addOption('create', null, InputOption::VALUE_OPTIONAL, 'Alias for --table option')
         ;
     }
 
@@ -40,18 +47,37 @@ class MakeMigrationCommand extends Command
         $this->io = new SymfonyStyle($input, $output);
         $this->io->title('Create Migration');
 
+        $connectionOption = $input->getOption('connection');
+        $this->connection = (is_string($connectionOption) && $connectionOption !== '') ? $connectionOption : null;
+
+        if ($this->connection !== null) {
+            $this->io->note("Using database connection: {$this->connection}");
+        }
+
         $migrationNameValue = $input->getArgument('name');
         if (! is_string($migrationNameValue) || trim($migrationNameValue) === '') {
             $this->io->error('The migration name must be a non-empty string.');
 
             return Command::FAILURE;
         }
-        $this->migrationName = $migrationNameValue;
+
+        $this->parseMigrationName($migrationNameValue);
 
         $tableOption = $input->getOption('table');
-        $this->table = is_string($tableOption) ? $tableOption : null;
+        $createOption = $input->getOption('create');
+        $this->table = is_string($tableOption) ? $tableOption : (is_string($createOption) ? $createOption : null);
+
         $alterOption = $input->getOption('alter');
         $this->alter = is_string($alterOption) ? $alterOption : null;
+
+        if ($this->table === null && $this->alter === null) {
+            $this->autoDetectTableOperation($migrationNameValue);
+        }
+
+        $pathOption = $input->getOption('path');
+        if (is_string($pathOption) && $pathOption !== '') {
+            $this->subdirectory = trim($pathOption, '/\\');
+        }
 
         if (! $this->initializeProjectRoot()) {
             return Command::FAILURE;
@@ -68,23 +94,87 @@ class MakeMigrationCommand extends Command
         return Command::SUCCESS;
     }
 
-    private function initializeProjectRoot(): bool
+    private function parseMigrationName(string $input): void
     {
-        $this->projectRoot = $this->findProjectRoot();
-        if ($this->projectRoot === null) {
-            $this->io->error('Could not find project root');
+        $normalized = str_replace('\\', '/', $input);
 
-            return false;
+        if (str_contains($normalized, '/')) {
+            $parts = explode('/', $normalized);
+            $this->migrationName = array_pop($parts);
+
+            if ($this->subdirectory === null) {
+                $this->subdirectory = implode(DIRECTORY_SEPARATOR, $parts);
+            }
+        } else {
+            $this->migrationName = $input;
         }
 
-        return true;
+        $this->migrationName = $this->sanitizeMigrationName($this->migrationName);
+    }
+
+    private function sanitizeMigrationName(string $name): string
+    {
+        $name = str_replace(['/', '\\'], '', $name);
+
+        $name = preg_replace('/([a-z])([A-Z])/', '$1_$2', $name) ?? $name;
+        $name = strtolower($name);
+        $name = preg_replace('/[^a-z0-9_]/', '_', $name) ?? '';
+        $name = preg_replace('/_+/', '_', $name) ?? '';
+
+        return trim($name, '_');
+    }
+
+    private function autoDetectTableOperation(string $migrationName): void
+    {
+        $normalized = $this->sanitizeMigrationName($migrationName);
+
+        if (preg_match('/^create_(.+?)_table$/', $normalized, $matches) === 1) {
+            $this->table = $matches[1];
+            $this->io->note("Auto-detected table creation: {$this->table}");
+
+            return;
+        }
+
+        if (preg_match('/^add_.+?_to_(.+?)(?:_table)?$/', $normalized, $matches) === 1) {
+            $this->alter = $matches[1];
+            $this->io->note("Auto-detected table alteration: {$this->alter}");
+
+            return;
+        }
+
+        if (preg_match('/^remove_.+?_from_(.+?)(?:_table)?$/', $normalized, $matches) === 1) {
+            $this->alter = $matches[1];
+            $this->io->note("Auto-detected table alteration: {$this->alter}");
+
+            return;
+        }
+
+        if (preg_match('/^drop_(.+?)_table$/', $normalized, $matches) === 1) {
+            $this->alter = $matches[1];
+            $this->io->note("Auto-detected table operation: {$this->alter}");
+
+            return;
+        }
+
+        if (preg_match('/^(?:update|modify)_(.+?)_table$/', $normalized, $matches) === 1) {
+            $this->alter = $matches[1];
+            $this->io->note("Auto-detected table alteration: {$this->alter}");
+
+            return;
+        }
     }
 
     private function ensureMigrationsDirectory(): bool
     {
-        $this->migrationsPath = $this->getMigrationsPath();
+        $basePath = $this->getMigrationsPath($this->connection);
 
-        if (! is_dir($this->migrationsPath) && ! mkdir($this->migrationsPath, 0755, true)) {
+        if ($this->subdirectory !== null) {
+            $this->migrationsPath = $basePath . DIRECTORY_SEPARATOR . $this->subdirectory;
+        } else {
+            $this->migrationsPath = $basePath;
+        }
+
+        if (! $this->ensureDirectoryExists($this->migrationsPath)) {
             $this->io->error("Failed to create migrations directory: {$this->migrationsPath}");
 
             return false;
@@ -96,7 +186,14 @@ class MakeMigrationCommand extends Command
     private function createMigrationFile(): bool
     {
         $fileName = $this->generateFileName();
-        $filePath = $this->migrationsPath.'/'.$fileName;
+        $filePath = $this->migrationsPath . DIRECTORY_SEPARATOR . $fileName;
+
+        if (file_exists($filePath)) {
+            $this->io->error("Migration file already exists: {$fileName}");
+
+            return false;
+        }
+
         $stub = $this->generateMigrationStub();
 
         if (file_put_contents($filePath, $stub) === false) {
@@ -105,15 +202,24 @@ class MakeMigrationCommand extends Command
             return false;
         }
 
-        $relativePath = str_replace($this->projectRoot.'/', '', $this->migrationsPath);
-        $this->io->success("Migration created: {$relativePath}/{$fileName}");
+        $displayPath = $this->subdirectory !== null
+            ? $this->subdirectory . DIRECTORY_SEPARATOR . $fileName
+            : $fileName;
+
+        $displayPath = str_replace('\\', '/', $displayPath);
+
+        $this->io->success("Migration created: {$displayPath}");
+
+        if ($this->subdirectory !== null) {
+            $this->io->note("Migration organized in subdirectory: {$this->subdirectory}");
+        }
 
         return true;
     }
 
     private function generateFileName(): string
     {
-        $convention = $this->getNamingConvention();
+        $convention = $this->getNamingConvention($this->connection);
 
         return match ($convention) {
             'sequential' => $this->generateSequentialFileName(),
@@ -124,7 +230,7 @@ class MakeMigrationCommand extends Command
 
     private function generateTimestampFileName(): string
     {
-        $timezone = $this->getTimezone();
+        $timezone = $this->getTimezone($this->connection);
         $timestamp = Carbon::now($timezone)->format('Y_m_d_His');
 
         return "{$timestamp}_{$this->migrationName}.php";
@@ -132,9 +238,9 @@ class MakeMigrationCommand extends Command
 
     private function generateSequentialFileName(): string
     {
-        $files = glob($this->migrationsPath.'/*.php');
+        $files = glob($this->migrationsPath . '/*.php');
         if ($files === false) {
-            $files = []; // Default to empty array on error
+            $files = [];
         }
         $nextNumber = count($files) + 1;
         $paddedNumber = str_pad((string) $nextNumber, 4, '0', STR_PAD_LEFT);
@@ -157,30 +263,46 @@ class MakeMigrationCommand extends Command
 
     private function getCreateStub(): string
     {
+        $connectionLine = $this->connection !== null
+            ? "    protected ?string \$connection = '{$this->connection}';\n\n"
+            : '';
+
         return "<?php
 
 use Hibla\PdoQueryBuilder\Schema\Blueprint;
-use Hibla\PdoQueryBuilder\Schema\SchemaBuilder;
+use Hibla\PdoQueryBuilder\Schema\Migration;
 use Hibla\Promise\Interfaces\PromiseInterface;
 
-return new class() {
-    /**
+use function Hibla\async;
+use function Hibla\await;
+
+return new class extends Migration
+{
+{$connectionLine}    /**
+     * Run the migration.
+     *
      * @return PromiseInterface<int|null>
      */
-    public function up(SchemaBuilder \$schema): PromiseInterface
+    public function up(): PromiseInterface
     {
-        return \$schema->create('{$this->table}', function (Blueprint \$table) {
-            \$table->id();
-            \$table->timestamps();
+        return async(function () {
+            await(\$this->create('{$this->table}', function (Blueprint \$table) {
+                \$table->id();
+                \$table->timestamps();
+            }));
         });
     }
     
     /**
+     * Reverse the migration.
+     *
      * @return PromiseInterface<int>
      */
-    public function down(SchemaBuilder \$schema): PromiseInterface
+    public function down(): PromiseInterface
     {
-        return \$schema->dropIfExists('{$this->table}');
+        return async(function () {
+            await(\$this->dropIfExists('{$this->table}'));
+        });
     }
 };
 ";
@@ -188,30 +310,46 @@ return new class() {
 
     private function getAlterStub(): string
     {
+        $connectionLine = $this->connection !== null
+            ? "    protected ?string \$connection = '{$this->connection}';\n\n"
+            : '';
+
         return "<?php
 
 use Hibla\PdoQueryBuilder\Schema\Blueprint;
-use Hibla\PdoQueryBuilder\Schema\SchemaBuilder;
+use Hibla\PdoQueryBuilder\Schema\Migration;
 use Hibla\Promise\Interfaces\PromiseInterface;
 
-return new class () {
-    /**
+use function Hibla\async;
+use function Hibla\await;
+
+return new class extends Migration
+{
+{$connectionLine}    /**
+     * Run the migration.
+     *
      * @return PromiseInterface<int|null>
      */
-    public function up(SchemaBuilder \$schema): PromiseInterface
+    public function up(): PromiseInterface
     {
-        return \$schema->table('{$this->alter}', function (Blueprint \$table) {
-            // Add columns, indexes, etc.
+        return async(function () {
+            await(\$this->table('{$this->alter}', function (Blueprint \$table) {
+                // Add columns, indexes, etc.
+            }));
         });
     }
 
     /**
-     * @return PromiseInterface<int>
+     * Reverse the migration.
+     *
+     * @return PromiseInterface<int|null>
      */
-    public function down(SchemaBuilder \$schema): PromiseInterface
+    public function down(): PromiseInterface
     {
-        return \$schema->table('{$this->alter}', function (Blueprint \$table) {
-            // Reverse the changes
+        return async(function () {
+            await(\$this->table('{$this->alter}', function (Blueprint \$table) {
+                // Reverse the changes
+            }));
         });
     }
 };
@@ -220,43 +358,47 @@ return new class () {
 
     private function getBlankStub(): string
     {
+        $connectionLine = $this->connection !== null
+            ? "    protected ?string \$connection = '{$this->connection}';\n\n"
+            : '';
+
         return "<?php
 
 use Hibla\PdoQueryBuilder\Schema\Blueprint;
-use Hibla\PdoQueryBuilder\Schema\SchemaBuilder;
+use Hibla\PdoQueryBuilder\Schema\Migration;
 use Hibla\Promise\Interfaces\PromiseInterface;
-use Hibla\Promise\Promise;
 
-return new class () {
-    public function up(SchemaBuilder \$schema): PromiseInterface
+use function Hibla\async;
+use function Hibla\await;
+
+return new class extends Migration
+{
+{$connectionLine}    /**
+     * Run the migration.
+     *
+     * @return PromiseInterface<mixed>
+     */
+    public function up(): PromiseInterface
     {
-        // Write your migration here and return a promise
+        return async(function () {
+            // Write your migration here
+            await(\$this->raw('-- Add your SQL here'));
+        });
     }
 
-    public function down(SchemaBuilder \$schema): PromiseInterface
+    /**
+     * Reverse the migration.
+     *
+     * @return PromiseInterface<mixed>
+     */
+    public function down(): PromiseInterface
     {
-        // Reverse your migration here and return a promise
+        return async(function () {
+            // Reverse your migration here
+            await(\$this->raw('-- Add your rollback SQL here'));
+        });
     }
 };
 ";
-    }
-
-    private function findProjectRoot(): ?string
-    {
-        $currentDir = getcwd();
-        $dir = ($currentDir !== false) ? $currentDir : __DIR__;
-
-        for ($i = 0; $i < 10; $i++) {
-            if (file_exists($dir.'/composer.json')) {
-                return $dir;
-            }
-            $parent = dirname($dir);
-            if ($parent === $dir) {
-                break;
-            }
-            $dir = $parent;
-        }
-
-        return null;
     }
 }
