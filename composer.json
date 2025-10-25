@@ -19,6 +19,7 @@
         "hiblaphp/promise": "dev-main",
         "hiblaphp/async": "dev-main",
         "hiblaphp/async-pdo": "dev-main",
+        "hiblaphp/postgres": "dev-main",
         "rcalicdan/query-builder-primitives": "dev-main",
         "ext-pdo": "*",
         "symfony/console": "^7.3",

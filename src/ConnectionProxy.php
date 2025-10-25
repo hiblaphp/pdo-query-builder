@@ -4,51 +4,41 @@ declare(strict_types=1);
 
 namespace Hibla\PdoQueryBuilder;
 
-use Hibla\AsyncPDO\AsyncPDOConnection;
+use Hibla\PdoQueryBuilder\Interfaces\ConnectionInterface;
+use Hibla\PdoQueryBuilder\Interfaces\ProxyInterface;
 use Hibla\PdoQueryBuilder\Utilities\Builder;
 use Hibla\Promise\Interfaces\PromiseInterface;
 
 /**
  * Connection Proxy - Provides a fluent API for database operations on a specific connection.
  */
-class ConnectionProxy
+class ConnectionProxy implements ProxyInterface
 {
-    /**
-     * @var AsyncPDOConnection The underlying connection instance
-     */
-    private AsyncPDOConnection $connection;
-
-    /**
-     * @var string|null The name of this connection
-     */
+    private ConnectionInterface $connection;
     private ?string $connectionName;
 
     /**
      * Create a new ConnectionProxy instance.
      *
-     * @param AsyncPDOConnection $connection
+     * @param ConnectionInterface $connection
      * @param string|null $connectionName
      */
-    public function __construct(AsyncPDOConnection $connection, ?string $connectionName = null)
+    public function __construct(ConnectionInterface $connection, ?string $connectionName = null)
     {
         $this->connection = $connection;
         $this->connectionName = $connectionName;
     }
 
     /**
-     * Get the underlying connection instance.
-     *
-     * @return AsyncPDOConnection
+     * {@inheritDoc}
      */
-    public function getConnection(): AsyncPDOConnection
+    public function getConnection(): ConnectionInterface
     {
         return $this->connection;
     }
 
     /**
-     * Get the name of this connection.
-     *
-     * @return string|null
+     * {@inheritDoc}
      */
     public function getConnectionName(): ?string
     {
@@ -56,36 +46,29 @@ class ConnectionProxy
     }
 
     /**
-     * Start a new query builder instance for the given table.
-     *
-     * @param  string  $table  Table name
-     * @return Builder
+     * {@inheritDoc}
      */
     public function table(string $table): Builder
     {
-        return new Builder($table, $this->connection);
+        $builder = new Builder($table);
+        $builder->setConnectionAdapter($this->connection);
+
+        return $builder;
     }
 
     /**
-     * Start a new query builder instance with a specific driver.
-     *
-     * @param  string  $table  Table name
-     * @param  string  $driver  Driver name (mysql, pgsql, sqlite, sqlsrv)
-     * @return Builder
+     * {@inheritDoc}
      */
     public function tableWithDriver(string $table, string $driver): Builder
     {
-        $builder = new Builder($table, $this->connection);
+        $builder = new Builder($table);
+        $builder->setConnectionAdapter($this->connection);
 
         return $builder->setDriver($driver);
     }
 
     /**
-     * Execute a raw query.
-     *
-     * @param  string  $sql  SQL query
-     * @param  array<int|string, mixed>  $bindings  Query bindings
-     * @return PromiseInterface<array<int, array<string, mixed>>>
+     * {@inheritDoc}
      */
     public function raw(string $sql, array $bindings = []): PromiseInterface
     {
@@ -93,11 +76,7 @@ class ConnectionProxy
     }
 
     /**
-     * Execute a raw query and return the first result.
-     *
-     * @param  string  $sql  SQL query
-     * @param  array<int|string, mixed>  $bindings  Query bindings
-     * @return PromiseInterface<array<string, mixed>|false>
+     * {@inheritDoc}
      */
     public function rawFirst(string $sql, array $bindings = []): PromiseInterface
     {
@@ -105,11 +84,7 @@ class ConnectionProxy
     }
 
     /**
-     * Execute a raw query and return a single scalar value.
-     *
-     * @param  string  $sql  SQL query
-     * @param  array<int|string, mixed>  $bindings  Query bindings
-     * @return PromiseInterface<mixed>
+     * {@inheritDoc}
      */
     public function rawValue(string $sql, array $bindings = []): PromiseInterface
     {
@@ -117,11 +92,7 @@ class ConnectionProxy
     }
 
     /**
-     * Execute a raw statement (INSERT, UPDATE, DELETE).
-     *
-     * @param  string  $sql  SQL statement
-     * @param  array<int|string, mixed>  $bindings  Query bindings
-     * @return PromiseInterface<int>
+     * {@inheritDoc}
      */
     public function rawExecute(string $sql, array $bindings = []): PromiseInterface
     {
@@ -129,11 +100,7 @@ class ConnectionProxy
     }
 
     /**
-     * Run a database transaction with automatic retry on failure.
-     *
-     * @param  callable  $callback  Transaction callback
-     * @param  int  $attempts  Number of times to attempt the transaction (default: 1)
-     * @return PromiseInterface<mixed>
+     * {@inheritDoc}
      */
     public function transaction(callable $callback, int $attempts = 1): PromiseInterface
     {
@@ -141,10 +108,7 @@ class ConnectionProxy
     }
 
     /**
-     * Register a callback to be executed when a transaction is committed.
-     *
-     * @param  callable  $callback  Callback to execute on commit
-     * @return void
+     * {@inheritDoc}
      */
     public function onCommit(callable $callback): void
     {
@@ -152,10 +116,7 @@ class ConnectionProxy
     }
 
     /**
-     * Register a callback to be executed when a transaction is rolled back.
-     *
-     * @param  callable  $callback  Callback to execute on rollback
-     * @return void
+     * {@inheritDoc}
      */
     public function onRollback(callable $callback): void
     {
@@ -163,23 +124,19 @@ class ConnectionProxy
     }
 
     /**
-     * Execute a callback with a PDO connection.
+     * Execute a callback with the underlying connection.
      *
      * @template TResult
-     * @param  callable(\PDO): TResult  $callback  Callback that receives PDO instance
+     * @param callable $callback Callback that receives connection instance
      * @return PromiseInterface<TResult>
-     * @phpstan-return PromiseInterface<TResult>
      */
     public function run(callable $callback): PromiseInterface
     {
-        /** @phpstan-var PromiseInterface<TResult> */
         return $this->connection->run($callback);
     }
 
     /**
-     * Get statistics about this connection's pool.
-     *
-     * @return array<string, int|bool>
+     * {@inheritDoc}
      */
     public function getStats(): array
     {

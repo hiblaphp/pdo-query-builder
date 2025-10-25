@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Hibla\PdoQueryBuilder\Utilities;
 
 use Hibla\AsyncPDO\AsyncPDOConnection;
+use Hibla\PdoQueryBuilder\Interfaces\ConnectionInterface;
 use Hibla\PdoQueryBuilder\DB;
 use Hibla\PdoQueryBuilder\Pagination\CursorPaginator;
 use Hibla\PdoQueryBuilder\Pagination\Paginator;
@@ -23,6 +24,7 @@ class Builder extends QueryBuilderBase
 {
     private bool $returnAsObject = false;
     private ?AsyncPDOConnection $connection = null;
+    private ?ConnectionInterface $connectionAdapter = null;
 
     /**
      * Create a new AsyncQueryBuilder instance.
@@ -52,22 +54,69 @@ class Builder extends QueryBuilderBase
         return $clone;
     }
 
+    // /**
+    //  * Get the connection instance.
+    //  *
+    //  * @throws \RuntimeException If no connection can be obtained
+    //  */
+    // private function getConnection(): AsyncPDOConnection
+    // {
+    //     if ($this->connection !== null) {
+    //         return $this->connection;
+    //     }
+
+    //     try {
+    //         $proxy = DB::connection();
+    //         $connection = $proxy->getConnection();
+
+    //         $this->connection = $connection;
+
+    //         return $connection;
+    //     } catch (\Throwable $e) {
+    //         throw new \RuntimeException(
+    //             'No connection available. Ensure database configuration is loaded properly. Error: ' . $e->getMessage()
+    //         );
+    //     }
+    // }
+
     /**
-     * Get the connection instance.
-     *
-     * @throws \RuntimeException If no connection can be obtained
+     * Set the connection adapter for this builder instance.
      */
-    private function getConnection(): AsyncPDOConnection
+    public function setConnectionAdapter(ConnectionInterface $adapter): static
     {
+        $clone = clone $this;
+        $clone->connectionAdapter = $adapter;
+
+        if ($adapter->getDriver() !== '') {
+            $clone->driver = $adapter->getDriver();
+        }
+
+        return $clone;
+    }
+
+    /**
+     * Get the connection adapter instance.
+     */
+    private function getConnectionAdapter(): ConnectionInterface
+    {
+        if ($this->connectionAdapter !== null) {
+            return $this->connectionAdapter;
+        }
+
         if ($this->connection !== null) {
-            return $this->connection;
+            $this->connectionAdapter = new \Hibla\PdoQueryBuilder\Adapters\PdoAdapter(
+                [], 
+                10
+            );
+          
+            return $this->connectionAdapter;
         }
 
         try {
             $proxy = DB::connection();
             $connection = $proxy->getConnection();
 
-            $this->connection = $connection;
+            $this->connectionAdapter = $connection;
 
             return $connection;
         } catch (\Throwable $e) {
@@ -76,6 +125,7 @@ class Builder extends QueryBuilderBase
             );
         }
     }
+
 
     /**
      * Reset the driver cache. Useful for testing or when switching connections.
@@ -115,7 +165,7 @@ class Builder extends QueryBuilderBase
      */
     private function convertToObjects(array $results): array
     {
-        return array_map(static fn (array $row): object => (object) $row, $results);
+        return array_map(static fn(array $row): object => (object) $row, $results);
     }
 
     /**
@@ -128,7 +178,7 @@ class Builder extends QueryBuilderBase
         $sql = $this->buildSelectQuery();
 
         return async(function () use ($sql): array {
-            $results = await($this->getConnection()->query($sql, $this->getCompiledBindings()));
+            $results = await($this->getConnectionAdapter()->query($sql, $this->getCompiledBindings()));
 
             return $this->returnAsObject ? $this->convertToObjects($results) : $results;
         });
@@ -145,7 +195,7 @@ class Builder extends QueryBuilderBase
         $sql = $instanceWithLimit->buildSelectQuery();
 
         return async(function () use ($sql, $instanceWithLimit): array|\stdClass|false {
-            $result = await($instanceWithLimit->getConnection()->fetchOne($sql, $instanceWithLimit->getCompiledBindings()));
+            $result = await($instanceWithLimit->getConnectionAdapter()->fetchOne($sql, $instanceWithLimit->getCompiledBindings()));
 
             if ($result === false) {
                 return false;
@@ -247,7 +297,7 @@ class Builder extends QueryBuilderBase
         $sql = $this->buildCountQuery($column);
 
         /** @var PromiseInterface<int> */
-        return $this->getConnection()->fetchValue($sql, $this->getCompiledBindings());
+        return $this->getConnectionAdapter()->fetchValue($sql, $this->getCompiledBindings());
     }
 
     /**
@@ -260,7 +310,7 @@ class Builder extends QueryBuilderBase
     {
         $sql = $this->buildAggregateQuery('MAX', $column);
 
-        return $this->getConnection()->fetchValue($sql, $this->getCompiledBindings());
+        return $this->getConnectionAdapter()->fetchValue($sql, $this->getCompiledBindings());
     }
 
     /**
@@ -273,7 +323,7 @@ class Builder extends QueryBuilderBase
     {
         $sql = $this->buildAggregateQuery('MIN', $column);
 
-        return $this->getConnection()->fetchValue($sql, $this->getCompiledBindings());
+        return $this->getConnectionAdapter()->fetchValue($sql, $this->getCompiledBindings());
     }
 
     /**
@@ -286,7 +336,7 @@ class Builder extends QueryBuilderBase
     {
         $sql = $this->buildAggregateQuery('AVG', $column);
 
-        return $this->getConnection()->fetchValue($sql, $this->getCompiledBindings());
+        return $this->getConnectionAdapter()->fetchValue($sql, $this->getCompiledBindings());
     }
 
     /**
@@ -299,7 +349,7 @@ class Builder extends QueryBuilderBase
     {
         $sql = $this->buildAggregateQuery('SUM', $column);
 
-        return $this->getConnection()->fetchValue($sql, $this->getCompiledBindings());
+        return $this->getConnectionAdapter()->fetchValue($sql, $this->getCompiledBindings());
     }
 
     /**
@@ -329,7 +379,7 @@ class Builder extends QueryBuilderBase
         }
         $sql = $this->buildInsertQuery($data);
 
-        return $this->getConnection()->execute($sql, array_values($data));
+        return $this->getConnectionAdapter()->execute($sql, array_values($data));
     }
 
     /**
@@ -349,7 +399,7 @@ class Builder extends QueryBuilderBase
         $sql = $this->buildUpsertQuery($data, $uniqueColumns, $updateColumns);
         $params = $this->flattenBatchParameters($data);
 
-        return $this->getConnection()->execute($sql, $params);
+        return $this->getConnectionAdapter()->execute($sql, $params);
     }
 
     /**
@@ -396,7 +446,7 @@ class Builder extends QueryBuilderBase
             }
         }
 
-        return $this->getConnection()->execute($sql, $bindings);
+        return $this->getConnectionAdapter()->execute($sql, $bindings);
     }
 
     /**
@@ -425,7 +475,7 @@ class Builder extends QueryBuilderBase
         $whereBindings = $this->getCompiledBindings();
         $bindings = array_merge(array_values($data), $whereBindings);
 
-        return $this->getConnection()->execute($sql, $bindings);
+        return $this->getConnectionAdapter()->execute($sql, $bindings);
     }
 
     /**
@@ -437,7 +487,7 @@ class Builder extends QueryBuilderBase
     {
         $sql = $this->buildDeleteQuery();
 
-        return $this->getConnection()->execute($sql, $this->getCompiledBindings());
+        return $this->getConnectionAdapter()->execute($sql, $this->getCompiledBindings());
     }
 
     /**

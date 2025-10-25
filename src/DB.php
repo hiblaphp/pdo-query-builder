@@ -4,7 +4,9 @@ declare(strict_types=1);
 
 namespace Hibla\PdoQueryBuilder;
 
-use Hibla\AsyncPDO\AsyncPDOConnection;
+use Hibla\PdoQueryBuilder\Adapters\PdoAdapter;
+use Hibla\PdoQueryBuilder\Adapters\PostgresNativeAdapter;
+use Hibla\PdoQueryBuilder\Interfaces\ConnectionInterface;
 use Hibla\PdoQueryBuilder\Exceptions\DatabaseConfigNotFoundException;
 use Hibla\PdoQueryBuilder\Exceptions\InvalidConnectionConfigException;
 use Hibla\PdoQueryBuilder\Exceptions\InvalidPoolSizeException;
@@ -17,7 +19,7 @@ use Rcalicdan\ConfigLoader\Config;
  */
 class DB
 {
-    /** @var array<string, AsyncPDOConnection> Named connection instances */
+    /** @var array<string, ConnectionInterface> Named connection instances */
     private static array $connections = [];
 
     /** @var string|null The default connection name */
@@ -33,7 +35,7 @@ class DB
     /**
      * Get or create a connection proxy.
      *
-     * @param  string|null  $name  Connection name from config, or null for default
+     * @param string|null $name Connection name from config, or null for default
      * @return ConnectionProxy Returns a ConnectionProxy bound to the specified connection
      *
      * @throws DatabaseConfigNotFoundException
@@ -64,41 +66,44 @@ class DB
         }
 
         $connectionConfig = $connections[$connectionName];
+        $driver = $connectionConfig['driver'] ?? 'mysql';
+        $poolSize = is_int($connectionConfig['pool_size'] ?? null) ? $connectionConfig['pool_size'] : 10;
 
-        /** @var array<string, mixed> $validatedConfig */
-        $validatedConfig = [];
-        $poolSize = 10;
-
-        foreach ($connectionConfig as $key => $value) {
-            if (! is_string($key)) {
-                throw new InvalidConnectionConfigException('Database connection configuration must have string keys only.');
-            }
-
-            if ($key === 'pool_size') {
-                if (! is_int($value) || $value < 1) {
-                    throw new InvalidPoolSizeException();
-                }
-                $poolSize = $value;
-
-                continue;
-            }
-
-            $validatedConfig[$key] = $value;
+        if (! is_int($poolSize) || $poolSize < 1) {
+            throw new InvalidPoolSizeException();
         }
 
-        $connection = new AsyncPDOConnection($validatedConfig, $poolSize);
+        $connection = self::createAdapter($driver, $connectionConfig, $poolSize);
         self::$connections[$connectionName] = $connection;
 
         return new ConnectionProxy($connection, $connectionName);
     }
 
     /**
+     * Create the appropriate connection adapter based on driver.
+     *
+     * @param string $driver Database driver name
+     * @param array<string, mixed> $config Connection configuration
+     * @param int $poolSize Connection pool size
+     * @return ConnectionInterface
+     *
+     * @throws InvalidPoolSizeException
+     */
+    private static function createAdapter(string $driver, array $config, int $poolSize): ConnectionInterface
+    {
+        return match ($driver) {
+            'pgsql_native' => new PostgresNativeAdapter($config, $poolSize),
+            default => new PdoAdapter($config, $poolSize),
+        };
+    }
+
+    /**
      * Initialize the default database connection manually.
      * This is useful when you want to set up the connection without a config file or for testing purposes.
      *
-     * @param  array<string, mixed>  $config  Database connection configuration
-     * @param  int  $poolSize  Connection pool size (default: 10)
-     * @param  string  $name  Connection name (default: 'default')
+     * @param array<string, mixed> $config Database connection configuration
+     * @param int $poolSize Connection pool size (default: 10)
+     * @param string $name Connection name (default: 'default')
      * @return ConnectionProxy
      *
      * @throws InvalidPoolSizeException
@@ -109,7 +114,8 @@ class DB
             throw new InvalidPoolSizeException();
         }
 
-        $connection = new AsyncPDOConnection($config, $poolSize);
+        $driver = $config['driver'] ?? 'mysql';
+        $connection = self::createAdapter($driver, $config, $poolSize);
         self::$connections[$name] = $connection;
 
         if ($name === 'default' || self::$defaultConnectionName === null) {
@@ -122,11 +128,12 @@ class DB
     /**
      * Initialize multiple database connections at once.
      *
-     * @param  array<string, array{config: array<string, mixed>, pool_size?: int}>  $connections
-     * @param  string|null  $defaultConnection  The name of the default connection
+     * @param array<string, array{config: array<string, mixed>, pool_size?: int}> $connections
+     * @param string|null $defaultConnection The name of the default connection
      * @return void
      *
      * @throws InvalidPoolSizeException
+     * @throws InvalidConnectionConfigException
      */
     public static function initMultiple(array $connections, ?string $defaultConnection = null): void
     {
@@ -146,18 +153,17 @@ class DB
                 throw new InvalidPoolSizeException();
             }
 
-            $connection = new AsyncPDOConnection($config, $poolSize);
+            $driver = $config['driver'] ?? 'mysql';
+            $connection = self::createAdapter($driver, $config, $poolSize);
             self::$connections[$name] = $connection;
         }
 
-        // Set default connection
         if ($defaultConnection !== null) {
             if (! isset(self::$connections[$defaultConnection])) {
                 throw new InvalidConnectionConfigException("Default connection '{$defaultConnection}' does not exist.");
             }
             self::$defaultConnectionName = $defaultConnection;
         } elseif (self::$defaultConnectionName === null && self::$connections !== []) {
-            // Set the first connection as default if no default is specified
             self::$defaultConnectionName = array_key_first(self::$connections);
         }
     }
@@ -165,7 +171,7 @@ class DB
     /**
      * Set the default connection name.
      *
-     * @param  string  $name  Connection name
+     * @param string $name Connection name
      * @return void
      *
      * @throws InvalidConnectionConfigException
@@ -193,6 +199,9 @@ class DB
      * Get the default connection name from config.
      *
      * @return string
+     *
+     * @throws DatabaseConfigNotFoundException
+     * @throws InvalidConnectionConfigException
      */
     private static function getDefaultConnectionName(): string
     {
@@ -219,7 +228,7 @@ class DB
     /**
      * Start a new query builder instance for the given table using the default connection.
      *
-     * @param  string  $table  Table name
+     * @param string $table Table name
      * @return Builder
      */
     public static function table(string $table): Builder
@@ -232,8 +241,8 @@ class DB
     /**
      * Execute a raw query on the default connection.
      *
-     * @param  string  $sql  SQL query
-     * @param  array<int|string, mixed>  $bindings  Query bindings
+     * @param string $sql SQL query
+     * @param array<int|string, mixed> $bindings Query bindings
      * @return PromiseInterface<array<int, array<string, mixed>>>
      */
     public static function raw(string $sql, array $bindings = []): PromiseInterface
@@ -246,8 +255,8 @@ class DB
     /**
      * Execute a raw query and return the first result on the default connection.
      *
-     * @param  string  $sql  SQL query
-     * @param  array<int|string, mixed>  $bindings  Query bindings
+     * @param string $sql SQL query
+     * @param array<int|string, mixed> $bindings Query bindings
      * @return PromiseInterface<array<string, mixed>|false>
      */
     public static function rawFirst(string $sql, array $bindings = []): PromiseInterface
@@ -260,8 +269,8 @@ class DB
     /**
      * Execute a raw query and return a single scalar value on the default connection.
      *
-     * @param  string  $sql  SQL query
-     * @param  array<int|string, mixed>  $bindings  Query bindings
+     * @param string $sql SQL query
+     * @param array<int|string, mixed> $bindings Query bindings
      * @return PromiseInterface<mixed>
      */
     public static function rawValue(string $sql, array $bindings = []): PromiseInterface
@@ -274,8 +283,8 @@ class DB
     /**
      * Execute a raw statement (INSERT, UPDATE, DELETE) on the default connection.
      *
-     * @param  string  $sql  SQL statement
-     * @param  array<int|string, mixed>  $bindings  Query bindings
+     * @param string $sql SQL statement
+     * @param array<int|string, mixed> $bindings Query bindings
      * @return PromiseInterface<int>
      */
     public static function rawExecute(string $sql, array $bindings = []): PromiseInterface
@@ -288,8 +297,8 @@ class DB
     /**
      * Run a database transaction on the default connection.
      *
-     * @param  callable  $callback  Transaction callback
-     * @param  int  $attempts  Number of times to attempt the transaction (default: 1)
+     * @param callable $callback Transaction callback
+     * @param int $attempts Number of times to attempt the transaction (default: 1)
      * @return PromiseInterface<mixed>
      *
      * @throws DatabaseConfigNotFoundException
@@ -305,6 +314,9 @@ class DB
 
     /**
      * Register a callback to execute when the current transaction rolls back.
+     *
+     * @param callable $callback
+     * @return void
      */
     public static function onRollback(callable $callback): void
     {
@@ -314,6 +326,9 @@ class DB
 
     /**
      * Register a callback to execute when the current transaction commits.
+     *
+     * @param callable $callback
+     * @return void
      */
     public static function onCommit(callable $callback): void
     {
@@ -322,10 +337,10 @@ class DB
     }
 
     /**
-     * Execute a callback with a PDO connection on the default connection.
+     * Execute a callback with a connection on the default connection.
      *
      * @template TResult
-     * @param  callable(\PDO): TResult  $callback  Callback that receives PDO instance
+     * @param callable $callback Callback that receives connection instance
      * @return PromiseInterface<TResult>
      * @phpstan-return PromiseInterface<TResult>
      */
@@ -340,10 +355,12 @@ class DB
     /**
      * Manually create a connection with custom configuration.
      *
-     * @param  string  $name  Connection name
-     * @param  array<string, mixed>  $connectionConfig  Database connection configuration
-     * @param  int  $poolSize  Connection pool size (default: 10)
+     * @param string $name Connection name
+     * @param array<string, mixed> $connectionConfig Database connection configuration
+     * @param int $poolSize Connection pool size (default: 10)
      * @return ConnectionProxy
+     *
+     * @throws InvalidPoolSizeException
      */
     public static function addConnection(string $name, array $connectionConfig, int $poolSize = 10): ConnectionProxy
     {
@@ -351,7 +368,8 @@ class DB
             throw new InvalidPoolSizeException();
         }
 
-        $connection = new AsyncPDOConnection($connectionConfig, $poolSize);
+        $driver = $connectionConfig['driver'] ?? 'mysql';
+        $connection = self::createAdapter($driver, $connectionConfig, $poolSize);
         self::$connections[$name] = $connection;
 
         return new ConnectionProxy($connection, $name);
@@ -360,7 +378,7 @@ class DB
     /**
      * Remove a connection by name.
      *
-     * @param  string  $name  Connection name
+     * @param string $name Connection name
      * @return void
      */
     public static function removeConnection(string $name): void
@@ -388,7 +406,7 @@ class DB
     /**
      * Check if a connection exists.
      *
-     * @param  string  $name  Connection name
+     * @param string $name Connection name
      * @return bool
      */
     public static function hasConnection(string $name): bool
@@ -398,6 +416,8 @@ class DB
 
     /**
      * Resets the entire database system. Crucial for isolated testing.
+     *
+     * @return void
      */
     public static function reset(): void
     {

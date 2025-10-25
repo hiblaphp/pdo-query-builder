@@ -27,7 +27,7 @@ return [
     | PDO attributes to control behavior like error handling and fetch modes.
     | You can add more connections as needed for your application.
     |
-    | Supported drivers: "sqlite", "mysql", "pgsql", "sqlsrv"
+    | Supported drivers: "sqlite", "mysql", "pgsql", "pgsql_native", "sqlsrv"
     |
     */
     'connections' => [
@@ -77,6 +77,16 @@ return [
                 PDO::ATTR_EMULATE_PREPARES => false,
                 PDO::ATTR_PERSISTENT => true,
             ],
+        ],
+
+        'pgsql_native' => [
+            'driver' => 'pgsql_native',
+            'host' => env('DB_HOST', '127.0.0.1'),
+            'port' => env('DB_PORT', 5432, true),
+            'database' => env('DB_DATABASE', 'test'),
+            'username' => env('DB_USERNAME', 'postgres'),
+            'password' => env('DB_PASSWORD', ''),
+            'pool_size' => env('DB_POOL_SIZE', 10, true),
         ],
 
         'sqlsrv' => [
