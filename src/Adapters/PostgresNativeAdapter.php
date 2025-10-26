@@ -29,19 +29,18 @@ class PostgresNativeAdapter implements ConnectionInterface
      */
     public function __construct(array $config, int $poolSize = 10)
     {
-        $pgConfig = [
-            'host' => $config['host'],
-            'port' => $config['port'],
-            'database' => $config['database'],
-            'username' => $config['username'],
-            'password' => $config['password'] ?? '',
-        ];
+        $this->connection = new AsyncPgSQLConnection($config, $poolSize);
+    }
 
-        if (isset($config['options']) && is_array($config['options'])) {
-            $pgConfig['options'] = $config['options'];
-        }
-
-        $this->connection = new AsyncPgSQLConnection($pgConfig, $poolSize);
+    /**
+     * Convert bindings to positional array.
+     *
+     * @param array<int|string, mixed> $bindings
+     * @return array<int, mixed>
+     */
+    private function normalizeBindings(array $bindings): array
+    {
+        return array_values($bindings);
     }
 
     /**
@@ -49,12 +48,7 @@ class PostgresNativeAdapter implements ConnectionInterface
      */
     public function query(string $sql, array $bindings = []): PromiseInterface
     {
-        return async(function () use ($sql, $bindings) {
-            $convertedSql = $this->convertPlaceholders($sql, $bindings);
-            $indexedBindings = array_values($bindings);
-
-            return await($this->connection->query($convertedSql, $indexedBindings));
-        });
+        return $this->connection->query($sql, $this->normalizeBindings($bindings));
     }
 
     /**
@@ -63,11 +57,7 @@ class PostgresNativeAdapter implements ConnectionInterface
     public function fetchOne(string $sql, array $bindings = []): PromiseInterface
     {
         return async(function () use ($sql, $bindings) {
-            $convertedSql = $this->convertPlaceholders($sql, $bindings);
-            $indexedBindings = array_values($bindings);
-
-            $result = await($this->connection->fetchOne($convertedSql, $indexedBindings));
-
+            $result = await($this->connection->fetchOne($sql, $this->normalizeBindings($bindings)));
             return $result === null ? false : $result;
         });
     }
@@ -77,12 +67,7 @@ class PostgresNativeAdapter implements ConnectionInterface
      */
     public function fetchValue(string $sql, array $bindings = []): PromiseInterface
     {
-        return async(function () use ($sql, $bindings) {
-            $convertedSql = $this->convertPlaceholders($sql, $bindings);
-            $indexedBindings = array_values($bindings);
-
-            return await($this->connection->fetchValue($convertedSql, $indexedBindings));
-        });
+        return $this->connection->fetchValue($sql, $this->normalizeBindings($bindings));
     }
 
     /**
@@ -90,12 +75,7 @@ class PostgresNativeAdapter implements ConnectionInterface
      */
     public function execute(string $sql, array $bindings = []): PromiseInterface
     {
-        return async(function () use ($sql, $bindings) {
-            $convertedSql = $this->convertPlaceholders($sql, $bindings);
-            $indexedBindings = array_values($bindings);
-
-            return await($this->connection->execute($convertedSql, $indexedBindings));
-        });
+        return $this->connection->execute($sql, $this->normalizeBindings($bindings));
     }
 
     /**
@@ -162,35 +142,5 @@ class PostgresNativeAdapter implements ConnectionInterface
     public function getNativeConnection(): AsyncPgSQLConnection
     {
         return $this->connection;
-    }
-
-    /**
-     * Convert ? placeholders to PostgreSQL $1, $2, $3 format.
-     *
-     * @param string $sql SQL with ? placeholders
-     * @param array<int|string, mixed> $bindings
-     * @return string SQL with $n placeholders
-     */
-    private function convertPlaceholders(string $sql, array &$bindings): string
-    {
-        if ($bindings === []) {
-            return $sql;
-        }
-
-        if (array_keys($bindings) !== range(0, count($bindings) - 1)) {
-            $bindings = array_values($bindings);
-        }
-
-        $count = 0;
-
-        return (string) preg_replace_callback(
-            '/\?/',
-            function () use (&$count): string {
-                $count++;
-
-                return '$' . $count;
-            },
-            $sql
-        );
     }
 }

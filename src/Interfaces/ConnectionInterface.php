@@ -79,7 +79,7 @@ interface ConnectionInterface
      * Execute a callback with the underlying connection.
      *
      * @template TResult
-     * @param callable $callback
+     * @param callable(): TResult $callback
      * @return PromiseInterface<TResult>
      */
     public function run(callable $callback): PromiseInterface;

@@ -28,9 +28,7 @@ class DB
     /**
      * Private constructor to prevent direct instantiation.
      */
-    private function __construct()
-    {
-    }
+    private function __construct() {}
 
     /**
      * Get or create a connection proxy.
@@ -65,9 +63,14 @@ class DB
             throw new InvalidConnectionConfigException("Connection '{$connectionName}' not found in configuration.");
         }
 
+        /** @var array<string, mixed> $connectionConfig */
         $connectionConfig = $connections[$connectionName];
         $driver = $connectionConfig['driver'] ?? 'mysql';
-        $poolSize = is_int($connectionConfig['pool_size'] ?? null) ? $connectionConfig['pool_size'] : 10;
+        if (!is_string($driver)) {
+            throw new InvalidConnectionConfigException('Driver must be a string.');
+        }
+
+        $poolSize = $connectionConfig['pool_size'] ?? 10;
 
         if (! is_int($poolSize) || $poolSize < 1) {
             throw new InvalidPoolSizeException();
@@ -115,6 +118,10 @@ class DB
         }
 
         $driver = $config['driver'] ?? 'mysql';
+        if (!is_string($driver)) {
+            throw new InvalidConnectionConfigException('Driver must be a string.');
+        }
+
         $connection = self::createAdapter($driver, $config, $poolSize);
         self::$connections[$name] = $connection;
 
@@ -154,6 +161,10 @@ class DB
             }
 
             $driver = $config['driver'] ?? 'mysql';
+            if (!is_string($driver)) {
+                throw new InvalidConnectionConfigException("Driver for connection '{$name}' must be a string.");
+            }
+
             $connection = self::createAdapter($driver, $config, $poolSize);
             self::$connections[$name] = $connection;
         }
@@ -340,15 +351,13 @@ class DB
      * Execute a callback with a connection on the default connection.
      *
      * @template TResult
-     * @param callable $callback Callback that receives connection instance
+     * @param callable(): TResult $callback Callback that receives connection instance
      * @return PromiseInterface<TResult>
-     * @phpstan-return PromiseInterface<TResult>
      */
     public static function run(callable $callback): PromiseInterface
     {
         $proxy = self::connection();
 
-        /** @phpstan-var PromiseInterface<TResult> */
         return $proxy->run($callback);
     }
 
@@ -369,6 +378,10 @@ class DB
         }
 
         $driver = $connectionConfig['driver'] ?? 'mysql';
+        if (!is_string($driver)) {
+            throw new InvalidConnectionConfigException('Driver must be a string.');
+        }
+
         $connection = self::createAdapter($driver, $connectionConfig, $poolSize);
         self::$connections[$name] = $connection;
 

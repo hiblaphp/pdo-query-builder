@@ -28,7 +28,9 @@ class PdoAdapter implements ConnectionInterface
     public function __construct(array $config, int $poolSize = 10)
     {
         $this->connection = new AsyncPDOConnection($config, $poolSize);
-        $this->driver = $config['driver'] ?? 'mysql';
+        $driver = $config['driver'] ?? 'mysql';
+        assert(is_string($driver));
+        $this->driver = $driver;
     }
 
     /**

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Hibla\PdoQueryBuilder\Utilities;
 
 use Hibla\AsyncPDO\AsyncPDOConnection;
+use Hibla\PdoQueryBuilder\Adapters\PdoAdapter;
 use Hibla\PdoQueryBuilder\Interfaces\ConnectionInterface;
 use Hibla\PdoQueryBuilder\DB;
 use Hibla\PdoQueryBuilder\Pagination\CursorPaginator;
@@ -54,31 +55,6 @@ class Builder extends QueryBuilderBase
         return $clone;
     }
 
-    // /**
-    //  * Get the connection instance.
-    //  *
-    //  * @throws \RuntimeException If no connection can be obtained
-    //  */
-    // private function getConnection(): AsyncPDOConnection
-    // {
-    //     if ($this->connection !== null) {
-    //         return $this->connection;
-    //     }
-
-    //     try {
-    //         $proxy = DB::connection();
-    //         $connection = $proxy->getConnection();
-
-    //         $this->connection = $connection;
-
-    //         return $connection;
-    //     } catch (\Throwable $e) {
-    //         throw new \RuntimeException(
-    //             'No connection available. Ensure database configuration is loaded properly. Error: ' . $e->getMessage()
-    //         );
-    //     }
-    // }
-
     /**
      * Set the connection adapter for this builder instance.
      */
@@ -104,7 +80,7 @@ class Builder extends QueryBuilderBase
         }
 
         if ($this->connection !== null) {
-            $this->connectionAdapter = new \Hibla\PdoQueryBuilder\Adapters\PdoAdapter(
+            $this->connectionAdapter = new PdoAdapter(
                 [], 
                 10
             );

@@ -127,7 +127,7 @@ class ConnectionProxy implements ProxyInterface
      * Execute a callback with the underlying connection.
      *
      * @template TResult
-     * @param callable $callback Callback that receives connection instance
+     * @param callable(): TResult $callback Callback that receives connection instance
      * @return PromiseInterface<TResult>
      */
     public function run(callable $callback): PromiseInterface
