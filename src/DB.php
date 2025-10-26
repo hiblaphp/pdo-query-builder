@@ -12,6 +12,7 @@ use Hibla\QueryBuilder\Exceptions\InvalidConnectionConfigException;
 use Hibla\QueryBuilder\Exceptions\InvalidPoolSizeException;
 use Hibla\QueryBuilder\Utilities\Builder;
 use Hibla\Promise\Interfaces\PromiseInterface;
+use Hibla\QueryBuilder\Adapters\MySQLiAdapter;
 use Rcalicdan\ConfigLoader\Config;
 
 /**
@@ -96,6 +97,7 @@ class DB
     {
         return match ($driver) {
             'pgsql_native' => new PostgresNativeAdapter($config, $poolSize),
+            'mysqli' => new MySQLiAdapter($config, $poolSize),
             default => new PdoAdapter($config, $poolSize),
         };
     }

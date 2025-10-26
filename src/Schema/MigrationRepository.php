@@ -69,9 +69,9 @@ class MigrationRepository
     private function quoteIdentifier(string $identifier): string
     {
         return match ($this->driver) {
-            'pgsql' => "\"{$identifier}\"",
+            'pgsql', 'pgsql_native' => "\"{$identifier}\"",
             'sqlsrv' => "[{$identifier}]",
-            'sqlite', 'mysql' => "`{$identifier}`",
+            'sqlite', 'mysql', 'mysqli' => "`{$identifier}`",
             default => "`{$identifier}`",
         };
     }
@@ -86,7 +86,7 @@ class MigrationRepository
         $table = $this->quoteIdentifier($this->table);
 
         $sql = match ($this->driver) {
-            'pgsql' => "CREATE TABLE IF NOT EXISTS {$table} (
+            'pgsql', 'pgsql_native' => "CREATE TABLE IF NOT EXISTS {$table} (
                 id SERIAL PRIMARY KEY,
                 migration VARCHAR(255) NOT NULL,
                 batch INTEGER NOT NULL,
@@ -220,7 +220,7 @@ class MigrationRepository
     public function repositoryExists(): PromiseInterface
     {
         $sql = match ($this->driver) {
-            'pgsql' => "SELECT COUNT(*) FROM information_schema.tables 
+            'pgsql', 'pgsql_native' => "SELECT COUNT(*) FROM information_schema.tables 
                        WHERE table_schema = 'public' AND table_name = ?",
             'sqlsrv' => 'SELECT COUNT(*) FROM INFORMATION_SCHEMA.TABLES 
                         WHERE TABLE_NAME = ?',

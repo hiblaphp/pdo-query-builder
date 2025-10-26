@@ -314,7 +314,7 @@ class SchemaBuilder
     private function nullPromise(): PromiseInterface
     {
         /** @phpstan-ignore-next-line */
-        return async(static fn () => null);
+        return async(static fn() => null);
     }
 
     /**
@@ -360,8 +360,8 @@ class SchemaBuilder
     private function getCompiler(): SchemaCompiler
     {
         return match ($this->driver) {
-            'mysql' => new Compilers\MySQLSchemaCompiler(),
-            'pgsql' => new Compilers\PostgreSQLSchemaCompiler(),
+            'mysql', 'mysqli' => new Compilers\MySQLSchemaCompiler(),
+            'pgsql', 'pgsql_native' => new Compilers\PostgreSQLSchemaCompiler(),
             'sqlite' => new Compilers\SQLiteSchemaCompiler(),
             'sqlsrv' => new Compilers\SQLServerSchemaCompiler(),
             default => new Compilers\MySQLSchemaCompiler(),
