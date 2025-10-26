@@ -1,6 +1,6 @@
 <?php
 
-use Hibla\PdoQueryBuilder\Schema\Blueprint;
+use Hibla\QueryBuilder\Schema\Blueprint;
 
 beforeEach(function () {
     initializeSchemaForSqlite();

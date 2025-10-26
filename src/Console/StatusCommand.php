@@ -2,9 +2,9 @@
 
 declare(strict_types=1);
 
-namespace Hibla\PdoQueryBuilder\Console;
+namespace Hibla\QueryBuilder\Console;
 
-use Hibla\PdoQueryBuilder\Console\Traits\FindProjectRoot;
+use Hibla\QueryBuilder\Console\Traits\FindProjectRoot;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Output\OutputInterface;

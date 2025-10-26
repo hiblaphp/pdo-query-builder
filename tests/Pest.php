@@ -1,6 +1,6 @@
 <?php
 
-use Hibla\PdoQueryBuilder\DB;
+use Hibla\QueryBuilder\DB;
 use Tests\Helpers\SchemaTestHelper;
 use Tests\Helpers\ConsoleTestHelper;
 

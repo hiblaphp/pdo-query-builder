@@ -2,10 +2,10 @@
 
 declare(strict_types=1);
 
-namespace Hibla\PdoQueryBuilder\Utilities;
+namespace Hibla\QueryBuilder\Utilities;
 
-use Hibla\PdoQueryBuilder\Pagination\CursorPaginator;
-use Hibla\PdoQueryBuilder\Pagination\Paginator;
+use Hibla\QueryBuilder\Pagination\CursorPaginator;
+use Hibla\QueryBuilder\Pagination\Paginator;
 use Rcalicdan\ConfigLoader\Config;
 
 /**

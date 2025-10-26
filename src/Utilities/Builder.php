@@ -2,14 +2,14 @@
 
 declare(strict_types=1);
 
-namespace Hibla\PdoQueryBuilder\Utilities;
+namespace Hibla\QueryBuilder\Utilities;
 
 use Hibla\AsyncPDO\AsyncPDOConnection;
-use Hibla\PdoQueryBuilder\Adapters\PdoAdapter;
-use Hibla\PdoQueryBuilder\Interfaces\ConnectionInterface;
-use Hibla\PdoQueryBuilder\DB;
-use Hibla\PdoQueryBuilder\Pagination\CursorPaginator;
-use Hibla\PdoQueryBuilder\Pagination\Paginator;
+use Hibla\QueryBuilder\Adapters\PdoAdapter;
+use Hibla\QueryBuilder\Interfaces\ConnectionInterface;
+use Hibla\QueryBuilder\DB;
+use Hibla\QueryBuilder\Pagination\CursorPaginator;
+use Hibla\QueryBuilder\Pagination\Paginator;
 use Hibla\Promise\Interfaces\PromiseInterface;
 use Hibla\Promise\Promise;
 use Rcalicdan\QueryBuilderPrimitives\QueryBuilderBase;

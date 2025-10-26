@@ -1,6 +1,6 @@
 <?php
 
-namespace Hibla\PdoQueryBuilder\Console\Traits;
+namespace Hibla\QueryBuilder\Console\Traits;
 
 use InvalidArgumentException;
 use Rcalicdan\ConfigLoader\Config;

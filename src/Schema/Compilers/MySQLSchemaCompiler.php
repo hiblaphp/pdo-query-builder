@@ -2,18 +2,18 @@
 
 declare(strict_types=1);
 
-namespace Hibla\PdoQueryBuilder\Schema\Compilers;
+namespace Hibla\QueryBuilder\Schema\Compilers;
 
-use Hibla\PdoQueryBuilder\Schema\Blueprint;
-use Hibla\PdoQueryBuilder\Schema\Column;
-use Hibla\PdoQueryBuilder\Schema\Compilers\Utilities\MySQLDefaultValueCompiler;
-use Hibla\PdoQueryBuilder\Schema\Compilers\Utilities\MySQLForeignKeyCompiler;
-use Hibla\PdoQueryBuilder\Schema\Compilers\Utilities\MySQLIndexCompiler;
-use Hibla\PdoQueryBuilder\Schema\Compilers\Utilities\MySQLTypeMapper;
-use Hibla\PdoQueryBuilder\Schema\Compilers\Utilities\ValueQuoter;
-use Hibla\PdoQueryBuilder\Schema\ForeignKey;
-use Hibla\PdoQueryBuilder\Schema\IndexDefinition;
-use Hibla\PdoQueryBuilder\Schema\SchemaCompiler;
+use Hibla\QueryBuilder\Schema\Blueprint;
+use Hibla\QueryBuilder\Schema\Column;
+use Hibla\QueryBuilder\Schema\Compilers\Utilities\MySQLDefaultValueCompiler;
+use Hibla\QueryBuilder\Schema\Compilers\Utilities\MySQLForeignKeyCompiler;
+use Hibla\QueryBuilder\Schema\Compilers\Utilities\MySQLIndexCompiler;
+use Hibla\QueryBuilder\Schema\Compilers\Utilities\MySQLTypeMapper;
+use Hibla\QueryBuilder\Schema\Compilers\Utilities\ValueQuoter;
+use Hibla\QueryBuilder\Schema\ForeignKey;
+use Hibla\QueryBuilder\Schema\IndexDefinition;
+use Hibla\QueryBuilder\Schema\SchemaCompiler;
 use PDO;
 
 class MySQLSchemaCompiler implements SchemaCompiler

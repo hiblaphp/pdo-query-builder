@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace Hibla\PdoQueryBuilder\Schema;
+namespace Hibla\QueryBuilder\Schema;
 
 use PDO;
 use Rcalicdan\ConfigLoader\Config;
@@ -27,7 +27,7 @@ class DatabaseManager
 
     public function __construct(?string $connection = null)
     {
-        $dbConfig = Config::get('pdo-query-builder');
+        $dbConfig = Config::get('async-database');
 
         if (! is_array($dbConfig)) {
             throw new \RuntimeException('Invalid database configuration format');

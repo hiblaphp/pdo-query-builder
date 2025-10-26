@@ -2,9 +2,9 @@
 
 declare(strict_types=1);
 
-namespace Hibla\PdoQueryBuilder\Console;
+namespace Hibla\QueryBuilder\Console;
 
-use Hibla\PdoQueryBuilder\Console\Traits\FindProjectRoot;
+use Hibla\QueryBuilder\Console\Traits\FindProjectRoot;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Input\InputOption;
@@ -171,16 +171,16 @@ class InitCommand extends Command
 require_once __DIR__ . '/vendor/autoload.php';
 
 use Symfony\Component\Console\Application;
-use Hibla\PdoQueryBuilder\Console\InitCommand;
-use Hibla\PdoQueryBuilder\Console\PublishTemplatesCommand;
-use Hibla\PdoQueryBuilder\Console\MakeMigrationCommand;
-use Hibla\PdoQueryBuilder\Console\MigrateCommand;
-use Hibla\PdoQueryBuilder\Console\MigrateRollbackCommand;
-use Hibla\PdoQueryBuilder\Console\MigrateResetCommand;
-use Hibla\PdoQueryBuilder\Console\MigrateRefreshCommand;
-use Hibla\PdoQueryBuilder\Console\MigrateFreshCommand;
-use Hibla\PdoQueryBuilder\Console\MigrateStatusCommand;
-use Hibla\PdoQueryBuilder\Console\StatusCommand;
+use Hibla\QueryBuilder\Console\InitCommand;
+use Hibla\QueryBuilder\Console\PublishTemplatesCommand;
+use Hibla\QueryBuilder\Console\MakeMigrationCommand;
+use Hibla\QueryBuilder\Console\MigrateCommand;
+use Hibla\QueryBuilder\Console\MigrateRollbackCommand;
+use Hibla\QueryBuilder\Console\MigrateResetCommand;
+use Hibla\QueryBuilder\Console\MigrateRefreshCommand;
+use Hibla\QueryBuilder\Console\MigrateFreshCommand;
+use Hibla\QueryBuilder\Console\MigrateStatusCommand;
+use Hibla\QueryBuilder\Console\StatusCommand;
 
 $application = new Application('Async PDO Query Builder', '1.0.0');
 

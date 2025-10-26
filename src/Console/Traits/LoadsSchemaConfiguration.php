@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace Hibla\PdoQueryBuilder\Console\Traits;
+namespace Hibla\QueryBuilder\Console\Traits;
 
 use Rcalicdan\ConfigLoader\Config;
 
@@ -46,7 +46,7 @@ trait LoadsSchemaConfiguration
     private function loadConfigSafely(?string $connection): array
     {
         try {
-            $config = Config::get('pdo-schema');
+            $config = Config::get('async-migrations');
 
             if (! is_array($config)) {
                 return [];

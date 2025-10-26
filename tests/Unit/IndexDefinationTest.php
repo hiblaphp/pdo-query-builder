@@ -1,6 +1,6 @@
 <?php
 
-use Hibla\PdoQueryBuilder\Schema\IndexDefinition;
+use Hibla\QueryBuilder\Schema\IndexDefinition;
 
 describe('IndexDefinition Class', function () {
     it('creates index definition with correct attributes', function () {

@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace Hibla\PdoQueryBuilder\Exceptions;
+namespace Hibla\QueryBuilder\Exceptions;
 
 /**
  * Thrown when default connection is not properly configured

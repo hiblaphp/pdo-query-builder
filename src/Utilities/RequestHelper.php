@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace Hibla\PdoQueryBuilder\Utilities;
+namespace Hibla\QueryBuilder\Utilities;
 
 /**
  * Helper class for HTTP request handling.

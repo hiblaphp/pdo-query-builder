@@ -2,10 +2,10 @@
 
 declare(strict_types=1);
 
-namespace Hibla\PdoQueryBuilder\Adapters;
+namespace Hibla\QueryBuilder\Adapters;
 
 use Hibla\Postgres\AsyncPgSQLConnection;
-use Hibla\PdoQueryBuilder\Interfaces\ConnectionInterface;
+use Hibla\QueryBuilder\Interfaces\ConnectionInterface;
 use Hibla\Promise\Interfaces\PromiseInterface;
 
 use function Hibla\async;

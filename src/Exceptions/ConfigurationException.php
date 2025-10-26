@@ -2,11 +2,11 @@
 
 declare(strict_types=1);
 
-namespace Hibla\PdoQueryBuilder\Exceptions;
+namespace Hibla\QueryBuilder\Exceptions;
 
 /**
  * Thrown when configuration files or .env cannot be loaded
  */
-class ConfigurationException extends PDOQueryBuilderException
+class ConfigurationException extends QueryBuilderException
 {
 }

@@ -2,9 +2,9 @@
 
 declare(strict_types=1);
 
-namespace Hibla\PdoQueryBuilder\Console;
+namespace Hibla\QueryBuilder\Console;
 
-use Hibla\PdoQueryBuilder\Console\Traits\FindProjectRoot;
+use Hibla\QueryBuilder\Console\Traits\FindProjectRoot;
 use Rcalicdan\ConfigLoader\Config;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Input\InputInterface;
@@ -99,7 +99,7 @@ class PublishTemplatesCommand extends Command
     private function getConfiguredPath(): ?string
     {
         try {
-            $dbConfig = Config::get('pdo-query-builder');
+            $dbConfig = Config::get('async-database');
 
             if (! is_array($dbConfig)) {
                 return null;
@@ -368,7 +368,7 @@ class PublishTemplatesCommand extends Command
     private function buildVendorPath(): string
     {
         return $this->projectRoot . DIRECTORY_SEPARATOR . 'vendor' . DIRECTORY_SEPARATOR . 'hibla'
-            . DIRECTORY_SEPARATOR . 'pdo-query-builder' . DIRECTORY_SEPARATOR . 'src'
+            . DIRECTORY_SEPARATOR . 'async-database' . DIRECTORY_SEPARATOR . 'src'
             . DIRECTORY_SEPARATOR . 'Pagination' . DIRECTORY_SEPARATOR . 'templates';
     }
 

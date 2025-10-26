@@ -2,14 +2,14 @@
 
 declare(strict_types=1);
 
-namespace Hibla\PdoQueryBuilder\Console;
+namespace Hibla\QueryBuilder\Console;
 
-use Hibla\PdoQueryBuilder\Console\Traits\FindProjectRoot;
-use Hibla\PdoQueryBuilder\Console\Traits\InitializeDatabase;
-use Hibla\PdoQueryBuilder\Console\Traits\LoadsSchemaConfiguration;
-use Hibla\PdoQueryBuilder\Console\Traits\ValidateConnection;
-use Hibla\PdoQueryBuilder\Schema\DatabaseManager;
-use Hibla\PdoQueryBuilder\Schema\MigrationRepository;
+use Hibla\QueryBuilder\Console\Traits\FindProjectRoot;
+use Hibla\QueryBuilder\Console\Traits\InitializeDatabase;
+use Hibla\QueryBuilder\Console\Traits\LoadsSchemaConfiguration;
+use Hibla\QueryBuilder\Console\Traits\ValidateConnection;
+use Hibla\QueryBuilder\Schema\DatabaseManager;
+use Hibla\QueryBuilder\Schema\MigrationRepository;
 use Hibla\Promise\Interfaces\PromiseInterface;
 use InvalidArgumentException;
 use Rcalicdan\ConfigLoader\Config;
@@ -245,7 +245,7 @@ class MigrateCommand extends Command
     private function getDatabaseName(): string
     {
         try {
-            $dbConfig = Config::get('pdo-query-builder');
+            $dbConfig = Config::get('async-database');
 
             if (! is_array($dbConfig)) {
                 return 'unknown';

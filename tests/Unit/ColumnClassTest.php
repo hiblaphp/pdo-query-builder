@@ -1,6 +1,6 @@
 <?php
 
-use Hibla\PdoQueryBuilder\Schema\Column;
+use Hibla\QueryBuilder\Schema\Column;
 
 describe('Column Class', function () {
     it('creates column with correct attributes', function () {

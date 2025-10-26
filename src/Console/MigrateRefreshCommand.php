@@ -2,9 +2,9 @@
 
 declare(strict_types=1);
 
-namespace Hibla\PdoQueryBuilder\Console;
+namespace Hibla\QueryBuilder\Console;
 
-use Hibla\PdoQueryBuilder\Console\Traits\ValidateConnection;
+use Hibla\QueryBuilder\Console\Traits\ValidateConnection;
 use InvalidArgumentException;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Input\ArrayInput;

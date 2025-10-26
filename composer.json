@@ -5,7 +5,7 @@
     "license": "MIT",
     "autoload": {
         "psr-4": {
-            "Hibla\\PdoQueryBuilder\\": "src/"
+            "Hibla\\QueryBuilder\\": "src/"
         }
     },
     "autoload-dev": {

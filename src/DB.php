@@ -2,15 +2,15 @@
 
 declare(strict_types=1);
 
-namespace Hibla\PdoQueryBuilder;
+namespace Hibla\QueryBuilder;
 
-use Hibla\PdoQueryBuilder\Adapters\PdoAdapter;
-use Hibla\PdoQueryBuilder\Adapters\PostgresNativeAdapter;
-use Hibla\PdoQueryBuilder\Interfaces\ConnectionInterface;
-use Hibla\PdoQueryBuilder\Exceptions\DatabaseConfigNotFoundException;
-use Hibla\PdoQueryBuilder\Exceptions\InvalidConnectionConfigException;
-use Hibla\PdoQueryBuilder\Exceptions\InvalidPoolSizeException;
-use Hibla\PdoQueryBuilder\Utilities\Builder;
+use Hibla\QueryBuilder\Adapters\PdoAdapter;
+use Hibla\QueryBuilder\Adapters\PostgresNativeAdapter;
+use Hibla\QueryBuilder\Interfaces\ConnectionInterface;
+use Hibla\QueryBuilder\Exceptions\DatabaseConfigNotFoundException;
+use Hibla\QueryBuilder\Exceptions\InvalidConnectionConfigException;
+use Hibla\QueryBuilder\Exceptions\InvalidPoolSizeException;
+use Hibla\QueryBuilder\Utilities\Builder;
 use Hibla\Promise\Interfaces\PromiseInterface;
 use Rcalicdan\ConfigLoader\Config;
 
@@ -48,7 +48,7 @@ class DB
             return new ConnectionProxy(self::$connections[$connectionName], $connectionName);
         }
 
-        $dbConfigAll = Config::get('pdo-query-builder');
+        $dbConfigAll = Config::get('async-database');
 
         if (! is_array($dbConfigAll)) {
             throw new DatabaseConfigNotFoundException();
@@ -220,7 +220,7 @@ class DB
             return self::$defaultConnectionName;
         }
 
-        $dbConfigAll = Config::get('pdo-query-builder');
+        $dbConfigAll = Config::get('async-database');
 
         if (! is_array($dbConfigAll)) {
             throw new DatabaseConfigNotFoundException();

@@ -2,9 +2,9 @@
 
 declare(strict_types=1);
 
-namespace Hibla\PdoQueryBuilder\Interfaces;
+namespace Hibla\QueryBuilder\Interfaces;
 
-use Hibla\PdoQueryBuilder\Utilities\Builder;
+use Hibla\QueryBuilder\Utilities\Builder;
 use Hibla\Promise\Interfaces\PromiseInterface;
 
 /**

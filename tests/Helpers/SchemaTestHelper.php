@@ -2,8 +2,8 @@
 
 namespace Tests\Helpers;
 
-use Hibla\PdoQueryBuilder\DB;
-use Hibla\PdoQueryBuilder\Schema\SchemaBuilder;
+use Hibla\QueryBuilder\DB;
+use Hibla\QueryBuilder\Schema\SchemaBuilder;
 
 class SchemaTestHelper
 {

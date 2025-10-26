@@ -2,17 +2,17 @@
 
 declare(strict_types=1);
 
-namespace Hibla\PdoQueryBuilder\Schema\Compilers;
+namespace Hibla\QueryBuilder\Schema\Compilers;
 
-use Hibla\PdoQueryBuilder\Schema\Blueprint;
-use Hibla\PdoQueryBuilder\Schema\Column;
-use Hibla\PdoQueryBuilder\Schema\Compilers\Utilities\PostgreSQLDefaultValueCompiler;
-use Hibla\PdoQueryBuilder\Schema\Compilers\Utilities\PostgreSQLForeignKeyCompiler;
-use Hibla\PdoQueryBuilder\Schema\Compilers\Utilities\PostgreSQLIndexCompiler;
-use Hibla\PdoQueryBuilder\Schema\Compilers\Utilities\PostgreSQLTypeMapper;
-use Hibla\PdoQueryBuilder\Schema\ForeignKey;
-use Hibla\PdoQueryBuilder\Schema\IndexDefinition;
-use Hibla\PdoQueryBuilder\Schema\SchemaCompiler;
+use Hibla\QueryBuilder\Schema\Blueprint;
+use Hibla\QueryBuilder\Schema\Column;
+use Hibla\QueryBuilder\Schema\Compilers\Utilities\PostgreSQLDefaultValueCompiler;
+use Hibla\QueryBuilder\Schema\Compilers\Utilities\PostgreSQLForeignKeyCompiler;
+use Hibla\QueryBuilder\Schema\Compilers\Utilities\PostgreSQLIndexCompiler;
+use Hibla\QueryBuilder\Schema\Compilers\Utilities\PostgreSQLTypeMapper;
+use Hibla\QueryBuilder\Schema\ForeignKey;
+use Hibla\QueryBuilder\Schema\IndexDefinition;
+use Hibla\QueryBuilder\Schema\SchemaCompiler;
 
 class PostgreSQLSchemaCompiler implements SchemaCompiler
 {

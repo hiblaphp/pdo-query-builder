@@ -2,9 +2,9 @@
 
 declare(strict_types=1);
 
-namespace Hibla\PdoQueryBuilder\Console\Traits;
+namespace Hibla\QueryBuilder\Console\Traits;
 
-use Hibla\PdoQueryBuilder\DB;
+use Hibla\QueryBuilder\DB;
 
 trait InitializeDatabase
 {

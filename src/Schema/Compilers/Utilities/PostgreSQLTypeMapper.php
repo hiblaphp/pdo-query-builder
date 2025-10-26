@@ -2,9 +2,9 @@
 
 declare(strict_types=1);
 
-namespace Hibla\PdoQueryBuilder\Schema\Compilers\Utilities;
+namespace Hibla\QueryBuilder\Schema\Compilers\Utilities;
 
-use Hibla\PdoQueryBuilder\Schema\Column;
+use Hibla\QueryBuilder\Schema\Column;
 
 /**
  * PostgreSQL-specific type mapping

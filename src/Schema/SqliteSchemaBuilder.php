@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace Hibla\PdoQueryBuilder\Schema;
+namespace Hibla\QueryBuilder\Schema;
 
 use function Hibla\async;
 
@@ -29,9 +29,9 @@ class SQLiteSchemaBuilder
     {
         /** @phpstan-ignore-next-line */
         return async(function () use ($sql) {
-            await(\Hibla\PdoQueryBuilder\DB::rawExecute('PRAGMA foreign_keys = ON', []));
+            await(\Hibla\QueryBuilder\DB::rawExecute('PRAGMA foreign_keys = ON', []));
 
-            return await(\Hibla\PdoQueryBuilder\DB::rawExecute($sql, []));
+            return await(\Hibla\QueryBuilder\DB::rawExecute($sql, []));
         });
     }
 
@@ -105,13 +105,13 @@ class SQLiteSchemaBuilder
     {
         /** @phpstan-ignore-next-line */
         return async(function () use ($table, $blueprint) {
-            $existingColumns = await(\Hibla\PdoQueryBuilder\DB::raw("PRAGMA table_info(`{$table}`)", []));
+            $existingColumns = await(\Hibla\QueryBuilder\DB::raw("PRAGMA table_info(`{$table}`)", []));
 
             if (method_exists($this->compiler, 'setExistingTableColumns')) {
                 $this->compiler->setExistingTableColumns($existingColumns);
             }
 
-            await(\Hibla\PdoQueryBuilder\DB::rawExecute('PRAGMA foreign_keys = ON', []));
+            await(\Hibla\QueryBuilder\DB::rawExecute('PRAGMA foreign_keys = ON', []));
 
             $sql = $this->compiler->compileAlter($blueprint);
 
@@ -119,7 +119,7 @@ class SQLiteSchemaBuilder
                 return $this->executeStatements($sql);
             }
 
-            return await(\Hibla\PdoQueryBuilder\DB::rawExecute($sql, []));
+            return await(\Hibla\QueryBuilder\DB::rawExecute($sql, []));
         });
     }
 
@@ -134,13 +134,13 @@ class SQLiteSchemaBuilder
     {
         /** @phpstan-ignore-next-line */
         return async(function () use ($table, $blueprint) {
-            $existingColumns = await(\Hibla\PdoQueryBuilder\DB::raw("PRAGMA table_info(`{$table}`)", []));
+            $existingColumns = await(\Hibla\QueryBuilder\DB::raw("PRAGMA table_info(`{$table}`)", []));
 
             if (method_exists($this->compiler, 'setExistingTableColumns')) {
                 $this->compiler->setExistingTableColumns($existingColumns);
             }
 
-            await(\Hibla\PdoQueryBuilder\DB::rawExecute('PRAGMA foreign_keys = ON', []));
+            await(\Hibla\QueryBuilder\DB::rawExecute('PRAGMA foreign_keys = ON', []));
 
             $sql = $this->compiler->compileAlter($blueprint);
 
@@ -148,7 +148,7 @@ class SQLiteSchemaBuilder
                 return count($sql) === 0 ? true : $this->executeStatements($sql);
             }
 
-            return await(\Hibla\PdoQueryBuilder\DB::rawExecute($sql, []));
+            return await(\Hibla\QueryBuilder\DB::rawExecute($sql, []));
         });
     }
 
@@ -168,7 +168,7 @@ class SQLiteSchemaBuilder
                 return count($sql) === 0 ? true : $this->executeMultiple($sql);
             }
 
-            return await(\Hibla\PdoQueryBuilder\DB::rawExecute($sql, []));
+            return await(\Hibla\QueryBuilder\DB::rawExecute($sql, []));
         });
     }
 
@@ -183,13 +183,13 @@ class SQLiteSchemaBuilder
         return async(function () use ($statements) {
             try {
                 foreach ($statements as $statement) {
-                    await(\Hibla\PdoQueryBuilder\DB::rawExecute($statement, []));
+                    await(\Hibla\QueryBuilder\DB::rawExecute($statement, []));
                 }
 
                 return true;
             } catch (\Throwable $e) {
                 try {
-                    await(\Hibla\PdoQueryBuilder\DB::rawExecute('ROLLBACK', []));
+                    await(\Hibla\QueryBuilder\DB::rawExecute('ROLLBACK', []));
                 } catch (\Throwable $rollbackError) {
                 }
 
@@ -209,7 +209,7 @@ class SQLiteSchemaBuilder
         return async(function () use ($statements) {
             $results = [];
             foreach ($statements as $sql) {
-                $results[] = await(\Hibla\PdoQueryBuilder\DB::rawExecute($sql, []));
+                $results[] = await(\Hibla\QueryBuilder\DB::rawExecute($sql, []));
             }
 
             return $results;

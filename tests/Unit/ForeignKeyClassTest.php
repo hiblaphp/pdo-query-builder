@@ -1,6 +1,6 @@
 <?php
 
-use Hibla\PdoQueryBuilder\Schema\ForeignKey;
+use Hibla\QueryBuilder\Schema\ForeignKey;
 
 describe('ForeignKey Class', function () {
     it('creates foreign key with correct attributes', function () {

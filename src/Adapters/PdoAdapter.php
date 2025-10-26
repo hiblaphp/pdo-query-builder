@@ -2,17 +2,16 @@
 
 declare(strict_types=1);
 
-namespace Hibla\PdoQueryBuilder\Adapters;
+namespace Hibla\QueryBuilder\Adapters;
 
 use Hibla\AsyncPDO\AsyncPDOConnection;
-use Hibla\PdoQueryBuilder\Interfaces\ConnectionInterface;
+use Hibla\QueryBuilder\Interfaces\ConnectionInterface;
 use Hibla\Promise\Interfaces\PromiseInterface;
 
 /**
  * PDO Connection Adapter.
  * 
  * This adapter wraps AsyncPDOConnection to implement the ConnectionInterface,
- * maintaining backward compatibility with existing PDO-based code.
  */
 class PdoAdapter implements ConnectionInterface
 {

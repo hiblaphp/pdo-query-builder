@@ -1,6 +1,6 @@
 <?php
 
-namespace Hibla\PdoQueryBuilder\Pagination;
+namespace Hibla\QueryBuilder\Pagination;
 
 class TemplateEngine
 {

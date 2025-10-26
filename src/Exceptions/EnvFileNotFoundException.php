@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace Hibla\PdoQueryBuilder\Exceptions;
+namespace Hibla\QueryBuilder\Exceptions;
 
 /**
  * Thrown when .env file is missing or cannot be loaded

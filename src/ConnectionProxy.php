@@ -2,11 +2,11 @@
 
 declare(strict_types=1);
 
-namespace Hibla\PdoQueryBuilder;
+namespace Hibla\QueryBuilder;
 
-use Hibla\PdoQueryBuilder\Interfaces\ConnectionInterface;
-use Hibla\PdoQueryBuilder\Interfaces\ProxyInterface;
-use Hibla\PdoQueryBuilder\Utilities\Builder;
+use Hibla\QueryBuilder\Interfaces\ConnectionInterface;
+use Hibla\QueryBuilder\Interfaces\ProxyInterface;
+use Hibla\QueryBuilder\Utilities\Builder;
 use Hibla\Promise\Interfaces\PromiseInterface;
 
 /**

@@ -2,12 +2,12 @@
 
 declare(strict_types=1);
 
-namespace Hibla\PdoQueryBuilder\Console;
+namespace Hibla\QueryBuilder\Console;
 
-use Hibla\PdoQueryBuilder\Console\Traits\FindProjectRoot;
-use Hibla\PdoQueryBuilder\Console\Traits\LoadsSchemaConfiguration;
-use Hibla\PdoQueryBuilder\Console\Traits\ValidateConnection;
-use Hibla\PdoQueryBuilder\DB;
+use Hibla\QueryBuilder\Console\Traits\FindProjectRoot;
+use Hibla\QueryBuilder\Console\Traits\LoadsSchemaConfiguration;
+use Hibla\QueryBuilder\Console\Traits\ValidateConnection;
+use Hibla\QueryBuilder\DB;
 use InvalidArgumentException;
 use Rcalicdan\ConfigLoader\Config;
 use Symfony\Component\Console\Command\Command;
@@ -412,7 +412,7 @@ class MigrateFreshCommand extends Command
      */
     private function getDatabaseConfig(): ?array
     {
-        $dbConfig = Config::get('pdo-query-builder');
+        $dbConfig = Config::get('async-database');
 
         if (! is_array($dbConfig)) {
             return null;

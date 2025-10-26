@@ -2,13 +2,13 @@
 
 declare(strict_types=1);
 
-namespace Hibla\PdoQueryBuilder\Console;
+namespace Hibla\QueryBuilder\Console;
 
-use Hibla\PdoQueryBuilder\Console\Traits\FindProjectRoot;
-use Hibla\PdoQueryBuilder\Console\Traits\InitializeDatabase;
-use Hibla\PdoQueryBuilder\Console\Traits\LoadsSchemaConfiguration;
-use Hibla\PdoQueryBuilder\Console\Traits\ValidateConnection;
-use Hibla\PdoQueryBuilder\Schema\MigrationRepository;
+use Hibla\QueryBuilder\Console\Traits\FindProjectRoot;
+use Hibla\QueryBuilder\Console\Traits\InitializeDatabase;
+use Hibla\QueryBuilder\Console\Traits\LoadsSchemaConfiguration;
+use Hibla\QueryBuilder\Console\Traits\ValidateConnection;
+use Hibla\QueryBuilder\Schema\MigrationRepository;
 use Hibla\Promise\Interfaces\PromiseInterface;
 use InvalidArgumentException;
 use Symfony\Component\Console\Command\Command;

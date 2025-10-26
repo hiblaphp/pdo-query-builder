@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace Hibla\PdoQueryBuilder\Schema;
+namespace Hibla\QueryBuilder\Schema;
 
 use Hibla\Promise\Interfaces\PromiseInterface;
 use Rcalicdan\ConfigLoader\Config;
@@ -29,7 +29,7 @@ class MigrationRepository
     private function detectDriver(): string
     {
         try {
-            $dbConfig = Config::get('pdo-query-builder');
+            $dbConfig = Config::get('async-database');
 
             if (! is_array($dbConfig)) {
                 return 'mysql';
@@ -61,9 +61,9 @@ class MigrationRepository
     /**
      * Get the database connection to use.
      */
-    private function getConnection(): \Hibla\PdoQueryBuilder\ConnectionProxy
+    private function getConnection(): \Hibla\QueryBuilder\ConnectionProxy
     {
-        return \Hibla\PdoQueryBuilder\DB::connection($this->connection);
+        return \Hibla\QueryBuilder\DB::connection($this->connection);
     }
 
     private function quoteIdentifier(string $identifier): string

@@ -1,7 +1,7 @@
 <?php
 
-use Hibla\PdoQueryBuilder\DB;
-use Hibla\PdoQueryBuilder\Schema\Blueprint;
+use Hibla\QueryBuilder\DB;
+use Hibla\QueryBuilder\Schema\Blueprint;
 
 beforeEach(function () {
     initializeSchemaForPostgres();

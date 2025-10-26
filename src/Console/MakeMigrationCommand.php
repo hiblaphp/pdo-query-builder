@@ -2,11 +2,11 @@
 
 declare(strict_types=1);
 
-namespace Hibla\PdoQueryBuilder\Console;
+namespace Hibla\QueryBuilder\Console;
 
 use Carbon\Carbon;
-use Hibla\PdoQueryBuilder\Console\Traits\FindProjectRoot;
-use Hibla\PdoQueryBuilder\Console\Traits\LoadsSchemaConfiguration;
+use Hibla\QueryBuilder\Console\Traits\FindProjectRoot;
+use Hibla\QueryBuilder\Console\Traits\LoadsSchemaConfiguration;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Input\InputArgument;
 use Symfony\Component\Console\Input\InputInterface;
@@ -269,8 +269,8 @@ class MakeMigrationCommand extends Command
 
         return "<?php
 
-use Hibla\PdoQueryBuilder\Schema\Blueprint;
-use Hibla\PdoQueryBuilder\Schema\Migration;
+use Hibla\QueryBuilder\Schema\Blueprint;
+use Hibla\QueryBuilder\Schema\Migration;
 use Hibla\Promise\Interfaces\PromiseInterface;
 
 use function Hibla\async;
@@ -316,8 +316,8 @@ return new class extends Migration
 
         return "<?php
 
-use Hibla\PdoQueryBuilder\Schema\Blueprint;
-use Hibla\PdoQueryBuilder\Schema\Migration;
+use Hibla\QueryBuilder\Schema\Blueprint;
+use Hibla\QueryBuilder\Schema\Migration;
 use Hibla\Promise\Interfaces\PromiseInterface;
 
 use function Hibla\async;
@@ -364,8 +364,8 @@ return new class extends Migration
 
         return "<?php
 
-use Hibla\PdoQueryBuilder\Schema\Blueprint;
-use Hibla\PdoQueryBuilder\Schema\Migration;
+use Hibla\QueryBuilder\Schema\Blueprint;
+use Hibla\QueryBuilder\Schema\Migration;
 use Hibla\Promise\Interfaces\PromiseInterface;
 
 use function Hibla\async;

@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace Hibla\PdoQueryBuilder\Schema;
+namespace Hibla\QueryBuilder\Schema;
 
 use Carbon\Carbon;
 use Doctrine\Inflector\Inflector as DoctrineInflector;

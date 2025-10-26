@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace Hibla\PdoQueryBuilder\Console\Traits;
+namespace Hibla\QueryBuilder\Console\Traits;
 
 trait FindProjectRoot
 {

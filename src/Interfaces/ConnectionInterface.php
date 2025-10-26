@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace Hibla\PdoQueryBuilder\Interfaces;
+namespace Hibla\QueryBuilder\Interfaces;
 
 use Hibla\Promise\Interfaces\PromiseInterface;
 
