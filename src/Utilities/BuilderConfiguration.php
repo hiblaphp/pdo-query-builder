@@ -52,7 +52,7 @@ class BuilderConfiguration
         }
 
         try {
-            $dbConfig = Config::get('pdo-query-builder');
+            $dbConfig = Config::get('async-database');
 
             if (! is_array($dbConfig)) {
                 return;
@@ -91,7 +91,7 @@ class BuilderConfiguration
      */
     private static function getDriverFromConfig(): ?string
     {
-        $dbConfig = Config::get('pdo-query-builder');
+        $dbConfig = Config::get('async-database');
 
         if (! is_array($dbConfig)) {
             return null;

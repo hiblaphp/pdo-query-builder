@@ -44,7 +44,7 @@ trait ValidateConnection
     private function getAvailableConnections(): array
     {
         try {
-            $dbConfig = Config::get('pdo-query-builder');
+            $dbConfig = Config::get('async-database');
 
             if (! is_array($dbConfig)) {
                 return [];
