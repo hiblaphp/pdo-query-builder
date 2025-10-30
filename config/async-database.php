@@ -71,6 +71,7 @@ return [
             'password' => env('DB_PASSWORD', ''),
             'charset' => 'utf8mb4',
             'pool_size' => env('DB_POOL_SIZE', 10, true),
+            'persistent' => true,
             'options' => [
                 MYSQLI_OPT_INT_AND_FLOAT_NATIVE => true,
             ]
@@ -101,6 +102,7 @@ return [
             'username' => env('DB_USERNAME', 'postgres'),
             'password' => env('DB_PASSWORD', ''),
             'pool_size' => env('DB_POOL_SIZE', 10, true),
+            'persistent' => true,
         ],
 
         'sqlsrv' => [
