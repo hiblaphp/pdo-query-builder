@@ -15,7 +15,7 @@ use Hibla\QueryBuilder\Console\MigrateFreshCommand;
 use Hibla\QueryBuilder\Console\MigrateStatusCommand;
 use Hibla\QueryBuilder\Console\StatusCommand;
 
-$application = new Application('Async PDO Query Builder', '1.0.0');
+$application = new Application('Hibla Query Builder', '1.0.0');
 
 // Register all commands
 $application->add(new InitCommand());
