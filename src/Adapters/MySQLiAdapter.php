@@ -17,6 +17,10 @@ use function Hibla\await;
  * 
  * This adapter wraps AsyncMySQLConnection to implement the ConnectionInterface,
  * allowing native MySQL connections to work with the query builder.
+ * 
+ * Note: This adapter returns all values as strings to preserve data integrity
+ * (leading zeros, precision, etc.). Use NumericConverter utility class if you
+ * need to convert specific values to native PHP types.
  */
 class MySQLiAdapter implements ConnectionInterface
 {
@@ -34,11 +38,22 @@ class MySQLiAdapter implements ConnectionInterface
     }
 
     /**
+     * Convert bindings to positional array.
+     *
+     * @param array<int|string, mixed> $bindings
+     * @return array<int, mixed>
+     */
+    private function normalizeBindings(array $bindings): array
+    {
+        return array_values($bindings);
+    }
+
+    /**
      * {@inheritDoc}
      */
     public function query(string $sql, array $bindings = []): PromiseInterface
     {
-        return $this->connection->query($sql, $bindings);
+        return $this->connection->query($sql, $this->normalizeBindings($bindings));
     }
 
     /**
@@ -47,7 +62,7 @@ class MySQLiAdapter implements ConnectionInterface
     public function fetchOne(string $sql, array $bindings = []): PromiseInterface
     {
         return async(function () use ($sql, $bindings) {
-            $result = await($this->connection->fetchOne($sql, $bindings));
+            $result = await($this->connection->fetchOne($sql, $this->normalizeBindings($bindings)));
             return $result === null ? false : $result;
         });
     }
@@ -57,7 +72,7 @@ class MySQLiAdapter implements ConnectionInterface
      */
     public function fetchValue(string $sql, array $bindings = []): PromiseInterface
     {
-        return $this->connection->fetchValue($sql, $bindings);
+        return $this->connection->fetchValue($sql, $this->normalizeBindings($bindings));
     }
 
     /**
@@ -65,7 +80,7 @@ class MySQLiAdapter implements ConnectionInterface
      */
     public function execute(string $sql, array $bindings = []): PromiseInterface
     {
-        return $this->connection->execute($sql, $bindings);
+        return $this->connection->execute($sql, $this->normalizeBindings($bindings));
     }
 
     /**
