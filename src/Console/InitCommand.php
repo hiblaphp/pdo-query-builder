@@ -74,8 +74,8 @@ class InitCommand extends Command
     private function copyConfigFiles(string $configDir): int
     {
         $files = [
-            'pdo-query-builder.php' => $this->getSourceConfigPath('pdo-query-builder.php'),
-            'pdo-schema.php' => $this->getSourceConfigPath('pdo-schema.php'),
+            'async-database.php' => $this->getSourceConfigPath('async-database.php'),
+            'async-migrations.php' => $this->getSourceConfigPath('async-migrations.php'),
         ];
 
         $copiedFiles = [];
@@ -130,10 +130,10 @@ class InitCommand extends Command
 
     private function createAsyncPdoExecutable(): void
     {
-        $asyncPdoPath = $this->projectRoot . '/async-pdo';
+        $asyncPdoPath = $this->projectRoot . '/db';
 
         if (file_exists($asyncPdoPath) && ! $this->force) {
-            $this->io->warning('async-pdo file already exists. Use --force to overwrite.');
+            $this->io->warning('db file already exists. Use --force to overwrite.');
 
             return;
         }
@@ -141,7 +141,7 @@ class InitCommand extends Command
         $stub = $this->getAsyncPdoStub();
 
         if (file_put_contents($asyncPdoPath, $stub) === false) {
-            $this->io->error('Failed to create async-pdo file');
+            $this->io->error('Failed to create db file');
 
             return;
         }
@@ -150,15 +150,15 @@ class InitCommand extends Command
             chmod($asyncPdoPath, 0755);
         }
 
-        $this->io->success('✓ Created async-pdo executable');
+        $this->io->success('✓ Created db executable');
         $this->io->section('Usage:');
         $this->io->listing([
-            'php async-pdo init',
-            'php async-pdo publish:templates',
-            'php async-pdo migrate',
-            'php async-pdo make:migration create_users_table',
-            'php async-pdo migrate:rollback',
-            'php async-pdo migrate:status',
+            'php db init',
+            'php db publish:templates',
+            'php db migrate',
+            'php db make:migration create_users_table',
+            'php db migrate:rollback',
+            'php db migrate:status',
         ]);
     }
 
@@ -182,7 +182,7 @@ use Hibla\QueryBuilder\Console\MigrateFreshCommand;
 use Hibla\QueryBuilder\Console\MigrateStatusCommand;
 use Hibla\QueryBuilder\Console\StatusCommand;
 
-$application = new Application('Async PDO Query Builder', '1.0.0');
+$application = new Application('Hibla Query Builder', '1.0.0');
 
 $application->add(new InitCommand());
 $application->add(new PublishTemplatesCommand());

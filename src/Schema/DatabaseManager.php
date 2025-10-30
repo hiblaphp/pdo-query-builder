@@ -4,8 +4,9 @@ declare(strict_types=1);
 
 namespace Hibla\QueryBuilder\Schema;
 
-use PDO;
+use Hibla\QueryBuilder\DB;
 use Rcalicdan\ConfigLoader\Config;
+use function Hibla\await;
 
 /**
  * @phpstan-type TConnectionConfig array{
@@ -24,6 +25,7 @@ class DatabaseManager
     private string $driver;
     /** @var TConnectionConfig */
     private array $config;
+    private ?string $connectionName;
 
     public function __construct(?string $connection = null)
     {
@@ -51,6 +53,7 @@ class DatabaseManager
         /** @var TConnectionConfig $config */
         $this->config = $config;
         $this->driver = strtolower($this->config['driver'] ?? 'mysql');
+        $this->connectionName = $connectionName;
     }
 
     /**
@@ -68,8 +71,8 @@ class DatabaseManager
 
         try {
             return match ($this->driver) {
-                'mysql' => $this->createMySQLDatabase($database),
-                'pgsql' => $this->createPostgreSQLDatabase($database),
+                'mysql', 'mysqli' => $this->createMySQLDatabase($database),
+                'pgsql', 'pgsql_native' => $this->createPostgreSQLDatabase($database),
                 'sqlite' => $this->createSQLiteDatabase($database),
                 'sqlsrv' => $this->createSQLServerDatabase($database),
                 default => throw new \RuntimeException("Unsupported driver: {$this->driver}"),
@@ -85,52 +88,44 @@ class DatabaseManager
 
     private function createMySQLDatabase(string $database): bool
     {
-        $dsn = sprintf(
-            'mysql:host=%s;port=%s;charset=%s',
-            $this->config['host'] ?? '127.0.0.1',
-            $this->config['port'] ?? 3306,
-            $this->config['charset'] ?? 'utf8mb4'
-        );
+        $tempConfig = array_merge($this->config, ['database' => 'mysql']);
+        $tempConnectionName = '_temp_' . uniqid();
+        
+        DB::addConnection($tempConnectionName, $tempConfig);
 
-        $pdo = new PDO(
-            $dsn,
-            $this->config['username'] ?? 'root',
-            $this->config['password'] ?? '',
-            [PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION]
-        );
+        try {
+            $charset = $this->config['charset'] ?? 'utf8mb4';
+            $collation = $this->config['collation'] ?? 'utf8mb4_unicode_ci';
 
-        $charset = $this->config['charset'] ?? 'utf8mb4';
-        $collation = $this->config['collation'] ?? 'utf8mb4_unicode_ci';
+            $sql = "CREATE DATABASE IF NOT EXISTS `{$database}` CHARACTER SET {$charset} COLLATE {$collation}";
+            await(DB::connection($tempConnectionName)->rawExecute($sql, []));
 
-        $pdo->exec("CREATE DATABASE IF NOT EXISTS `{$database}` CHARACTER SET {$charset} COLLATE {$collation}");
-
-        return true;
+            return true;
+        } finally {
+            DB::removeConnection($tempConnectionName);
+        }
     }
 
     private function createPostgreSQLDatabase(string $database): bool
     {
-        $dsn = sprintf(
-            'pgsql:host=%s;port=%s;dbname=postgres',
-            $this->config['host'] ?? '127.0.0.1',
-            $this->config['port'] ?? 5432
-        );
+        $tempConfig = array_merge($this->config, ['database' => 'postgres']);
+        $tempConnectionName = '_temp_' . uniqid();
+        
+        DB::addConnection($tempConnectionName, $tempConfig);
 
-        $pdo = new PDO(
-            $dsn,
-            $this->config['username'] ?? 'postgres',
-            $this->config['password'] ?? '',
-            [PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION]
-        );
+        try {
+            $checkSql = 'SELECT 1 FROM pg_database WHERE datname = $1';
+            $exists = await(DB::connection($tempConnectionName)->rawValue($checkSql, [$database]));
 
-        $stmt = $pdo->prepare('SELECT 1 FROM pg_database WHERE datname = ?');
-        $stmt->execute([$database]);
-        $exists = $stmt->fetchColumn();
+            if (!$exists) {
+                $sql = "CREATE DATABASE \"{$database}\"";
+                await(DB::connection($tempConnectionName)->rawExecute($sql, []));
+            }
 
-        if ($exists === false) {
-            $pdo->exec("CREATE DATABASE \"{$database}\"");
+            return true;
+        } finally {
+            DB::removeConnection($tempConnectionName);
         }
-
-        return true;
     }
 
     private function createSQLiteDatabase(string $database): bool
@@ -154,28 +149,24 @@ class DatabaseManager
 
     private function createSQLServerDatabase(string $database): bool
     {
-        $dsn = sprintf(
-            'sqlsrv:Server=%s,%s',
-            $this->config['host'] ?? '127.0.0.1',
-            (string) ($this->config['port'] ?? 1433)
-        );
+        $tempConfig = array_merge($this->config, ['database' => 'master']);
+        $tempConnectionName = '_temp_' . uniqid();
+        
+        DB::addConnection($tempConnectionName, $tempConfig);
 
-        $pdo = new PDO(
-            $dsn,
-            $this->config['username'] ?? 'sa',
-            $this->config['password'] ?? '',
-            [PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION]
-        );
+        try {
+            $checkSql = 'SELECT database_id FROM sys.databases WHERE name = ?';
+            $exists = await(DB::connection($tempConnectionName)->rawValue($checkSql, [$database]));
 
-        $stmt = $pdo->prepare('SELECT database_id FROM sys.databases WHERE name = ?');
-        $stmt->execute([$database]);
-        $exists = $stmt->fetchColumn();
+            if (!$exists) {
+                $sql = "CREATE DATABASE [{$database}]";
+                await(DB::connection($tempConnectionName)->rawExecute($sql, []));
+            }
 
-        if ($exists === false) {
-            $pdo->exec("CREATE DATABASE [{$database}]");
+            return true;
+        } finally {
+            DB::removeConnection($tempConnectionName);
         }
-
-        return true;
     }
 
     /**
@@ -191,8 +182,8 @@ class DatabaseManager
 
         try {
             return match ($this->driver) {
-                'mysql' => $this->checkMySQLDatabase($database),
-                'pgsql' => $this->checkPostgreSQLDatabase($database),
+                'mysql', 'mysqli' => $this->checkMySQLDatabase($database),
+                'pgsql', 'pgsql_native' => $this->checkPostgreSQLDatabase($database),
                 'sqlite' => $this->checkSQLiteDatabase($database),
                 'sqlsrv' => $this->checkSQLServerDatabase($database),
                 default => false,
@@ -204,44 +195,36 @@ class DatabaseManager
 
     private function checkMySQLDatabase(string $database): bool
     {
-        $dsn = sprintf(
-            'mysql:host=%s;port=%s',
-            $this->config['host'] ?? '127.0.0.1',
-            $this->config['port'] ?? 3306
-        );
+        $tempConfig = array_merge($this->config, ['database' => 'mysql']);
+        $tempConnectionName = '_temp_' . uniqid();
+        
+        DB::addConnection($tempConnectionName, $tempConfig);
 
-        $pdo = new PDO(
-            $dsn,
-            $this->config['username'] ?? 'root',
-            $this->config['password'] ?? '',
-            [PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION]
-        );
+        try {
+            $sql = 'SELECT SCHEMA_NAME FROM INFORMATION_SCHEMA.SCHEMATA WHERE SCHEMA_NAME = ?';
+            $result = await(DB::connection($tempConnectionName)->rawValue($sql, [$database]));
 
-        $stmt = $pdo->prepare('SELECT SCHEMA_NAME FROM INFORMATION_SCHEMA.SCHEMATA WHERE SCHEMA_NAME = ?');
-        $stmt->execute([$database]);
-
-        return (bool) $stmt->fetchColumn();
+            return (bool) $result;
+        } finally {
+            DB::removeConnection($tempConnectionName);
+        }
     }
 
     private function checkPostgreSQLDatabase(string $database): bool
     {
-        $dsn = sprintf(
-            'pgsql:host=%s;port=%s;dbname=postgres',
-            $this->config['host'] ?? '127.0.0.1',
-            $this->config['port'] ?? 5432
-        );
+        $tempConfig = array_merge($this->config, ['database' => 'postgres']);
+        $tempConnectionName = '_temp_' . uniqid();
+        
+        DB::addConnection($tempConnectionName, $tempConfig);
 
-        $pdo = new PDO(
-            $dsn,
-            $this->config['username'] ?? 'postgres',
-            $this->config['password'] ?? '',
-            [PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION]
-        );
+        try {
+            $sql = 'SELECT 1 FROM pg_database WHERE datname = $1';
+            $result = await(DB::connection($tempConnectionName)->rawValue($sql, [$database]));
 
-        $stmt = $pdo->prepare('SELECT 1 FROM pg_database WHERE datname = ?');
-        $stmt->execute([$database]);
-
-        return (bool) $stmt->fetchColumn();
+            return (bool) $result;
+        } finally {
+            DB::removeConnection($tempConnectionName);
+        }
     }
 
     private function checkSQLiteDatabase(string $database): bool
@@ -251,22 +234,34 @@ class DatabaseManager
 
     private function checkSQLServerDatabase(string $database): bool
     {
-        $dsn = sprintf(
-            'sqlsrv:Server=%s,%s',
-            $this->config['host'] ?? '127.0.0.1',
-            (string) ($this->config['port'] ?? 1433)
-        );
+        $tempConfig = array_merge($this->config, ['database' => 'master']);
+        $tempConnectionName = '_temp_' . uniqid();
+        
+        DB::addConnection($tempConnectionName, $tempConfig);
 
-        $pdo = new PDO(
-            $dsn,
-            $this->config['username'] ?? 'sa',
-            $this->config['password'] ?? '',
-            [PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION]
-        );
+        try {
+            $sql = 'SELECT database_id FROM sys.databases WHERE name = ?';
+            $result = await(DB::connection($tempConnectionName)->rawValue($sql, [$database]));
 
-        $stmt = $pdo->prepare('SELECT database_id FROM sys.databases WHERE name = ?');
-        $stmt->execute([$database]);
+            return (bool) $result;
+        } finally {
+            DB::removeConnection($tempConnectionName);
+        }
+    }
 
-        return (bool) $stmt->fetchColumn();
+    /**
+     * Get the current driver name.
+     */
+    public function getDriver(): string
+    {
+        return $this->driver;
+    }
+
+    /**
+     * Get the connection name.
+     */
+    public function getConnectionName(): ?string
+    {
+        return $this->connectionName;
     }
 }

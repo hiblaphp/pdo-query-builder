@@ -346,17 +346,33 @@ trait LoadsSchemaConfiguration
     /**
      * Ensure a directory exists, creating it if necessary.
      */
-    private function ensureDirectoryExists(string $directory): bool
+    private function ensureDirectoryExists(string $path): bool
     {
-        if (is_dir($directory)) {
+        $path = str_replace(['/', '\\'], DIRECTORY_SEPARATOR, $path);
+
+        if (is_dir($path)) {
             return true;
         }
 
-        try {
-            return mkdir($directory, 0755, true);
-        } catch (\Throwable $e) {
+        $result = @mkdir($path, 0755, true);
+
+        if ($result === false) {
+            $error = error_get_last();
+            $this->io->error("Failed to create directory: {$path}");
+
+            if ($error !== null && is_array($error)) {
+                $this->io->error("Error: " . ($error['message'] ?? 'Unknown error'));
+            }
+
+            $parentDir = dirname($path);
+            $this->io->note("Parent directory: {$parentDir}");
+            $this->io->note("Parent directory exists: " . (is_dir($parentDir) ? 'Yes' : 'No'));
+            $this->io->note("Parent directory writable: " . (is_writable($parentDir) ? 'Yes' : 'No'));
+
             return false;
         }
+
+        return true;
     }
 
     /**
