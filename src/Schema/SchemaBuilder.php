@@ -8,6 +8,8 @@ use function Hibla\async;
 use function Hibla\await;
 
 use Hibla\Promise\Interfaces\PromiseInterface;
+use Hibla\QueryBuilder\ConnectionProxy;
+use Hibla\QueryBuilder\DB;
 use Rcalicdan\ConfigLoader\Config;
 
 class SchemaBuilder
@@ -61,9 +63,9 @@ class SchemaBuilder
     /**
      * Get the database connection to use.
      */
-    private function getConnection(): \Hibla\QueryBuilder\ConnectionProxy
+    private function getConnection(): ConnectionProxy
     {
-        return \Hibla\QueryBuilder\DB::connection($this->connection);
+        return DB::connection($this->connection);
     }
 
     /**

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Hibla\QueryBuilder\Schema\Compilers\Utilities;
 
+use Hibla\QueryBuilder\Exceptions\SchemaCompilerException;
 use Hibla\QueryBuilder\Schema\Column;
 
 /**
@@ -14,7 +15,7 @@ class SQLiteTypeMapper extends ColumnTypeMapper
     public function mapType(string $type, Column $column): string
     {
         if ($type === 'VECTOR') {
-            throw new \RuntimeException(
+            throw new SchemaCompilerException(
                 'Vector columns are only supported in PostgreSQL. ' .
                     'Please use PostgreSQL with the pgvector extension for vector database functionality.'
             );

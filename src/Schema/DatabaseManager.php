@@ -7,6 +7,7 @@ namespace Hibla\QueryBuilder\Schema;
 use function Hibla\await;
 
 use Hibla\QueryBuilder\DB;
+use Hibla\QueryBuilder\Exceptions\SchemaMigrationException;
 use Rcalicdan\ConfigLoader\Config;
 
 /**
@@ -33,22 +34,22 @@ class DatabaseManager
         $dbConfig = Config::get('async-database');
 
         if (! is_array($dbConfig)) {
-            throw new \RuntimeException('Invalid database configuration format');
+            throw new SchemaMigrationException('Invalid database configuration format');
         }
 
         $connectionName = $connection ?? ($dbConfig['default'] ?? 'mysql');
         if (! is_string($connectionName)) {
-            throw new \RuntimeException('Connection name must be a string');
+            throw new SchemaMigrationException('Connection name must be a string');
         }
 
         $connections = $dbConfig['connections'] ?? [];
         if (! is_array($connections)) {
-            throw new \RuntimeException('Connections configuration must be an array');
+            throw new SchemaMigrationException('Connections configuration must be an array');
         }
 
         $config = $connections[$connectionName] ?? [];
         if (! is_array($config)) {
-            throw new \RuntimeException("Configuration for '{$connectionName}' connection is invalid");
+            throw new SchemaMigrationException("Configuration for '{$connectionName}' connection is invalid");
         }
 
         /** @var TConnectionConfig $config */
@@ -67,7 +68,7 @@ class DatabaseManager
         $database = $this->config['database'] ?? null;
 
         if (! is_string($database) || $database === '') {
-            throw new \RuntimeException('Database name not specified or invalid in configuration');
+            throw new SchemaMigrationException('Database name not specified or invalid in configuration');
         }
 
         try {
@@ -76,10 +77,10 @@ class DatabaseManager
                 'pgsql', 'pgsql_native' => $this->createPostgreSQLDatabase($database),
                 'sqlite' => $this->createSQLiteDatabase($database),
                 'sqlsrv' => $this->createSQLServerDatabase($database),
-                default => throw new \RuntimeException("Unsupported driver: {$this->driver}"),
+                default => throw new SchemaMigrationException("Unsupported driver: {$this->driver}"),
             };
         } catch (\Throwable $e) {
-            throw new \RuntimeException(
+            throw new SchemaMigrationException(
                 "Failed to create database '{$database}': " . $e->getMessage(),
                 0,
                 $e
@@ -138,7 +139,7 @@ class DatabaseManager
         $directory = dirname($database);
 
         if (! is_dir($directory) && mkdir($directory, 0755, true) === false) {
-            throw new \RuntimeException("Failed to create directory: {$directory}");
+            throw new SchemaMigrationException("Failed to create directory: {$directory}");
         }
 
         if (! file_exists($database)) {

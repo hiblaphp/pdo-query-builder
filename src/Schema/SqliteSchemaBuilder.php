@@ -9,6 +9,7 @@ use function Hibla\async;
 use function Hibla\await;
 
 use Hibla\Promise\Interfaces\PromiseInterface;
+use Hibla\QueryBuilder\DB;
 
 class SQLiteSchemaBuilder
 {
@@ -29,9 +30,9 @@ class SQLiteSchemaBuilder
     {
         /** @phpstan-ignore-next-line */
         return async(function () use ($sql) {
-            await(\Hibla\QueryBuilder\DB::rawExecute('PRAGMA foreign_keys = ON', []));
+            await(DB::rawExecute('PRAGMA foreign_keys = ON', []));
 
-            return await(\Hibla\QueryBuilder\DB::rawExecute($sql, []));
+            return await(DB::rawExecute($sql, []));
         });
     }
 
@@ -105,13 +106,13 @@ class SQLiteSchemaBuilder
     {
         /** @phpstan-ignore-next-line */
         return async(function () use ($table, $blueprint) {
-            $existingColumns = await(\Hibla\QueryBuilder\DB::raw("PRAGMA table_info(`{$table}`)", []));
+            $existingColumns = await(DB::raw("PRAGMA table_info(`{$table}`)", []));
 
             if (method_exists($this->compiler, 'setExistingTableColumns')) {
                 $this->compiler->setExistingTableColumns($existingColumns);
             }
 
-            await(\Hibla\QueryBuilder\DB::rawExecute('PRAGMA foreign_keys = ON', []));
+            await(DB::rawExecute('PRAGMA foreign_keys = ON', []));
 
             $sql = $this->compiler->compileAlter($blueprint);
 
@@ -119,7 +120,7 @@ class SQLiteSchemaBuilder
                 return $this->executeStatements($sql);
             }
 
-            return await(\Hibla\QueryBuilder\DB::rawExecute($sql, []));
+            return await(DB::rawExecute($sql, []));
         });
     }
 
@@ -134,13 +135,13 @@ class SQLiteSchemaBuilder
     {
         /** @phpstan-ignore-next-line */
         return async(function () use ($table, $blueprint) {
-            $existingColumns = await(\Hibla\QueryBuilder\DB::raw("PRAGMA table_info(`{$table}`)", []));
+            $existingColumns = await(DB::raw("PRAGMA table_info(`{$table}`)", []));
 
             if (method_exists($this->compiler, 'setExistingTableColumns')) {
                 $this->compiler->setExistingTableColumns($existingColumns);
             }
 
-            await(\Hibla\QueryBuilder\DB::rawExecute('PRAGMA foreign_keys = ON', []));
+            await(DB::rawExecute('PRAGMA foreign_keys = ON', []));
 
             $sql = $this->compiler->compileAlter($blueprint);
 
@@ -148,7 +149,7 @@ class SQLiteSchemaBuilder
                 return count($sql) === 0 ? true : $this->executeStatements($sql);
             }
 
-            return await(\Hibla\QueryBuilder\DB::rawExecute($sql, []));
+            return await(DB::rawExecute($sql, []));
         });
     }
 
@@ -168,7 +169,7 @@ class SQLiteSchemaBuilder
                 return count($sql) === 0 ? true : $this->executeMultiple($sql);
             }
 
-            return await(\Hibla\QueryBuilder\DB::rawExecute($sql, []));
+            return await(DB::rawExecute($sql, []));
         });
     }
 
@@ -183,13 +184,13 @@ class SQLiteSchemaBuilder
         return async(function () use ($statements) {
             try {
                 foreach ($statements as $statement) {
-                    await(\Hibla\QueryBuilder\DB::rawExecute($statement, []));
+                    await(DB::rawExecute($statement, []));
                 }
 
                 return true;
             } catch (\Throwable $e) {
                 try {
-                    await(\Hibla\QueryBuilder\DB::rawExecute('ROLLBACK', []));
+                    await(DB::rawExecute('ROLLBACK', []));
                 } catch (\Throwable $rollbackError) {
                 }
 
@@ -209,7 +210,7 @@ class SQLiteSchemaBuilder
         return async(function () use ($statements) {
             $results = [];
             foreach ($statements as $sql) {
-                $results[] = await(\Hibla\QueryBuilder\DB::rawExecute($sql, []));
+                $results[] = await(DB::rawExecute($sql, []));
             }
 
             return $results;

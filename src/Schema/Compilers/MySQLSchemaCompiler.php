@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Hibla\QueryBuilder\Schema\Compilers;
 
+use Hibla\QueryBuilder\Exceptions\SchemaCompilerException;
 use Hibla\QueryBuilder\Schema\Blueprint;
 use Hibla\QueryBuilder\Schema\Column;
 use Hibla\QueryBuilder\Schema\Compilers\Utilities\MySQLDefaultValueCompiler;
@@ -67,7 +68,7 @@ class MySQLSchemaCompiler implements SchemaCompiler
             $major = (int) $matches[1];
 
             if ($major < 8) {
-                throw new \RuntimeException(
+                throw new SchemaCompilerException(
                     "MySQL version {$version} is not supported. " .
                         'This library requires MySQL ' . self::MINIMUM_VERSION . ' or higher. ' .
                         'Please upgrade your MySQL server.'
