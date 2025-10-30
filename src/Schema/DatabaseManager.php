@@ -26,7 +26,7 @@ class DatabaseManager
     private string $driver;
     /** @var TConnectionConfig */
     private array $config;
-    private ?string $connectionName;
+    private string $connectionName; // Changed: Removed nullable type
 
     public function __construct(?string $connection = null)
     {
@@ -118,7 +118,7 @@ class DatabaseManager
             $checkSql = 'SELECT 1 FROM pg_database WHERE datname = $1';
             $exists = await(DB::connection($tempConnectionName)->rawValue($checkSql, [$database]));
 
-            if (! $exists) {
+            if ($exists === false) {
                 $sql = "CREATE DATABASE \"{$database}\"";
                 await(DB::connection($tempConnectionName)->rawExecute($sql, []));
             }
@@ -137,7 +137,7 @@ class DatabaseManager
 
         $directory = dirname($database);
 
-        if (! is_dir($directory) && ! mkdir($directory, 0755, true)) {
+        if (! is_dir($directory) && mkdir($directory, 0755, true) === false) {
             throw new \RuntimeException("Failed to create directory: {$directory}");
         }
 
@@ -159,7 +159,7 @@ class DatabaseManager
             $checkSql = 'SELECT database_id FROM sys.databases WHERE name = ?';
             $exists = await(DB::connection($tempConnectionName)->rawValue($checkSql, [$database]));
 
-            if (! $exists) {
+            if ($exists === false) {
                 $sql = "CREATE DATABASE [{$database}]";
                 await(DB::connection($tempConnectionName)->rawExecute($sql, []));
             }
@@ -261,7 +261,7 @@ class DatabaseManager
     /**
      * Get the connection name.
      */
-    public function getConnectionName(): ?string
+    public function getConnectionName(): string 
     {
         return $this->connectionName;
     }

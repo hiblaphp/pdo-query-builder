@@ -10,7 +10,7 @@ use Doctrine\Inflector\InflectorFactory;
 use Rcalicdan\ConfigLoader\Config;
 
 /**
- * @phpstan-type TColumnIndex array{type: 'UNIQUE'|'INDEX'|'FULLTEXT'|'SPATIAL', name: string|null, algorithm: string|null, operatorClass?: string|null}
+ * @phpstan-type TColumnIndex array{type: 'UNIQUE'|'INDEX'|'FULLTEXT'|'SPATIAL'|'VECTOR', name: string|null, algorithm: string|null, operatorClass?: string|null}
  * @phpstan-type TColumnArray array{
  *     name: string,
  *     type: string,

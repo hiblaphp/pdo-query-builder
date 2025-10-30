@@ -360,8 +360,8 @@ trait LoadsSchemaConfiguration
             $error = error_get_last();
             $this->io->error("Failed to create directory: {$path}");
 
-            if ($error !== null && is_array($error)) {
-                $this->io->error('Error: ' . ($error['message'] ?? 'Unknown error'));
+            if ($error !== null) {
+                $this->io->error('Error: ' . $error['message']);
             }
 
             $parentDir = dirname($path);
