@@ -33,6 +33,7 @@ class PostgreSQLTypeMapper extends ColumnTypeMapper
             'LINESTRING' => 'GEOMETRY(LINESTRING)',
             'POLYGON' => 'GEOMETRY(POLYGON)',
             'GEOMETRY' => 'GEOMETRY',
+            'VECTOR' => $column->getLength() !== null ? "vector({$column->getLength()})" : 'vector',
             default => $type,
         };
     }

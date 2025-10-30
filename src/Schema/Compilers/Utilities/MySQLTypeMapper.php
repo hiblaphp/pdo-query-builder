@@ -36,6 +36,13 @@ class MySQLTypeMapper extends ColumnTypeMapper
 
     public function mapType(string $type, Column $column): string
     {
+        if ($type === 'VECTOR') {
+            throw new \RuntimeException(
+                'Vector columns are only supported in PostgreSQL. ' .
+                    'Please use PostgreSQL with the pgvector extension for vector database functionality.'
+            );
+        }
+
         return match (true) {
             $type === 'ENUM' => 'ENUM',
             in_array($type, ['DECIMAL', 'FLOAT', 'DOUBLE'], true) => $this->formatPrecisionScale($type, $column),

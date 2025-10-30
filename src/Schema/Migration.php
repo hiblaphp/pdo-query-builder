@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace Hibla\QueryBuilder\Schema;
 
 use Hibla\Promise\Interfaces\PromiseInterface;
+use Hibla\QueryBuilder\DB;
+use Hibla\QueryBuilder\Utilities\Builder;
 
 /**
  * Base migration class that provides helper methods and configuration for migrations.
@@ -200,7 +202,7 @@ abstract class Migration
      */
     protected function raw(string $sql, array $bindings = []): PromiseInterface
     {
-        return \Hibla\QueryBuilder\DB::connection($this->connection)->raw($sql, $bindings);
+        return DB::connection($this->connection)->raw($sql, $bindings);
     }
 
     /**
@@ -211,16 +213,16 @@ abstract class Migration
      */
     protected function rawExecute(string $sql, array $bindings = []): PromiseInterface
     {
-        return \Hibla\QueryBuilder\DB::connection($this->connection)->rawExecute($sql, $bindings);
+        return DB::connection($this->connection)->rawExecute($sql, $bindings);
     }
 
     /**
      * Get a query builder for a table.
      *
-     * @return \Hibla\QueryBuilder\Utilities\Builder
+     * @return Builder
      */
-    protected function db(string $table): \Hibla\QueryBuilder\Utilities\Builder
+    protected function db(string $table): Builder
     {
-        return \Hibla\QueryBuilder\DB::connection($this->connection)->table($table);
+        return DB::connection($this->connection)->table($table);
     }
 }

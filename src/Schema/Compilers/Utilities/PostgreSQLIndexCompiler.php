@@ -28,10 +28,6 @@ class PostgreSQLIndexCompiler extends IndexCompiler
         };
     }
 
-    /**
-     * Add index to existing table - returns array of statements
-     * @return list<string>
-     */
     public function compileAddIndexDefinition(string $table, IndexDefinition $indexDef): array
     {
         $type = $indexDef->getType();
@@ -47,6 +43,8 @@ class PostgreSQLIndexCompiler extends IndexCompiler
             $statements = array_merge($statements, $this->compileFulltextIndexStatements($table, $indexDef));
         } elseif ($type === 'SPATIAL') {
             $statements = array_merge($statements, $this->compileSpatialIndexStatements($table, $indexDef));
+        } elseif ($type === 'VECTOR') {
+            $statements = array_merge($statements, $this->compileVectorIndexStatements($table, $indexDef));
         } elseif ($type === 'INDEX') {
             $cols = $this->getColumnsList($indexDef);
             $sql = "CREATE INDEX IF NOT EXISTS \"{$indexDef->getName()}\" ON \"{$table}\" (\"{$cols}\")";
@@ -69,7 +67,7 @@ class PostgreSQLIndexCompiler extends IndexCompiler
      */
     protected function compileFulltextIndexStatements(string $table, IndexDefinition $indexDef): array
     {
-        $cols = implode(" || ' ' || ", array_map(fn ($c) => "\"{$c}\"", $indexDef->getColumns()));
+        $cols = implode(" || ' ' || ", array_map(fn($c) => "\"{$c}\"", $indexDef->getColumns()));
         $name = $indexDef->getName();
 
         return ["CREATE INDEX IF NOT EXISTS \"{$name}\" ON \"{$table}\" USING gin(to_tsvector('english', {$cols}))"];
@@ -95,7 +93,7 @@ class PostgreSQLIndexCompiler extends IndexCompiler
         $statements = [];
         $typeMapper = new PostgreSQLTypeMapper();
 
-        $colDef = "\"{$column->getName()}\" ".$typeMapper->mapType($column->getType(), $column);
+        $colDef = "\"{$column->getName()}\" " . $typeMapper->mapType($column->getType(), $column);
         if (! $column->isNullable()) {
             $colDef .= ' NOT NULL';
         }
@@ -149,5 +147,27 @@ class PostgreSQLIndexCompiler extends IndexCompiler
         }
 
         return $statements;
+    }
+
+    /**
+     * Add vector index support
+     * @return list<string>
+     */
+    protected function compileVectorIndexStatements(string $table, IndexDefinition $indexDef): array
+    {
+        $cols = $this->getColumnsList($indexDef);
+        $name = $indexDef->getName();
+
+        $algorithm = $indexDef->getAlgorithm();
+        $ops = match ($algorithm) {
+            'L2', 'EUCLIDEAN' => 'vector_l2_ops',
+            'IP', 'INNER_PRODUCT' => 'vector_ip_ops',
+            'COSINE', null => 'vector_cosine_ops',
+            default => 'vector_cosine_ops',
+        };
+
+        return [
+            "CREATE INDEX IF NOT EXISTS \"{$name}\" ON \"{$table}\" USING ivfflat (\"{$cols}\" {$ops})"
+        ];
     }
 }

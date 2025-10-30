@@ -1041,4 +1041,36 @@ class Blueprint
 
         return $column;
     }
+
+    /**
+     * Create a new vector column (PostgreSQL only).
+     */
+    public function vector(string $name, int $dimensions = 1536): Column
+    {
+        $column = new Column($name, 'VECTOR', $dimensions);
+        $column->setBlueprint($this);
+        $this->columns[] = $column;
+
+        return $column;
+    }
+
+    /**
+     * Specify a vector index for the table (PostgreSQL only).
+     * @param string|list<string> $columns
+     */
+    public function vectorIndex(string|array $columns, ?string $name = null, ?string $distanceMetric = 'COSINE'): IndexDefinition
+    {
+        $columns = is_array($columns) ? $columns : [$columns];
+        $name ??= $this->table . '_' . implode('_', $columns) . '_vector';
+
+        $indexDef = new IndexDefinition('VECTOR', $columns, $name);
+        if ($distanceMetric !== null) {
+            $indexDef->algorithm($distanceMetric);
+        }
+
+        $this->indexes[] = ['type' => 'VECTOR', 'name' => $name, 'columns' => $columns];
+        $this->indexDefinitions[] = $indexDef;
+
+        return $indexDef;
+    }
 }

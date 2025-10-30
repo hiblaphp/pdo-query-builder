@@ -13,6 +13,13 @@ class SQLiteTypeMapper extends ColumnTypeMapper
 {
     public function mapType(string $type, Column $column): string
     {
+        if ($type === 'VECTOR') {
+            throw new \RuntimeException(
+                'Vector columns are only supported in PostgreSQL. ' .
+                    'Please use PostgreSQL with the pgvector extension for vector database functionality.'
+            );
+        }
+
         return match ($type) {
             'BIGINT', 'INT', 'TINYINT', 'SMALLINT', 'MEDIUMINT' => 'INTEGER',
             'VARCHAR' => 'TEXT',

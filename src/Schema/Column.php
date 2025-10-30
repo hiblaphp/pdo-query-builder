@@ -666,6 +666,20 @@ class Column
     }
 
     /**
+     * Add a vector index to the column (PostgreSQL only).
+     */
+    public function vectorIndex(?string $name = null, ?string $distanceMetric = 'COSINE'): self
+    {
+        $this->columnIndexes[] = [
+            'type' => 'VECTOR',
+            'name' => $name,
+            'algorithm' => $distanceMetric,
+        ];
+
+        return $this;
+    }
+
+    /**
      * Create a new column instance with modified attributes.
      * @param array<string, mixed> $modifications
      */
