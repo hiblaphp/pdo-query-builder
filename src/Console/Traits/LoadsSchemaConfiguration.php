@@ -361,13 +361,13 @@ trait LoadsSchemaConfiguration
             $this->io->error("Failed to create directory: {$path}");
 
             if ($error !== null && is_array($error)) {
-                $this->io->error("Error: " . ($error['message'] ?? 'Unknown error'));
+                $this->io->error('Error: ' . ($error['message'] ?? 'Unknown error'));
             }
 
             $parentDir = dirname($path);
             $this->io->note("Parent directory: {$parentDir}");
-            $this->io->note("Parent directory exists: " . (is_dir($parentDir) ? 'Yes' : 'No'));
-            $this->io->note("Parent directory writable: " . (is_writable($parentDir) ? 'Yes' : 'No'));
+            $this->io->note('Parent directory exists: ' . (is_dir($parentDir) ? 'Yes' : 'No'));
+            $this->io->note('Parent directory writable: ' . (is_writable($parentDir) ? 'Yes' : 'No'));
 
             return false;
         }

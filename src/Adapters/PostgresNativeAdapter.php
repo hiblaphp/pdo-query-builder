@@ -4,16 +4,17 @@ declare(strict_types=1);
 
 namespace Hibla\QueryBuilder\Adapters;
 
-use Hibla\Postgres\AsyncPgSQLConnection;
-use Hibla\QueryBuilder\Interfaces\ConnectionInterface;
-use Hibla\Promise\Interfaces\PromiseInterface;
-
 use function Hibla\async;
 use function Hibla\await;
 
+use Hibla\Postgres\AsyncPgSQLConnection;
+
+use Hibla\Promise\Interfaces\PromiseInterface;
+use Hibla\QueryBuilder\Interfaces\ConnectionInterface;
+
 /**
  * PostgreSQL Native Connection Adapter.
- * 
+ *
  * This adapter wraps AsyncPgSQLConnection to implement the ConnectionInterface,
  * allowing native PostgreSQL connections to work with the query builder.
  */
@@ -58,6 +59,7 @@ class PostgresNativeAdapter implements ConnectionInterface
     {
         return async(function () use ($sql, $bindings) {
             $result = await($this->connection->fetchOne($sql, $this->normalizeBindings($bindings)));
+
             return $result === null ? false : $result;
         });
     }

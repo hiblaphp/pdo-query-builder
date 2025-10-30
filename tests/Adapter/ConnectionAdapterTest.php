@@ -1,22 +1,26 @@
 <?php
 
+declare(strict_types=1);
+
 use Hibla\QueryBuilder\Adapters\MySQLiAdapter;
 use Hibla\QueryBuilder\Adapters\PdoAdapter;
 use Hibla\QueryBuilder\Adapters\PostgresNativeAdapter;
 use Hibla\QueryBuilder\DB;
 
-function adapter($adapter = null) {
+function adapter($adapter = null)
+{
     static $instance;
     if ($adapter !== null) {
         $instance = $adapter;
     }
+
     return $instance;
 }
 
 describe('MySQLiAdapter', function () {
     beforeEach(function () {
         DB::reset();
-        
+
         $config = [
             'driver' => 'mysqli',
             'host' => getenv('MYSQL_HOST') ?: '127.0.0.1',
@@ -25,7 +29,7 @@ describe('MySQLiAdapter', function () {
             'username' => getenv('MYSQL_USERNAME') ?: 'test_user',
             'password' => getenv('MYSQL_PASSWORD') ?: 'test_password',
         ];
-        
+
         adapter(new MySQLiAdapter($config, 5));
     });
 
@@ -35,9 +39,10 @@ describe('MySQLiAdapter', function () {
 
     it('can run a simple SELECT query', function () {
         $result = adapter()->query('SELECT 1 as num')->await();
-        
+
         expect($result)->toBeArray()
-            ->and((int) $result[0]['num'])->toBe(1);
+            ->and((int) $result[0]['num'])->toBe(1)
+        ;
     });
 
     it('returns correct driver name', function () {
@@ -48,12 +53,12 @@ describe('MySQLiAdapter', function () {
 describe('PdoAdapter - SQLite', function () {
     beforeEach(function () {
         DB::reset();
-        
+
         $config = [
             'driver' => 'sqlite',
             'database' => ':memory:',
         ];
-        
+
         adapter(new PdoAdapter($config, 5));
     });
 
@@ -63,9 +68,10 @@ describe('PdoAdapter - SQLite', function () {
 
     it('can run a simple SELECT query', function () {
         $result = adapter()->query('SELECT 1 as num')->await();
-        
+
         expect($result)->toBeArray()
-            ->and($result[0]['num'])->toBe(1);
+            ->and($result[0]['num'])->toBe(1)
+        ;
     });
 
     it('returns correct driver name', function () {
@@ -76,7 +82,7 @@ describe('PdoAdapter - SQLite', function () {
 describe('PdoAdapter - MySQL', function () {
     beforeEach(function () {
         DB::reset();
-        
+
         $config = [
             'driver' => 'mysql',
             'host' => getenv('MYSQL_HOST') ?: '127.0.0.1',
@@ -85,7 +91,7 @@ describe('PdoAdapter - MySQL', function () {
             'username' => getenv('MYSQL_USERNAME') ?: 'test_user',
             'password' => getenv('MYSQL_PASSWORD') ?: 'test_password',
         ];
-        
+
         adapter(new PdoAdapter($config, 5));
     });
 
@@ -95,9 +101,10 @@ describe('PdoAdapter - MySQL', function () {
 
     it('can run a simple SELECT query', function () {
         $result = adapter()->query('SELECT 1 as num')->await();
-        
+
         expect($result)->toBeArray()
-            ->and($result[0]['num'])->toBe(1);
+            ->and($result[0]['num'])->toBe(1)
+        ;
     });
 
     it('returns correct driver name', function () {
@@ -108,7 +115,7 @@ describe('PdoAdapter - MySQL', function () {
 describe('PdoAdapter - PostgreSQL', function () {
     beforeEach(function () {
         DB::reset();
-        
+
         $config = [
             'driver' => 'pgsql',
             'host' => getenv('PGSQL_HOST') ?: '127.0.0.1',
@@ -117,7 +124,7 @@ describe('PdoAdapter - PostgreSQL', function () {
             'username' => getenv('PGSQL_USERNAME') ?: 'postgres',
             'password' => getenv('PGSQL_PASSWORD') ?: 'postgres',
         ];
-        
+
         adapter(new PdoAdapter($config, 5));
     });
 
@@ -127,9 +134,10 @@ describe('PdoAdapter - PostgreSQL', function () {
 
     it('can run a simple SELECT query', function () {
         $result = adapter()->query('SELECT 1 as num')->await();
-        
+
         expect($result)->toBeArray()
-            ->and($result[0]['num'])->toBe(1);
+            ->and($result[0]['num'])->toBe(1)
+        ;
     });
 
     it('returns correct driver name', function () {
@@ -140,7 +148,7 @@ describe('PdoAdapter - PostgreSQL', function () {
 describe('PostgresNativeAdapter', function () {
     beforeEach(function () {
         DB::reset();
-        
+
         $config = [
             'driver' => 'pgsql_native',
             'host' => getenv('PGSQL_HOST') ?: '127.0.0.1',
@@ -149,7 +157,7 @@ describe('PostgresNativeAdapter', function () {
             'username' => getenv('PGSQL_USERNAME') ?: 'postgres',
             'password' => getenv('PGSQL_PASSWORD') ?: 'postgres',
         ];
-        
+
         adapter(new PostgresNativeAdapter($config, 5));
     });
 
@@ -159,9 +167,10 @@ describe('PostgresNativeAdapter', function () {
 
     it('can run a simple SELECT query', function () {
         $result = adapter()->query('SELECT 1 as num')->await();
-        
+
         expect($result)->toBeArray()
-            ->and((int) $result[0]['num'])->toBe(1);
+            ->and((int) $result[0]['num'])->toBe(1)
+        ;
     });
 
     it('returns correct driver name', function () {

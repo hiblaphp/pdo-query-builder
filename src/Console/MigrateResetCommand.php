@@ -4,13 +4,13 @@ declare(strict_types=1);
 
 namespace Hibla\QueryBuilder\Console;
 
+use Hibla\Promise\Interfaces\PromiseInterface;
 use Hibla\QueryBuilder\Console\Traits\FindProjectRoot;
 use Hibla\QueryBuilder\Console\Traits\InitializeDatabase;
 use Hibla\QueryBuilder\Console\Traits\LoadsSchemaConfiguration;
 use Hibla\QueryBuilder\Console\Traits\ValidateConnection;
 use Hibla\QueryBuilder\Schema\MigrationRepository;
 use Hibla\QueryBuilder\Schema\SchemaBuilder;
-use Hibla\Promise\Interfaces\PromiseInterface;
 use InvalidArgumentException;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Input\InputInterface;

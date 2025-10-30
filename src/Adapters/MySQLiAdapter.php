@@ -4,20 +4,21 @@ declare(strict_types=1);
 
 namespace Hibla\QueryBuilder\Adapters;
 
-use Hibla\MySQL\AsyncMySQLConnection;
-use Hibla\QueryBuilder\Interfaces\ConnectionInterface;
-use Hibla\Promise\Interfaces\PromiseInterface;
-use mysqli;
-
 use function Hibla\async;
 use function Hibla\await;
 
+use Hibla\MySQL\AsyncMySQLConnection;
+use Hibla\Promise\Interfaces\PromiseInterface;
+
+use Hibla\QueryBuilder\Interfaces\ConnectionInterface;
+use mysqli;
+
 /**
  * MySQL Native Connection Adapter.
- * 
+ *
  * This adapter wraps AsyncMySQLConnection to implement the ConnectionInterface,
  * allowing native MySQL connections to work with the query builder.
- * 
+ *
  * Note: This adapter returns all values as strings to preserve data integrity
  * (leading zeros, precision, etc.). Use NumericConverter utility class if you
  * need to convert specific values to native PHP types.
@@ -63,6 +64,7 @@ class MySQLiAdapter implements ConnectionInterface
     {
         return async(function () use ($sql, $bindings) {
             $result = await($this->connection->fetchOne($sql, $this->normalizeBindings($bindings)));
+
             return $result === null ? false : $result;
         });
     }

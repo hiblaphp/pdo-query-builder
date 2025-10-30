@@ -8,7 +8,7 @@ use Hibla\Promise\Interfaces\PromiseInterface;
 
 /**
  * Interface for database connection adapters.
- * 
+ *
  * This interface defines the contract that all connection adapters must implement,
  * whether they use PDO, native extensions, or other database drivers.
  */

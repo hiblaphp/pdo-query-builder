@@ -314,7 +314,7 @@ class SchemaBuilder
     private function nullPromise(): PromiseInterface
     {
         /** @phpstan-ignore-next-line */
-        return async(static fn() => null);
+        return async(static fn () => null);
     }
 
     /**

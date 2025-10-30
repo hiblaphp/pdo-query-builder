@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 use function Rcalicdan\ConfigLoader\env;
 
 require 'vendor/autoload.php';
@@ -74,7 +76,7 @@ return [
             'persistent' => true,
             'options' => [
                 MYSQLI_OPT_INT_AND_FLOAT_NATIVE => true,
-            ]
+            ],
         ],
 
         'pgsql' => [

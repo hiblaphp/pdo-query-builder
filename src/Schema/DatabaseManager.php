@@ -4,9 +4,10 @@ declare(strict_types=1);
 
 namespace Hibla\QueryBuilder\Schema;
 
+use function Hibla\await;
+
 use Hibla\QueryBuilder\DB;
 use Rcalicdan\ConfigLoader\Config;
-use function Hibla\await;
 
 /**
  * @phpstan-type TConnectionConfig array{
@@ -90,7 +91,7 @@ class DatabaseManager
     {
         $tempConfig = array_merge($this->config, ['database' => 'mysql']);
         $tempConnectionName = '_temp_' . uniqid();
-        
+
         DB::addConnection($tempConnectionName, $tempConfig);
 
         try {
@@ -110,14 +111,14 @@ class DatabaseManager
     {
         $tempConfig = array_merge($this->config, ['database' => 'postgres']);
         $tempConnectionName = '_temp_' . uniqid();
-        
+
         DB::addConnection($tempConnectionName, $tempConfig);
 
         try {
             $checkSql = 'SELECT 1 FROM pg_database WHERE datname = $1';
             $exists = await(DB::connection($tempConnectionName)->rawValue($checkSql, [$database]));
 
-            if (!$exists) {
+            if (! $exists) {
                 $sql = "CREATE DATABASE \"{$database}\"";
                 await(DB::connection($tempConnectionName)->rawExecute($sql, []));
             }
@@ -151,14 +152,14 @@ class DatabaseManager
     {
         $tempConfig = array_merge($this->config, ['database' => 'master']);
         $tempConnectionName = '_temp_' . uniqid();
-        
+
         DB::addConnection($tempConnectionName, $tempConfig);
 
         try {
             $checkSql = 'SELECT database_id FROM sys.databases WHERE name = ?';
             $exists = await(DB::connection($tempConnectionName)->rawValue($checkSql, [$database]));
 
-            if (!$exists) {
+            if (! $exists) {
                 $sql = "CREATE DATABASE [{$database}]";
                 await(DB::connection($tempConnectionName)->rawExecute($sql, []));
             }
@@ -197,7 +198,7 @@ class DatabaseManager
     {
         $tempConfig = array_merge($this->config, ['database' => 'mysql']);
         $tempConnectionName = '_temp_' . uniqid();
-        
+
         DB::addConnection($tempConnectionName, $tempConfig);
 
         try {
@@ -214,7 +215,7 @@ class DatabaseManager
     {
         $tempConfig = array_merge($this->config, ['database' => 'postgres']);
         $tempConnectionName = '_temp_' . uniqid();
-        
+
         DB::addConnection($tempConnectionName, $tempConfig);
 
         try {
@@ -236,7 +237,7 @@ class DatabaseManager
     {
         $tempConfig = array_merge($this->config, ['database' => 'master']);
         $tempConnectionName = '_temp_' . uniqid();
-        
+
         DB::addConnection($tempConnectionName, $tempConfig);
 
         try {

@@ -67,7 +67,7 @@ class PostgreSQLIndexCompiler extends IndexCompiler
      */
     protected function compileFulltextIndexStatements(string $table, IndexDefinition $indexDef): array
     {
-        $cols = implode(" || ' ' || ", array_map(fn($c) => "\"{$c}\"", $indexDef->getColumns()));
+        $cols = implode(" || ' ' || ", array_map(fn ($c) => "\"{$c}\"", $indexDef->getColumns()));
         $name = $indexDef->getName();
 
         return ["CREATE INDEX IF NOT EXISTS \"{$name}\" ON \"{$table}\" USING gin(to_tsvector('english', {$cols}))"];
@@ -167,7 +167,7 @@ class PostgreSQLIndexCompiler extends IndexCompiler
         };
 
         return [
-            "CREATE INDEX IF NOT EXISTS \"{$name}\" ON \"{$table}\" USING ivfflat (\"{$cols}\" {$ops})"
+            "CREATE INDEX IF NOT EXISTS \"{$name}\" ON \"{$table}\" USING ivfflat (\"{$cols}\" {$ops})",
         ];
     }
 }

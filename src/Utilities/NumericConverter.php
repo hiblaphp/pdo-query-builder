@@ -22,7 +22,7 @@ class NumericConverter
         }
 
         $firstRow = reset($results);
-        if ($firstRow === false || !is_array($firstRow)) {
+        if ($firstRow === false || ! is_array($firstRow)) {
             return $results;
         }
 
@@ -47,6 +47,7 @@ class NumericConverter
     {
         $columnKeys ??= array_keys($row);
         self::convertRow($row, $columnKeys);
+
         return $row;
     }
 
@@ -60,7 +61,7 @@ class NumericConverter
     public static function convertValue(mixed $value): mixed
     {
         if (is_string($value) && is_numeric($value)) {
-            return $value + 0; 
+            return $value + 0;
         }
 
         return $value;

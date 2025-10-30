@@ -5,13 +5,13 @@ declare(strict_types=1);
 namespace Hibla\QueryBuilder\Utilities;
 
 use Hibla\AsyncPDO\AsyncPDOConnection;
-use Hibla\QueryBuilder\Adapters\PdoAdapter;
-use Hibla\QueryBuilder\Interfaces\ConnectionInterface;
-use Hibla\QueryBuilder\DB;
-use Hibla\QueryBuilder\Pagination\CursorPaginator;
-use Hibla\QueryBuilder\Pagination\Paginator;
 use Hibla\Promise\Interfaces\PromiseInterface;
 use Hibla\Promise\Promise;
+use Hibla\QueryBuilder\Adapters\PdoAdapter;
+use Hibla\QueryBuilder\DB;
+use Hibla\QueryBuilder\Interfaces\ConnectionInterface;
+use Hibla\QueryBuilder\Pagination\CursorPaginator;
+use Hibla\QueryBuilder\Pagination\Paginator;
 use Rcalicdan\QueryBuilderPrimitives\QueryBuilderBase;
 
 /**
@@ -81,10 +81,10 @@ class Builder extends QueryBuilderBase
 
         if ($this->connection !== null) {
             $this->connectionAdapter = new PdoAdapter(
-                [], 
+                [],
                 10
             );
-          
+
             return $this->connectionAdapter;
         }
 
@@ -101,7 +101,6 @@ class Builder extends QueryBuilderBase
             );
         }
     }
-
 
     /**
      * Reset the driver cache. Useful for testing or when switching connections.
@@ -141,7 +140,7 @@ class Builder extends QueryBuilderBase
      */
     private function convertToObjects(array $results): array
     {
-        return array_map(static fn(array $row): object => (object) $row, $results);
+        return array_map(static fn (array $row): object => (object) $row, $results);
     }
 
     /**

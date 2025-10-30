@@ -4,15 +4,15 @@ declare(strict_types=1);
 
 namespace Hibla\QueryBuilder;
 
+use Hibla\Promise\Interfaces\PromiseInterface;
+use Hibla\QueryBuilder\Adapters\MySQLiAdapter;
 use Hibla\QueryBuilder\Adapters\PdoAdapter;
 use Hibla\QueryBuilder\Adapters\PostgresNativeAdapter;
-use Hibla\QueryBuilder\Interfaces\ConnectionInterface;
 use Hibla\QueryBuilder\Exceptions\DatabaseConfigNotFoundException;
 use Hibla\QueryBuilder\Exceptions\InvalidConnectionConfigException;
 use Hibla\QueryBuilder\Exceptions\InvalidPoolSizeException;
+use Hibla\QueryBuilder\Interfaces\ConnectionInterface;
 use Hibla\QueryBuilder\Utilities\Builder;
-use Hibla\Promise\Interfaces\PromiseInterface;
-use Hibla\QueryBuilder\Adapters\MySQLiAdapter;
 use Rcalicdan\ConfigLoader\Config;
 
 /**
@@ -29,7 +29,9 @@ class DB
     /**
      * Private constructor to prevent direct instantiation.
      */
-    private function __construct() {}
+    private function __construct()
+    {
+    }
 
     /**
      * Get or create a connection proxy.
@@ -67,7 +69,7 @@ class DB
         /** @var array<string, mixed> $connectionConfig */
         $connectionConfig = $connections[$connectionName];
         $driver = $connectionConfig['driver'] ?? 'mysql';
-        if (!is_string($driver)) {
+        if (! is_string($driver)) {
             throw new InvalidConnectionConfigException('Driver must be a string.');
         }
 
@@ -120,7 +122,7 @@ class DB
         }
 
         $driver = $config['driver'] ?? 'mysql';
-        if (!is_string($driver)) {
+        if (! is_string($driver)) {
             throw new InvalidConnectionConfigException('Driver must be a string.');
         }
 
@@ -163,7 +165,7 @@ class DB
             }
 
             $driver = $config['driver'] ?? 'mysql';
-            if (!is_string($driver)) {
+            if (! is_string($driver)) {
                 throw new InvalidConnectionConfigException("Driver for connection '{$name}' must be a string.");
             }
 
@@ -380,7 +382,7 @@ class DB
         }
 
         $driver = $connectionConfig['driver'] ?? 'mysql';
-        if (!is_string($driver)) {
+        if (! is_string($driver)) {
             throw new InvalidConnectionConfigException('Driver must be a string.');
         }
 

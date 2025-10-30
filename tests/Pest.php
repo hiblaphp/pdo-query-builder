@@ -1,8 +1,9 @@
 <?php
 
+declare(strict_types=1);
+
 use Hibla\QueryBuilder\DB;
 use Tests\Helpers\SchemaTestHelper;
-use Tests\Helpers\ConsoleTestHelper;
 
 pest()->extend(Tests\TestCase::class)->in('Feature');
 pest()->extend(Tests\TestCase::class)->in('Stress');

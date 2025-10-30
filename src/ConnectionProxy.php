@@ -4,10 +4,10 @@ declare(strict_types=1);
 
 namespace Hibla\QueryBuilder;
 
+use Hibla\Promise\Interfaces\PromiseInterface;
 use Hibla\QueryBuilder\Interfaces\ConnectionInterface;
 use Hibla\QueryBuilder\Interfaces\ProxyInterface;
 use Hibla\QueryBuilder\Utilities\Builder;
-use Hibla\Promise\Interfaces\PromiseInterface;
 
 /**
  * Connection Proxy - Provides a fluent API for database operations on a specific connection.

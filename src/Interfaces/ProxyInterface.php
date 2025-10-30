@@ -4,12 +4,12 @@ declare(strict_types=1);
 
 namespace Hibla\QueryBuilder\Interfaces;
 
-use Hibla\QueryBuilder\Utilities\Builder;
 use Hibla\Promise\Interfaces\PromiseInterface;
+use Hibla\QueryBuilder\Utilities\Builder;
 
 /**
  * Interface for connection proxy implementations.
- * 
+ *
  * This interface defines the contract for connection proxies that provide
  * a fluent API for database operations.
  */

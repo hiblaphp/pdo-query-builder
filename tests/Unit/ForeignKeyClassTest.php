@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 use Hibla\QueryBuilder\Schema\ForeignKey;
 
 describe('ForeignKey Class', function () {
